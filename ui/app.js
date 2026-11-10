@@ -156,6 +156,38 @@ function initTheme() {
 
 // ── 请求层 ────────────────────────────────────────────────
 
+/**
+ * API 基址：必须是绝对地址。
+ *
+ * 页面跑在 magpie 的 `sandbox="allow-scripts"` iframe 里，安全源是**不透明**
+ * 的（`self.origin === "null"`，localStorage / cookie 都会抛 SecurityError）。
+ * 在这种文档里，`fetch('/api/ping')` 这种相对路径会被 Chrome 直接判
+ * `TypeError: Failed to fetch`——绝对地址却正常。实测对比：
+ *
+ *   相对 path   → TypeError: Failed to fetch
+ *   绝对 URL    → 200
+ *
+ * 所以这里把「当前文档所在目录」算成基址：
+ *   - 直接访问服务（http://127.0.0.1:3517/）        → http://127.0.0.1:3517/
+ *   - 经 magpie web 代理（…/_magpie/service/<tok>/）→ 保留那段前缀
+ * 不能直接用 location.origin：不透明文档里它可能报出真实源，也可能报 "null"，
+ * 两种情况都要能工作，所以从 href 里解析并保留 pathname 的目录部分。
+ */
+const API_BASE = (() => {
+  try {
+    const u = new URL(location.href);
+    const dir = u.pathname.replace(/[^/]*$/, ''); // 去掉文件名，保留目录
+    return u.origin + dir;
+  } catch {
+    return '/';
+  }
+})();
+
+/** apiUrl 把接口路径拼成绝对地址。传进来的 path 以 / 开头。 */
+function apiUrl(path) {
+  return API_BASE.replace(/\/+$/, '') + path;
+}
+
 class ApiError extends Error {
   constructor(message, status, payload) {
     super(message);
@@ -168,7 +200,7 @@ class ApiError extends Error {
 async function request(path, { method = 'GET', body } = {}) {
   let res;
   try {
-    res = await fetch(path, {
+    res = await fetch(apiUrl(path), {
       method,
       credentials: 'omit',       // opaque origin：带凭据必被拒
       cache: 'no-store',         // 服务端已经自己缓存目录，浏览器别再叠一层

@@ -68,8 +68,12 @@
   }
 
   if (service) {
+    // 必须以 `/` 结尾再拼 query。magpie web 给的地址形如
+    // `http://host/_magpie/service/<token>`，少了结尾斜杠时，界面里的
+    // 相对/目录解析会把 token 当成文件名丢掉，接口就全打到别处。
+    const base = service.endsWith('/') ? service : service + '/'
     armTimeout(port)
-    location.replace(service + '?' + q.toString())
+    location.replace(base + '?' + q.toString())
     return
   }
 

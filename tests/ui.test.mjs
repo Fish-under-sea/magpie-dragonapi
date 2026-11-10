@@ -5,14 +5,17 @@
 
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { startService } from '../lib/service.mjs'
 import { createCatalogSource } from '../lib/catalog-source.mjs'
 import { createStatusSource } from '../lib/status-source.mjs'
 import { loadState, saveState, maskKey } from '../lib/store.mjs'
+
+const here = dirname(fileURLToPath(import.meta.url))
 
 let dir
 let svc
@@ -111,11 +114,13 @@ test('界面里没有禁用 API（storage / cookie）', async () => {
   assert.equal(/document\.cookie\s*=/.test(js), false, 'app.js 不得写 cookie')
 })
 
-test('界面用的是相对路径，换端口也不坏', async () => {
+test('API 不写死主机名，换端口/换代理前缀也不坏', async () => {
   const js = await (await fetch(base + '/ui/app.js')).text()
-  // 允许出现站点绝对地址（跳控制台用），但 API 必须是相对路径
-  const apiAbsolute = js.match(/https?:\/\/[^'"`\s]*\/api\//g) || []
-  assert.deepEqual(apiAbsolute, [], `API 不应写绝对地址：${apiAbsolute.join(', ')}`)
+  // 请求虽然必须是绝对地址（不透明源的硬要求），但绝不能把 127.0.0.1 或端口
+  // 写死：换个端口、或经 magpie web 的 _magpie/service/<token>/ 代理时都要能用。
+  // 绝对地址必须由 API_BASE（从 location.href 推导）拼出来。
+  const hardcoded = js.match(/https?:\/\/(?:127\.0\.0\.1|localhost)[^'"`\s]*\/api\//g) || []
+  assert.deepEqual(hardcoded, [], `不该写死本地地址：${hardcoded.join(', ')}`)
 })
 
 test('四个标签页的入口文案都在', async () => {
@@ -203,4 +208,48 @@ test('窄屏不粘表头（避免矮滚动容器里遮内容）', async () => {
   const block = css.match(/@media \(max-width: 720px\)[\s\S]*?\n\}/)
   assert.ok(block, '找不到窄屏媒体查询')
   assert.match(block[0], /position:\s*static/, '窄屏应取消表头 sticky')
+})
+
+// ── 这一组守的是一个真实事故 ──────────────────────────────────────────
+// magpie 的插件页跑在 sandbox="allow-scripts" 的 iframe 里，安全源是不透明的
+// （self.origin === "null"，localStorage/cookie 都抛 SecurityError）。在这种
+// 文档里 `fetch('/api/ping')` 这种相对路径会被 Chrome 判 Failed to fetch，
+// 而绝对地址正常。界面曾经全用相对路径，于是装进 magpie 后每个接口都「连不上
+// 本地服务」——但直接开 http://127.0.0.1:<port>/ 又完全正常，极难查。
+test('界面请求必须用绝对地址（不透明源里相对路径会 Failed to fetch）', async () => {
+  const raw = await (await fetch(base + '/ui/app.js')).text()
+  // 去掉注释再扫：注释里会用 `fetch('/api/ping')` 举例说明这个坑，
+  // 不剥掉会把说明文字当成真实调用。
+  const js = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+
+  // 1) 存在 API 基址，且从 location.href 推导（不能用 location.origin：
+  //    不透明文档里它可能报真实源、也可能报 "null"）
+  assert.match(raw, /const API_BASE/, '缺少 API_BASE')
+  assert.match(raw, /new URL\(location\.href\)/, 'API_BASE 必须从 location.href 推导')
+  assert.match(js, /function apiUrl\(/, '缺少 apiUrl')
+  assert.match(js, /API_BASE\.replace/, 'apiUrl 必须用 API_BASE 拼')
+
+  // 2) fetch 只能走 apiUrl，不能出现裸相对路径
+  const fetchCalls = [...js.matchAll(/fetch\(\s*([^,)\n]+)/g)].map((m) => m[1].trim())
+  assert.ok(fetchCalls.length >= 1, '应该有 fetch 调用')
+  for (const arg of fetchCalls) {
+    assert.match(arg, /^apiUrl\(/, `fetch 的地址必须经 apiUrl 拼成绝对地址，实际是：${arg}`)
+  }
+  // 3) 不许出现 fetch('/api…') 这种写法
+  assert.equal(/fetch\(\s*['"]\/api/.test(js), false, '不该有 fetch 直接吃相对路径')
+})
+
+test('boot.js 保证服务地址以 / 结尾（否则 web 代理前缀会被吃掉）', async () => {
+  // boot.js 与 package.json 不经过本地服务（服务只发 ui/ 与根下静态资源），
+  // 直接从磁盘读。
+  const boot = readFileSync(join(here, '..', 'page', 'boot.js'), 'utf8')
+  assert.match(boot, /endsWith\('\/'\)/, 'boot.js 必须处理结尾斜杠')
+  assert.match(boot, /service \+ '\/'/, 'boot.js 应补上结尾斜杠再拼 query')
+})
+
+test('/api/ping 的版本来自 package.json，不是硬编码', async () => {
+  const pkg = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf8'))
+  const r = await (await fetch(base + '/api/ping')).json()
+  assert.ok(r.version, 'ping 应带 version')
+  assert.equal(r.version, pkg.version, `ping 版本 ${r.version} 与 package.json ${pkg.version} 不一致`)
 })

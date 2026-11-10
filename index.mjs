@@ -119,8 +119,16 @@ export default async function dragonapi(input, options) {
   void input
   const ctx = makeContext(input, options)
 
-  // 先把站点参数与目录拉起来：冷启动时宿主很快就要模型表。
-  await Promise.all([ctx.status.get({}), ctx.catalog.get({})])
+  // 预热目录与站点参数，但**绝不等它**。
+  //
+  // 宿主的插件加载有 20 秒上限（实测报错：the plugin's load didn't finish in 20s）。
+  // 之前这里 `await Promise.all([...])` 等站点，网络一慢就把整个插件的加载拖死，
+  // 表现是插件行直接标「没有加载成功」——而服务其实已经起来了，页面还能开，
+  // 只是宿主判定它加载失败。这两件事的因果很容易看错。
+  //
+  // 预热只是省掉第一次 models() 的等待，失败了也不影响任何功能：
+  // models() 自己会取，而且它本来就允许慢。
+  void Promise.allSettled([ctx.status.get({}), ctx.catalog.get({})])
 
   // 本地服务：页面的真正宿主。起不来也不能让供应商消失，所以失败只记一笔。
   let service = null

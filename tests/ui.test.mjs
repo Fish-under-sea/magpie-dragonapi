@@ -253,3 +253,76 @@ test('/api/ping 的版本来自 package.json，不是硬编码', async () => {
   assert.ok(r.version, 'ping 应带 version')
   assert.equal(r.version, pkg.version, `ping 版本 ${r.version} 与 package.json ${pkg.version} 不一致`)
 })
+
+// ── 模型广场卡片网格 ────────────────────────────────────────────────
+// 用户报过「卡片不等高」。等高不是靠调数值，而是三处结构同时到位：
+//   网格 align-items: stretch（别写 start）、卡片 flex 纵向、页脚 margin-top:auto。
+// 少任何一处，同一排卡片就会参差，所以这里逐条钉住。
+test('并排卡片必须等高：网格用 stretch，不写 align-items: start', async () => {
+  // 剥掉注释再比对：这些规则附近就写着「不要写 align-items: start」的说明，
+  // 不剥掉会把注释当规则。
+  const css = (await (await fetch(base + '/ui/style.css')).text()).replace(/\/\*[\s\S]*?\*\//g, '')
+
+  const grid2 = css.match(/\.grid-2\s*\{[^}]*\}/)
+  assert.ok(grid2, '找不到 .grid-2')
+  assert.match(grid2[0], /align-items:\s*stretch/, '.grid-2 必须 stretch')
+  assert.equal(/align-items:\s*start/.test(grid2[0]), false, '.grid-2 不该写 align-items: start')
+
+  const modelGrid = css.match(/\.model-grid\s*\{[^}]*\}/)
+  assert.ok(modelGrid, '找不到 .model-grid')
+  assert.match(modelGrid[0], /align-items:\s*stretch/, '.model-grid 必须 stretch')
+
+  const foot = css.match(/\.mc-foot\s*\{[^}]*\}/)
+  assert.ok(foot, '找不到 .mc-foot')
+  assert.match(foot[0], /margin-top:\s*auto/, '卡片页脚必须 margin-top:auto 才吸到卡底')
+
+  const mc = css.match(/\.mc\s*\{[^}]*\}/)
+  assert.ok(mc, '找不到 .mc')
+  assert.match(mc[0], /display:\s*flex/, '.mc 必须是 flex 容器')
+  assert.match(mc[0], /flex-direction:\s*column/, '.mc 必须纵向排布')
+})
+
+test('模型广场是筛选栏 + 卡片网格，不再是表格', async () => {
+  const html = await (await fetch(base + '/')).text()
+  assert.match(html, /class="market-body"/, '缺少 market-body 布局')
+  assert.match(html, /class="market-aside"/, '缺少左侧筛选栏')
+  assert.match(html, /class="model-grid"/, '缺少卡片网格容器')
+  assert.match(html, /id="group-chips"/, '缺少分组筛选')
+  assert.match(html, /id="kind-chips"/, '缺少类型筛选')
+
+  const js = await (await fetch(base + '/ui/app.js')).text()
+  assert.match(js, /function modelCard\(/, '缺少 modelCard 渲染函数')
+  // 模型广场不该再走表格渲染
+  assert.equal(/tableEl\(\s*\[\s*'模型名'/.test(js), false, '模型广场不该再用表格渲染')
+})
+
+test('卡片含 NearToken 那套信息位：名称/厂商/描述/计费/价格/分组/端点/详情', async () => {
+  const js = await (await fetch(base + '/ui/app.js')).text()
+  const fn = js.match(/function modelCard\([\s\S]*?\n\}/)
+  assert.ok(fn, '找不到 modelCard')
+  for (const cls of ['mc-name', 'mc-vendor', 'mc-desc', 'mc-billing', 'mc-prices', 'mc-group', 'mc-ends', 'mc-foot']) {
+    assert.match(fn[0], new RegExp(cls), `卡片缺少 ${cls}`)
+  }
+  // 价格三列：输入 / 输出 / 缓存读取
+  assert.match(fn[0], /输入/)
+  assert.match(fn[0], /输出/)
+  assert.match(fn[0], /缓存读取/)
+})
+
+test('卡片不伪造健康度：没有延迟/吞吐/成功率这类我们拿不到的数据', async () => {
+  const js = await (await fetch(base + '/ui/app.js')).text()
+  const fn = js.match(/function modelCard\([\s\S]*?\n\}/)
+  assert.ok(fn, '找不到 modelCard')
+  // NearToken 的卡片有实时健康度，我们没有这些数据，编出来比留白更糟
+  for (const word of ['延迟', '吞吐', '成功率', 'latency', 'tps']) {
+    assert.equal(fn[0].includes(word), false, `卡片不该出现「${word}」：我们没有这项数据`)
+  }
+})
+
+test('没设 PAT 时给引导式空态，不甩红色错误横幅', async () => {
+  const js = await (await fetch(base + '/ui/app.js')).text()
+  // 钥匙页：400 + 含「访问令牌」的失败应识别成「还没配置」而不是「出错了」
+  assert.match(js, /keysNeedPat/, '缺少 keysNeedPat 状态')
+  assert.match(js, /err\.status === 400/, '应按状态码区分「未配置」与「真失败」')
+  assert.match(js, /去设置访问令牌/, '应给一条通往 PAT 页的路')
+})

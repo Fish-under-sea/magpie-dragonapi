@@ -57,37 +57,35 @@
 
     <!-- 1. 模型广场：纯展示。这里刻意没有任何勾选框、开关或「已选」状态。 -->
     <section class="panel" id="panel-catalog" role="tabpanel" aria-labelledby="tab-catalog" data-panel="catalog">
-      <div class="card toolbar-card">
-        <div class="filter-row" role="group" aria-label="按分组筛选">
-          <span class="filter-label">分组</span>
-          <div class="chips" id="group-chips"></div>
-        </div>
-        <div class="filter-row">
-          <div class="field grow">
-            <label class="sr-only" for="catalog-search">搜索模型</label>
-            <input id="catalog-search" type="search" autocomplete="off" spellcheck="false"
-                   placeholder="搜索模型名 / 厂商 / 说明…">
+      <div class="market-body">
+        <aside class="market-aside" aria-label="筛选">
+          <div class="ma-head">
+            <h2>筛选</h2>
+            <button class="link" id="catalog-reset" type="button">重置</button>
           </div>
-          <div class="field">
-            <label class="sr-only" for="catalog-kind">模型类型</label>
-            <select id="catalog-kind">
-              <option value="">全部类型</option>
-              <option value="chat">对话 chat</option>
-              <option value="image">生图 image</option>
-              <option value="video">视频 video</option>
-              <option value="audio">音频 audio</option>
-              <option value="embedding">向量 embedding</option>
-            </select>
-          </div>
-          <button class="btn ghost" id="catalog-reset" type="button">重置筛选</button>
-        </div>
-      </div>
+          <p class="ma-note">按分组与类型细化。分组决定倍率，也决定你需要哪把钥匙。</p>
 
-      <div class="meta-row" id="catalog-meta"></div>
-      <div class="card flush" id="catalog-body">
-        <p class="loading">正在读取模型目录…</p>
+          <h3 id="aside-group-head">分组</h3>
+          <div class="market-chips" id="group-chips" role="group" aria-labelledby="aside-group-head"></div>
+        </aside>
+
+        <div class="market-main">
+          <div class="market-top">
+            <div class="field grow">
+              <label class="sr-only" for="catalog-search">搜索模型</label>
+              <input id="catalog-search" type="search" autocomplete="off" spellcheck="false"
+                     placeholder="搜索模型名、厂商、端点或说明…">
+            </div>
+            <div class="market-chips chips-row" id="kind-chips" role="group" aria-label="按类型筛选"></div>
+          </div>
+
+          <div class="market-count" id="catalog-meta"></div>
+          <div class="model-grid" id="catalog-body">
+            <p class="loading">正在读取模型目录…</p>
+          </div>
+          <p class="foot-note">只读展示：价格由站点 <code>/api/pricing</code> 解析而来，解析不出来就标「价格未知」，不猜。</p>
+        </div>
       </div>
-      <p class="foot-note">只读展示：价格由站点 <code>/api/pricing</code> 解析而来，解析不出来就标「价格未知」，不猜。</p>
     </section>
 
     <!-- 2. 余额与用量 -->

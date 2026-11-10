@@ -180,3 +180,33 @@ test('provider.models 出错时不抛、但也不静默（错误要记下来）'
   // 但错误要能查到
   assert.match(String(bad.__lastModelsError || ''), /故意/)
 })
+
+test('插件加载不等网络：站点挂住也必须立刻返回', async () => {
+  // 守的是实际事故：宿主的插件加载有 20 秒上限（报错原文
+  // "the plugin's load didn't finish in 20s"）。入口里一旦 await 站点请求，
+  // 网络慢就让插件被判定加载失败——而服务其实已经起来了，页面也能开，
+  // 因果关系极容易被看错。
+  //
+  // 这里造一个「只接受连接、永不响应」的服务器：若入口还 await 网络，
+  // 这次调用会卡到 AbortSignal 超时（20 秒），测试必然超时失败。
+  const net = await import('node:net')
+  const silent = net.createServer(() => { /* 收下连接，什么都不回 */ })
+  await new Promise((r) => silent.listen(0, '127.0.0.1', r))
+  const port = silent.address().port
+
+  const startedAt = Date.now()
+  let slowPlugin = null
+  try {
+    slowPlugin = await dragonapi({ directory: dir }, {
+      port: 3633,
+      site: `http://127.0.0.1:${port}`,
+    })
+  } finally {
+    const elapsed = Date.now() - startedAt
+    assert.ok(elapsed < 3000, `插件加载等了 ${elapsed}ms，说明还在等网络`)
+    assert.ok(slowPlugin, '插件必须返回，哪怕站点不可达')
+    assert.equal(typeof slowPlugin.provider.models, 'function')
+    await slowPlugin.dispose()
+    silent.close()
+  }
+})

@@ -549,6 +549,7 @@ function renderCatalog() {
   const groupMap = new Map(groups.map((g) => [g.id, g]));
 
   renderGroupChips(groups, models);
+  renderKindChips(models);
 
   const counts = catalogCounts(data);
   const query = filters.q.trim().toLowerCase();
@@ -556,31 +557,67 @@ function renderCatalog() {
     if (filters.group && m.group !== filters.group) return false;
     if (filters.kind && m.kind !== filters.kind) return false;
     if (!query) return true;
-    const hay = [m.name, m.id, m.group, m.vendor, m.description, m.tags].filter(Boolean).join(' ').toLowerCase();
+    const hay = [m.name, m.id, m.group, m.vendor, m.description, m.tags, ...(m.endpoints || [])]
+      .filter(Boolean).join(' ').toLowerCase();
     return hay.includes(query);
   });
 
-  meta.replaceChildren(
-    h('span', { class: 'stat' }, h('b', { text: fmtInt(counts.models) }), '个模型'),
-    h('span', { class: 'stat' }, h('b', { text: fmtInt(counts.rows) }), '行'),
-    h('span', { class: 'stat' }, h('b', { text: fmtInt(counts.groups) }), '个分组'),
-    h('span', { class: 'spacer' }),
-    h('span', {
-      class: 'muted',
-      text: `当前显示 ${fmtInt(rows.length)} 行 · 来源 ${SOURCE_LABEL[data.source] || data.source || '未知'} · 更新于 ${fmtAt(data.at)}`,
-    }),
-  );
+  if (meta) {
+    meta.replaceChildren(
+      h('b', { text: fmtInt(rows.length) }),
+      h('span', { text: ` 个模型 · 全站 ${fmtInt(counts.models)} 个 / ${fmtInt(counts.rows)} 行 / ${fmtInt(counts.groups)} 个分组` }),
+      h('span', { class: 'spacer' }),
+      h('span', {
+        class: 'muted',
+        text: `来源 ${SOURCE_LABEL[data.source] || data.source || '未知'} · 更新于 ${fmtAt(data.at)}`,
+      }),
+    );
+  }
 
   if (!rows.length) {
     body.replaceChildren(h('div', { class: 'empty', text: '没有符合条件的模型。放宽分组或搜索词再试。' }));
     return;
   }
 
-  const tableRows = rows.map((m) => catalogRow(m, groupMap));
-  body.replaceChildren(tableEl(
-    ['模型名', '分组', '倍率', '输入价', '输出价', '缓存价', '端点', '说明'],
-    tableRows,
-  ));
+  body.replaceChildren(...rows.map((m) => modelCard(m, groupMap)));
+}
+
+/** 类型筛选：分组之外的第二维，直接做成 chip，比下拉更省一次点击。 */
+function renderKindChips(models) {
+  const host = $('#kind-chips');
+  if (!host) return;
+
+  const counts = new Map();
+  for (const m of models) {
+    const k = m.kind || 'chat';
+    counts.set(k, (counts.get(k) || 0) + 1);
+  }
+
+  const order = ['chat', 'image', 'video', 'audio', 'embedding'];
+  const kinds = [...counts.keys()].sort((a, b) => {
+    const ia = order.indexOf(a);
+    const ib = order.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+
+  const chips = [h('button', {
+    class: 'market-chip', type: 'button',
+    'aria-pressed': String(filters.kind === ''),
+    onclick: () => { filters.kind = ''; renderCatalog(); },
+  }, '全部')];
+
+  for (const k of kinds) {
+    chips.push(h('button', {
+      class: 'market-chip', type: 'button',
+      'aria-pressed': String(filters.kind === k),
+      onclick: () => {
+        filters.kind = filters.kind === k ? '' : k;
+        renderCatalog();
+      },
+    }, KIND_LABEL[k] || k, h('span', { class: 'chip-count', text: String(counts.get(k) || 0) })));
+  }
+
+  host.replaceChildren(...chips);
 }
 
 function renderGroupChips(groups, models) {
@@ -592,112 +629,136 @@ function renderGroupChips(groups, models) {
 
   const chips = [
     h('button', {
-      class: 'chip', type: 'button',
+      class: 'market-chip', type: 'button',
       'aria-pressed': String(filters.group === ''),
       onclick: () => { filters.group = ''; renderCatalog(); },
     }, '全部', h('span', { class: 'chip-count', text: String(models.length) })),
   ];
 
   for (const g of groups) {
+    const ratio = g.ratio != null && Number(g.ratio) > 0 ? `×${fmtRatio(g.ratio)}` : '';
     chips.push(h('button', {
-      class: 'chip', type: 'button',
+      class: 'market-chip', type: 'button',
       'aria-pressed': String(filters.group === g.id),
       title: [
-        g.auto ? 'auto 分组：费率取决于实际命中的通道' : (g.ratio != null ? `分组倍率 ${g.ratio}×` : ''),
+        g.auto ? '该分组费率取决于实际命中的通道，站点没有给固定倍率' : (ratio ? `分组倍率 ${ratio}` : ''),
         g.note || '',
       ].filter(Boolean).join(' · '),
       onclick: () => {
         filters.group = filters.group === g.id ? '' : g.id;
         renderCatalog();
       },
-    }, g.id, h('span', { class: 'chip-count', text: String(counts.get(g.id) || g.models || 0) })));
+    },
+    h('span', { class: 'chip-name', text: g.id }),
+    ratio ? h('span', { class: 'ratio', text: ratio }) : null,
+    h('span', { class: 'chip-count', text: String(counts.get(g.id) || g.models || 0) })));
   }
 
   host.replaceChildren(...chips);
 }
 
-function catalogRow(m, groupMap) {
+/**
+ * 一张模型卡。
+ *
+ * 结构照 NearToken 的模型广场：名称/厂商 → 描述 → 计费方式 → 价格 → 分组
+ * → 端点 → 详情。等高靠三件事：外层 `.model-grid` 的 `align-items: stretch`、
+ * 卡片自身 `display:flex; flex-direction:column`、以及尾部 `margin-top:auto`
+ * 把「详情」按到底。任何一项缺失，同一行卡片就会参差。
+ *
+ * 刻意没照搬的两处：
+ *   1. NearToken 的卡片有「已启用/未启用」开关。我们按既定要求做成纯展示，
+ *      不给假开关——本站做不到按模型启停。
+ *   2. 它有实时健康度（延迟、吞吐、成功率条）。我们没有这些数据，
+ *      编一个出来比留白更糟，所以那个位置换成上下文长度与计费档位。
+ */
+function modelCard(m, groupMap) {
   const info = groupMap.get(m.group);
   const isAuto = m.group === 'auto' || (info && info.auto === true);
   const pricing = m.pricing || {};
   const priceKind = pricing.kind || 'unknown';
   const ratio = m.groupRatio != null ? m.groupRatio : (info ? info.ratio : null);
+  const kind = m.kind || 'chat';
+  const endpoints = Array.isArray(m.endpoints) ? m.endpoints : [];
 
-  const nameCell = h('td', { class: 'col-name' },
-    h('button', {
-      class: 'name-btn', type: 'button',
-      title: '查看这个模型的计费表达式与分档',
-      onclick: () => openModelDrawer(m),
-    }, m.name || m.id || '未命名'),
-    m.vendor ? h('span', { class: 'vendor', text: m.vendor }) : null,
-  );
+  // 计费方式的说法要跟价格表一致：按次/按秒只给一列，别硬凑出「输出价 —」。
+  let billing = { cls: 'flat', label: '倍率计费' };
+  if (isAuto) billing = { cls: 'auto', label: '以实际命中通道为准' };
+  else if (priceKind === 'unknown') billing = { cls: 'unknown', label: '价格未知' };
+  else if (priceKind === 'percall') {
+    billing = { cls: 'call', label: /\/秒/.test(pricing.input || '') ? '按秒计费' : '按次计费' };
+  } else if (priceKind === 'tiered') billing = { cls: 'dyn', label: '分档计费' };
 
-  const cells = [
-    nameCell,
-    { text: m.group || '—', cls: 'mono' },
-    {
-      text: ratio == null ? '—' : fmtRatio(ratio),
-      cls: 'num',
-      title: isAuto ? 'auto 分组没有固定倍率，按实际命中通道计费' : (ratio != null ? `分组倍率 ${ratio}×` : '站点没有给出倍率'),
-    },
-  ];
-
-  // 价格三列：auto 与 unknown 都用一格跨三列，避免三格重复同一句提示。
+  let priceCells;
   if (isAuto) {
-    cells.push({ node: h('td', {
-      colspan: 3, class: 'muted price-merged',
-      title: 'auto 分组没有固定倍率，实际费率取决于命中的通道',
-    }, '以实际命中通道为准') });
+    priceCells = [h('div', { class: 'wide' }, h('span', { text: '单价' }), h('b', { class: 'muted', text: '—' }))];
   } else if (priceKind === 'unknown') {
-    cells.push({ node: h('td', {
-      colspan: 3, class: 'unknown price-merged',
-      title: pricing.note || '站点没有给出可解析的价格',
-    }, '价格未知') });
+    priceCells = [h('div', { class: 'wide' }, h('span', { text: '单价' }), h('b', { class: 'unknown', text: '价格未知' }))];
+  } else if (priceKind === 'percall') {
+    priceCells = [h('div', { class: 'wide' }, h('span', { text: '单价' }), h('b', { text: pricing.input || '—' }))];
   } else {
-    cells.push(
-      { text: pricing.input || '—', cls: 'num', title: pricing.note || null },
-      { text: pricing.output || '—', cls: 'num', title: pricing.note || null },
-      { text: pricing.cache || '—', cls: 'num', title: pricing.note || null },
-    );
+    priceCells = [
+      h('div', null, h('span', { text: '输入' }), h('b', { text: pricing.input || '—' })),
+      h('div', null, h('span', { text: '输出' }), h('b', { text: pricing.output || '—' })),
+      h('div', null, h('span', { text: '缓存读取' }), h('b', { text: pricing.cache || '—' })),
+    ];
   }
 
-  const endpoints = Array.isArray(m.endpoints) ? m.endpoints : [];
-  cells.push({
-    node: h('td', null, endpoints.length
-      ? h('span', { class: 'ep-list' }, endpoints.map((e) => h('span', { class: 'ep', text: e })))
-      : h('span', { class: 'muted', text: '—' })),
-  });
+  const desc = m.description || '';
+  const titleBits = [
+    desc,
+    m.tags ? `标签：${m.tags}` : '',
+    pricing.note || '',
+    m.context ? `上下文 ${fmtInt(m.context)}` : '',
+    `模型 id：${m.id || ''}`,
+  ].filter(Boolean).join('\n');
 
-  const desc = m.description || m.tags || '';
-  cells.push({
-    text: desc || '—',
-    cls: 'col-desc',
-    title: [desc, m.tags ? `tags: ${m.tags}` : '', pricing.note || '', m.context ? `上下文 ${fmtInt(m.context)}` : '']
-      .filter(Boolean).join('\n'),
-  });
+  return h('article', { class: `mc mc-${kind}`, title: titleBits },
+    h('div', { class: 'mc-head' },
+      h('div', { class: 'grow' },
+        h('button', {
+          class: 'mc-name', type: 'button',
+          title: '查看这个模型的计费表达式与分档',
+          onclick: () => openModelDrawer(m),
+        }, m.name || m.id || '未命名'),
+        m.vendor ? h('div', { class: 'mc-vendor', text: m.vendor }) : null),
+      h('span', { class: 'mc-kind', text: KIND_LABEL[kind] || kind })),
 
-  return cells;
+    h('p', { class: desc ? 'mc-desc' : 'mc-desc is-empty', text: desc || '站点没有提供说明' }),
+
+    h('div', { class: `mc-billing ${billing.cls}`, text: billing.label }),
+
+    h('div', { class: priceKind === 'percall' || priceKind === 'unknown' || isAuto ? 'mc-prices one' : 'mc-prices' }, priceCells),
+
+    h('div', { class: 'mc-line' },
+      h('span', { class: 'k', text: '分组' }),
+      h('span', { class: 'mc-group', text: m.group || '—' }),
+      ratio != null && Number(ratio) > 0 ? h('span', { class: 'mc-ratio', text: `×${fmtRatio(ratio)}` }) : null),
+
+    h('div', { class: 'mc-line' },
+      h('span', { class: 'k', text: '端点' }),
+      endpoints.length
+        ? h('span', { class: 'mc-ends' }, endpoints.map((e) => h('span', { class: 'mc-end', text: e })))
+        : h('span', { class: 'muted', text: '—' })),
+
+    h('div', { class: 'mc-foot' },
+      h('button', { class: 'link', type: 'button', onclick: () => openModelDrawer(m) }, '详情')));
 }
 
 function bindCatalogControls() {
   const search = $('#catalog-search');
-  const kind = $('#catalog-kind');
   const reset = $('#catalog-reset');
 
   search.addEventListener('input', () => {
     filters.q = search.value;
     if (cache.catalog) renderCatalog();
   });
-  kind.addEventListener('change', () => {
-    filters.kind = kind.value;
-    if (cache.catalog) renderCatalog();
-  });
+
+  // 类型筛选现在是 aside 里的 chip（renderKindChips），不再是一个 select。
   reset.addEventListener('click', () => {
     filters.group = '';
     filters.kind = '';
     filters.q = '';
     search.value = '';
-    kind.value = '';
     if (cache.catalog) renderCatalog();
     search.focus();
   });
@@ -922,11 +983,25 @@ async function loadKeys(force = false) {
   try {
     const data = await api.keys();
     cache.keys = data;
+    cache.keysNeedPat = false;
     clearBanner('keys');
     renderKeys();
     return data;
   } catch (err) {
     const msg = describeError(err);
+    // 「还没设 PAT」是刚装好时的正常状态，不是错误。这里不该甩红条，
+    // 该直接告诉他下一步做什么——否则第一次打开就像插件坏了。
+    const needPat = err instanceof ApiError && err.status === 400 && /访问令牌/.test(msg);
+    if (needPat) {
+      cache.keysNeedPat = true;
+      cache.keysError = '';
+      clearBanner('keys');
+      renderKeys();
+      renderKeyGroupOptions();
+      return null;
+    }
+    cache.keysNeedPat = false;
+    cache.keysError = msg;
     banner('error', `读取钥匙列表失败：${msg}`, { key: 'keys' });
     regionError($('#keys-body'), `钥匙列表没读到：${msg}`, () => loadKeys(true));
     renderKeyGroupOptions();
@@ -988,6 +1063,17 @@ function renderKeys() {
   }
 
   if (!cache.keys) {
+    if (cache.keysNeedPat) {
+      // 首次打开、还没设 PAT：给一条通往「访问令牌」页的路，而不是报错。
+      box.replaceChildren(h('div', { class: 'empty guide' },
+        h('p', { text: '还没设置访问令牌（PAT），所以读不到钥匙列表，也不能建钥匙。' }),
+        h('p', { class: 'muted', text: 'PAT 只能在浏览器里登录控制台后创建：头像 → 安全 → 访问令牌，勾上 profile:read、api_key:read、api_key:write。' }),
+        h('button', {
+          class: 'btn primary', type: 'button',
+          onclick: () => activateTab('pat', { focus: true }),
+        }, '去设置访问令牌')));
+      return;
+    }
     if (!loading.keys) regionLoading(box, '正在读取钥匙列表');
     return;
   }

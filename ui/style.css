@@ -47,6 +47,11 @@ html[data-theme="light"] {
   --bad: #b22f2c;
 }
 
+/* 按钮与可点击卡片统一去掉移动端 300ms 点击延迟 */
+button,
+.mc,
+.market-chip { touch-action: manipulation; }
+
 * { box-sizing: border-box; }
 
 html, body {
@@ -62,6 +67,10 @@ html, body {
 }
 
 body { min-height: 100vh; }
+/* dvh 让移动端地址栏收起时不跳；不认 dvh 的浏览器保留上面那行 100vh */
+@supports (min-height: 100dvh) {
+  body { min-height: 100dvh; }
+}
 
 /* 焦点必须始终可见：键盘用户全靠它定位 */
 :focus-visible {
@@ -253,15 +262,19 @@ input[type="search"],
 input[type="password"],
 input[type="number"],
 select {
-  min-height: 30px;
+  /* 用 padding 撑高度而不是写死高度：字号或字体变了也能撑住，
+     34px 在桌面上点得准、读得清（触屏 44px 的基准见窄屏媒体查询）。 */
+  min-height: 34px;
   width: 100%;
-  padding: 0 9px;
+  padding: 6px 10px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
   background: var(--sunken);
   color: var(--fg);
   font: inherit;
   font-size: 12.5px;
+  /* 去掉移动端点击的 300ms 延迟 */
+  touch-action: manipulation;
 }
 input::placeholder { color: color-mix(in srgb, var(--muted) 80%, transparent); }
 input:disabled, select:disabled { opacity: .55; cursor: not-allowed; }
@@ -419,9 +432,13 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--gap);
-  align-items: start;
+  /* 不要写 align-items: start —— 那会让同一行的两张卡各自按内容高度撑开，
+     看上去参差不齐。默认的 stretch 才是并排卡片该有的样子；卡内用 flex
+     纵向布局把次要内容推到底。 */
+  align-items: stretch;
 }
-.grid-2 > .card { margin: 0; }
+.grid-2 > .card { margin: 0; display: flex; flex-direction: column; }
+.grid-2 > .card > :last-child { margin-bottom: 0; }
 
 .toolbar-card { display: flex; flex-direction: column; gap: 11px; }
 
@@ -722,6 +739,19 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   color: var(--muted);
   font-size: 12.5px;
 }
+/* 引导式空态：不是「没数据」，而是「下一步做什么」，所以左对齐并给按钮留位 */
+.empty.guide {
+  padding: 20px 18px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+}
+.empty.guide p { margin: 0; max-width: 62ch; line-height: 1.6; }
+.empty.guide .btn { margin-top: 2px; }
 .loading {
   margin: 0;
   padding: 22px 14px;
@@ -855,7 +885,9 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 }
 .bind-steps li::marker { color: var(--accent); font-family: var(--code); }
 
-.keys-grid { align-items: start; }
+/* 密钥页同样是两张并排卡：stretch 让它们等高，卡内 flex 把按钮按到底。 */
+.keys-grid > .card { display: flex; flex-direction: column; }
+.keys-grid > .card > :last-child { margin-bottom: 0; }
 
 .row-actions { display: inline-flex; gap: 6px; flex-wrap: wrap; }
 
@@ -868,6 +900,9 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   position: absolute;
   inset: 0;
   background: rgba(0, 0, 0, .5);
+  /* 这里的模糊是有理由的：抽屉压在列表之上，模糊把背后的内容明确推远，
+     让人一眼看出「现在在另一层」。不是给卡片糊一层装饰。
+     只有 2px，够分辨层级但不会让底下的文字变成光斑。 */
   backdrop-filter: blur(2px);
 }
 
@@ -875,6 +910,8 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   position: relative;
   width: min(760px, calc(100vw - 32px));
   max-height: calc(100vh - 64px);
+  /* 抽屉内部滚到底不应把滚动传给背后的页面 */
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--line-strong);
@@ -945,6 +982,15 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 
 @media (max-width: 720px) {
   .app { padding: 14px 12px 32px; }
+  /* iOS 在输入框字号 < 16px 时会自动放大整页，焦点一落就跳。窄屏统一放大到 16px。 */
+  input[type="text"],
+  input[type="search"],
+  input[type="password"],
+  input[type="number"],
+  select { font-size: 16px; }
+  /* 触屏命中区：24px 是 Web 底线，44px 是手指舒服的尺寸 */
+  .link,
+  .banner-close { min-height: 32px; min-width: 32px; }
   .topbar { gap: 10px; }
   .topbar-meta { margin-left: 0; width: 100%; }
   .summary-row { grid-template-columns: 1fr; }
@@ -966,3 +1012,263 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   /* 动效关掉后状态点必须仍然可见 */
   .dot[data-state="busy"] { opacity: 1; }
 }
+
+/* ── 模型广场：筛选栏 + 卡片网格 ────────────────────────────
+ *
+ * 结构参照 NearToken 的模型广场（左侧筛选、右侧双列卡片），因为它服务的
+ * 是同一件事：在一两百个模型里比价格。等高靠三处配合，缺一不可：
+ *   .model-grid 的 align-items: stretch
+ *   .mc 的 display:flex; flex-direction:column
+ *   .mc-foot 的 margin-top:auto
+ */
+
+.market-body {
+  display: grid;
+  grid-template-columns: 208px minmax(0, 1fr);
+  gap: var(--gap);
+  /* 这一层可以 start：侧栏本来就该比主区短，不该被拉到与列表等高 */
+  align-items: start;
+}
+
+.market-aside {
+  position: sticky;
+  top: 12px;
+  max-height: calc(100vh - 24px);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--sunken);
+}
+.ma-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ma-head h2 { margin: 0; font-size: 13px; }
+.ma-note { margin: 4px 0 10px; font-size: 11px; line-height: 1.5; color: var(--muted); }
+.market-aside h3 {
+  margin: 12px 0 7px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.market-chips { display: flex; flex-direction: column; gap: 5px; }
+.market-chips.chips-row { flex-direction: row; flex-wrap: wrap; }
+
+.market-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: color .12s ease, border-color .12s ease, background .12s ease;
+}
+.market-chip:hover { color: var(--fg); border-color: var(--line-strong); }
+.market-chip[aria-pressed="true"] {
+  color: var(--fg);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.market-chip .chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.market-chip .ratio { font-family: var(--code); font-size: 10px; color: var(--muted); }
+.market-chip .chip-count { margin-left: auto; font-family: var(--code); font-size: 10px; color: var(--muted); }
+.market-chips.chips-row .market-chip .chip-count { margin-left: 2px; }
+
+.market-main { min-width: 0; }
+.market-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.market-top .field { margin: 0; }
+.market-top .field.grow { flex: 1 1 240px; min-width: 0; }
+.market-top .market-chips { flex: none; }
+
+.market-count {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.market-count b { font-size: 15px; color: var(--fg); font-variant-numeric: tabular-nums; }
+.market-count .spacer { flex: 1 1 12px; }
+
+.model-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: stretch;
+}
+/* 空态与加载态要占满整行，否则会缩成半宽的一格 */
+.model-grid > .empty,
+.model-grid > .loading { grid-column: 1 / -1; margin: 0; }
+
+.mc {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  transition: border-color .12s ease, background .12s ease;
+}
+.mc:hover { border-color: var(--line-strong); background: var(--card-hover); }
+
+.mc-head { display: flex; align-items: flex-start; gap: 8px; }
+.mc-head > .grow { flex: 1; min-width: 0; }
+.mc-name {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mc-name:hover { color: var(--accent); text-decoration: underline; }
+.mc-vendor {
+  font-size: 10.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mc-kind {
+  flex: none;
+  padding: 1px 7px;
+  font-size: 10px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.mc-desc {
+  margin: 7px 0 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--muted);
+  /* 固定占两行：描述一行还是两行不该改变卡片内容高度。不然同一排里
+     短描述那张会在「端点」和「详情」之间留一大片空白，看着像没做完。 */
+  min-height: calc(1.55em * 2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.mc-desc.is-empty { opacity: .5; }
+
+.mc-billing { margin: 9px 0 6px; font-size: 10.5px; font-weight: 600; }
+.mc-billing.flat { color: var(--accent); }
+.mc-billing.dyn { color: var(--warn); }
+.mc-billing.call { color: var(--ok); }
+.mc-billing.auto,
+.mc-billing.unknown { color: var(--muted); font-weight: 500; }
+
+/* 价格是这张卡的主角：三列等宽、等宽数字、细线分隔 */
+.mc-prices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.mc-prices.one { grid-template-columns: minmax(0, 1fr); }
+.mc-prices > div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding-left: 9px;
+  border-left: 1px solid var(--line);
+}
+.mc-prices > div:first-child { padding-left: 0; border-left: 0; }
+.mc-prices span { font-size: 10px; color: var(--muted); }
+.mc-prices b {
+  font-family: var(--code);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mc-prices b.unknown { font-family: inherit; font-size: 11.5px; color: var(--warn); }
+.mc-prices b.muted { color: var(--muted); }
+
+.mc-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 4px;
+  font-size: 10.5px;
+}
+.mc-line .k { flex: none; width: 26px; line-height: 18px; color: var(--muted); }
+.mc-group { font-family: var(--code); color: var(--fg); overflow-wrap: anywhere; }
+.mc-ratio { font-family: var(--code); color: var(--muted); }
+.mc-ends { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.mc-end {
+  padding: 1px 5px;
+  font-family: var(--code);
+  font-size: 9.5px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+/* 把页脚按到卡底：这一行是同排卡片底部对齐的关键 */
+.mc-foot { margin-top: auto; padding-top: 9px; display: flex; justify-content: flex-end; }
+
+/* 文字按钮：卡片里的「详情」、侧栏的「重置」 */
+.link {
+  /* 命中区补到 24×24（WCAG 2.2 AA）：11px 的文字按钮本身只有 17px 高，
+     手指点起来太窄。用负外边距把补出来的空间吃掉，视觉位置不变。 */
+  min-height: 24px;
+  padding: 3px 4px;
+  margin: -3px -4px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--accent);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.link:hover { text-decoration: underline; }
+
+@media (max-width: 900px) {
+  .market-body { grid-template-columns: minmax(0, 1fr); }
+  .market-aside { position: static; max-height: none; }
+  /* 窄屏下 14 个分组纵向排开会把模型全挤到第二屏以后。改成横向滚动条：
+     侧栏只占一两行，模型立刻可见。 */
+  .market-aside .market-chips {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+  }
+  .market-aside .market-chip { flex: none; }
+  .market-aside .market-chip .chip-count { margin-left: 2px; }
+  .model-grid { grid-template-columns: minmax(0, 1fr); }
+}
+

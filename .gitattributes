@@ -1,0 +1,6 @@
+# 全仓库统一 LF：避免 Windows 上的工具把整个文件写成 CRLF，
+# 让一次小改动在 diff 里变成几千行的噪音（已经踩过一次）。
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.tgz binary

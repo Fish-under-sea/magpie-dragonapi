@@ -1,0 +1,3958 @@
+{
+ "auto_groups": [
+  "image",
+  "gpt-pro",
+  "gpt-promax",
+  "gpt-plus",
+  "gpt-特惠",
+  "claude-max企业",
+  "claude-kiro正价",
+  "claude-kiro",
+  "gemini",
+  "视频",
+  "国模",
+  "国模-原厂",
+  "grok"
+ ],
+ "data": [
+  {
+   "model_name": "gpt-6-sol",
+   "vendor_id": 2,
+   "quota_type": 0,
+   "model_ratio": 1,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "gpt-pro",
+    "gpt-promax",
+    "gpt-特惠",
+    "gpt-plus"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "(len <= 272000 ? tier(\"short_context\", p*2 + cr*0.2 + cc*2.5 + c*10) : tier(\"long_context\", p*4 + cr*0.4 + cc*5 + c*15)) * (param(\"service_tier\") == \"priority\" ? 2 : 1) * (param(\"service_tier\") == \"fast\" ? 2 : 1) * (param(\"service_tier\") == \"ultrafast\" ? 2 : 1)",
+   "pricing_version": "5a90f2b86c08bd983a9a2e6d66c255f4eaef9c4bc934386d2b6ae84ef0ff1f1f"
+  },
+  {
+   "model_name": "banana-pro-1k",
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.1,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "glm-5.2",
+   "vendor_id": 23,
+   "quota_type": 0,
+   "model_ratio": 4,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 3.5,
+   "cache_ratio": 0.25,
+   "enable_groups": [
+    "国模",
+    "国模-原厂"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "hy3",
+   "quota_type": 0,
+   "model_ratio": 0.5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 4,
+   "cache_ratio": 0.25,
+   "create_cache_ratio": 0,
+   "enable_groups": [
+    "国模",
+    "国模-原厂"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "mimo-v2.6-flash",
+   "quota_type": 0,
+   "model_ratio": 0.5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 2,
+   "cache_ratio": 0.02,
+   "create_cache_ratio": 0,
+   "enable_groups": [
+    "国模"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "deepseek-flash",
+   "vendor_id": 21,
+   "quota_type": 0,
+   "model_ratio": 1,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 4,
+   "cache_ratio": 0.02,
+   "create_cache_ratio": 0,
+   "enable_groups": [
+    "国模-原厂"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"flat\", p*2 + c*8 + cr*0.04)"
+  },
+  {
+   "model_name": "kimi-k2.7-code-highspeed",
+   "vendor_id": 29,
+   "quota_type": 0,
+   "model_ratio": 0.95,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 4.210526,
+   "cache_ratio": 0.2,
+   "enable_groups": [
+    "国模-原厂"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "grok-imagine-video-1.5",
+   "description": "官方key 480p 2.99折／720p 1.71折／1080p 0.96折。Grok 视频，1–15秒，¥0.16/秒。",
+   "tags": "视频",
+   "vendor_id": 11,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.16,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "u(\"moderated\") ? tier(\"moderated\", 0.1) : tier(\"video\", u(\"seconds\") * 0.16)",
+   "billing_usage_schema": {
+    "input_images": {
+     "type": "number",
+     "unit": "count",
+     "unitLabel": {
+      "en": "image",
+      "zh": "张",
+      "zh-TW": "張"
+     },
+     "description": {
+      "en": "Input image unit price",
+      "zh": "输入图片单价"
+     }
+    },
+    "moderated": {
+     "type": "boolean",
+     "description": {
+      "en": "Blocked by content moderation",
+      "zh": "被内容审核拦截"
+     }
+    },
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "1080p"
+     ],
+     "description": {
+      "en": "Output video resolution",
+      "zh": "输出视频分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Video generation unit price",
+      "zh": "视频生成单价"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "480p 8s",
+     "facts": {
+      "input_images": 0,
+      "moderated": false,
+      "resolution": "480p",
+      "seconds": 8
+     }
+    },
+    {
+     "label": "720p 8s · image",
+     "facts": {
+      "input_images": 1,
+      "moderated": false,
+      "resolution": "720p",
+      "seconds": 8
+     }
+    },
+    {
+     "label": "1080p 15s",
+     "facts": {
+      "input_images": 0,
+      "moderated": false,
+      "resolution": "1080p",
+      "seconds": 15
+     }
+    },
+    {
+     "label": "480p 8s · blocked",
+     "facts": {
+      "input_images": 0,
+      "moderated": true,
+      "resolution": "480p",
+      "seconds": 8
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "banana2-1k",
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.09,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "gpt-image-2.5-ext-2k",
+   "description": "GPT Image 2.5 Ext，原生 2K 出图（非超分），按张计费。不传 size 默认 2048×2048，可传 size 自选尺寸。",
+   "tags": "图像",
+   "vendor_id": 2,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.3,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "image-generation",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "minimax-m3",
+   "vendor_id": 15,
+   "quota_type": 0,
+   "model_ratio": 1.05,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 4,
+   "cache_ratio": 0.2,
+   "create_cache_ratio": 0,
+   "enable_groups": [
+    "国模-原厂"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "wan3.0-video-prime",
+   "description": "按秒。Wan 3.0 Prime，仅 15 或 30 秒，720p/1080p ¥0.38/0.43 每秒。支持参考图、视频、音频链接，不另收费。",
+   "tags": "视频",
+   "vendor_id": 16,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.38,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "u(\"resolution\") == \"1080p\" ? tier(\"1080p\", u(\"seconds\") * 0.43) : tier(\"720p\", u(\"seconds\") * 0.38)",
+   "billing_usage_schema": {
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 8s",
+     "facts": {
+      "resolution": "720p",
+      "seconds": 8
+     }
+    },
+    {
+     "label": "1080p 8s",
+     "facts": {
+      "resolution": "1080p",
+      "seconds": 8
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "claude-fable-5",
+   "description": "Claude Fable 5，Claude 5 系列首发的 Mythos 级模型，目前最强的通用可用 Claude 版本，面向复杂推理与长上下文任务。",
+   "tags": "Claude",
+   "vendor_id": 1,
+   "quota_type": 0,
+   "model_ratio": 5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "claude-cursor",
+    "claude-kiro",
+    "claude-kiro正价",
+    "claude-max企业"
+   ],
+   "supported_endpoint_types": [
+    "anthropic",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "claude-sonnet-4-5-20250929",
+   "vendor_id": 1,
+   "quota_type": 0,
+   "model_ratio": 1.5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "claude-kiro",
+    "claude-kiro正价",
+    "claude-max企业"
+   ],
+   "supported_endpoint_types": [
+    "anthropic",
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "len <= 200000 ? tier(\"short_context\", p*3 + c*15 + cr*0.3 + cc*3.75 + cc1h*6) : tier(\"long_context\", p*6 + c*22.5 + cr*0.6 + cc*7.5 + cc1h*12)"
+  },
+  {
+   "model_name": "claude-opus-5.5",
+   "vendor_id": 1,
+   "quota_type": 0,
+   "model_ratio": 2,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.05,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "claude-kiro正价"
+   ],
+   "supported_endpoint_types": [
+    "anthropic",
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"standard\", p * 4 + c * 20 + cr * 0.2 + cc * 5 + cc1h * 8) * (param(\"speed\") == \"fast\" ? 2 : 1)"
+  },
+  {
+   "model_name": "grok-4.7-build-fast",
+   "vendor_id": 11,
+   "quota_type": 0,
+   "model_ratio": 2,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 3,
+   "cache_ratio": 0.25,
+   "enable_groups": [
+    "image",
+    "grok"
+   ],
+   "supported_endpoint_types": [
+    "openai",
+    "openai-response"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "len < 200000 ? tier(\"short_context\", p*4 + c*12 + cr*1) : tier(\"long_context\", p*6 + c*18 + cr*1.5)"
+  },
+  {
+   "model_name": "claude-opus-4-7",
+   "description": "Claude Opus 系列迭代版本，深度推理能力持续增强，位于 max 分组。",
+   "tags": "Claude",
+   "vendor_id": 1,
+   "quota_type": 0,
+   "model_ratio": 2.5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "claude-cursor",
+    "claude-kiro",
+    "claude-kiro正价",
+    "claude-max企业"
+   ],
+   "supported_endpoint_types": [
+    "anthropic",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "gemini-4-argon-high",
+   "vendor_id": 4,
+   "quota_type": 0,
+   "model_ratio": 1,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.049999999999999996,
+   "create_cache_ratio": 0,
+   "enable_groups": [
+    "gemini"
+   ],
+   "supported_endpoint_types": [
+    "gemini",
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"flat\", p*2 + c*10 + cr*0.1)"
+  },
+  {
+   "model_name": "grok-4.5",
+   "description": "xAI Grok 4.5，均衡定价的主力对话模型（官方基础价 $2/1M input、$6/1M output）。",
+   "tags": "Grok",
+   "vendor_id": 11,
+   "quota_type": 0,
+   "model_ratio": 1,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 3,
+   "cache_ratio": 0.15,
+   "create_cache_ratio": 1,
+   "enable_groups": [
+    "grok"
+   ],
+   "supported_endpoint_types": [
+    "openai",
+    "openai-response"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "len < 200000 ? tier(\"short_context\", p*2 + c*6 + cr*0.3) : tier(\"long_context\", p*4 + c*12 + cr*0.6)"
+  },
+  {
+   "model_name": "deepseek-v4-pro",
+   "vendor_id": 21,
+   "quota_type": 0,
+   "model_ratio": 4.5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 3,
+   "cache_ratio": 0.03333333333333333,
+   "create_cache_ratio": 0,
+   "enable_groups": [
+    "国模-原厂",
+    "国模"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "(weekday(\"Asia/Shanghai\") >= 1 && weekday(\"Asia/Shanghai\") <= 5 && ((hour(\"Asia/Shanghai\") >= 9 && hour(\"Asia/Shanghai\") < 12) || (hour(\"Asia/Shanghai\") >= 14 && hour(\"Asia/Shanghai\") < 18))) ? tier(\"peak\", p*9 + c*27 + cr*0.3) : tier(\"offpeak\", p*4.5 + c*13.5 + cr*0.15)"
+  },
+  {
+   "model_name": "claude-fable-5-2",
+   "vendor_id": 1,
+   "quota_type": 0,
+   "model_ratio": 4,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.025,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "claude-cursor",
+    "claude-max企业"
+   ],
+   "supported_endpoint_types": [
+    "anthropic",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "gpt-image-2.5-sunburst-ad",
+   "vendor_id": 2,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.12,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "image-generation",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "claude-fable-5-1",
+   "vendor_id": 1,
+   "quota_type": 0,
+   "model_ratio": 5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.025,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "claude-cursor",
+    "claude-kiro",
+    "claude-kiro正价",
+    "claude-max企业"
+   ],
+   "supported_endpoint_types": [
+    "anthropic",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "claude-sonnet-5",
+   "description": "Claude Sonnet 5，均衡型主力模型，编码与多步骤任务的日常首选。",
+   "tags": "Claude",
+   "vendor_id": 1,
+   "quota_type": 0,
+   "model_ratio": 1,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "claude-cursor",
+    "claude-kiro",
+    "claude-kiro正价",
+    "claude-max企业"
+   ],
+   "supported_endpoint_types": [
+    "anthropic",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "gemini-3.8-flash",
+   "vendor_id": 4,
+   "quota_type": 0,
+   "model_ratio": 0.375,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.1,
+   "enable_groups": [
+    "gemini"
+   ],
+   "supported_endpoint_types": [
+    "gemini",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "gpt-6.1-sol",
+   "vendor_id": 2,
+   "quota_type": 0,
+   "model_ratio": 1,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.05,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "gpt-pro",
+    "gpt-promax",
+    "gpt-特惠",
+    "gpt-plus"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "(len <= 272000 ? tier(\"short_context\", p*2 + cr*0.1 + cc*2.5 + c*10) : tier(\"long_context\", p*4 + cr*0.2 + cc*5 + c*15)) * (param(\"service_tier\") == \"priority\" ? 2 : 1) * (param(\"service_tier\") == \"fast\" ? 2 : 1) * (param(\"service_tier\") == \"ultrafast\" ? 2 : 1)"
+  },
+  {
+   "model_name": "gpt-5.6",
+   "vendor_id": 2,
+   "quota_type": 0,
+   "model_ratio": 2.5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 6,
+   "cache_ratio": 0.1,
+   "enable_groups": [
+    "gpt-特惠"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "(len <= 272000 ? tier(\"0_272k\", p * 5 + c * 30 + cr * 0.5 + cc * 6.25) : tier(\"272k_plus\", p * 10 + c * 45 + cr * 1 + cc * 12.5)) * (param(\"service_tier\") == \"priority\" ? 2 : 1) * (param(\"service_tier\") == \"fast\" ? 2 : 1) * (param(\"service_tier\") == \"ultrafast\" ? 2 : 1)"
+  },
+  {
+   "model_name": "minimax-m3.1-flash",
+   "vendor_id": 15,
+   "quota_type": 0,
+   "model_ratio": 0.5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 4,
+   "cache_ratio": 0.1,
+   "enable_groups": [
+    "国模-原厂",
+    "国模"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "seedance-1.0-fast",
+   "description": "支持参考素材；720p ¥0.02／1080p ¥0.07每秒。首帧或 6、7、9 秒：720p ¥0.17每秒。",
+   "tags": "视频",
+   "vendor_id": 10,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.02,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "u(\"spec\") == \"plus\" && u(\"resolution\") == \"720p\" ? tier(\"720p-plus\", u(\"seconds\") * 0.17) : (u(\"resolution\") == \"1080p\" ? tier(\"1080p\", u(\"seconds\") * 0.07) : (tier(\"720p\", u(\"seconds\") * 0.02)))",
+   "billing_usage_schema": {
+    "reference_video_seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Reference video duration",
+      "zh": "参考视频时长"
+     }
+    },
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k",
+      "4k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    },
+    "spec": {
+     "enum": [
+      "standard",
+      "portrait",
+      "plus"
+     ],
+     "description": {
+      "en": "Capability tier",
+      "zh": "能力档"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 4s",
+     "facts": {
+      "reference_video_seconds": 0,
+      "resolution": "720p",
+      "seconds": 4,
+      "spec": "standard"
+     }
+    },
+    {
+     "label": "720p 4s + 5s reference video",
+     "facts": {
+      "reference_video_seconds": 5,
+      "resolution": "720p",
+      "seconds": 4,
+      "spec": "standard"
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "veo-3.1-lite",
+   "description": "按次 ¥1.00/次。Veo 3.1 Lite 文生视频，720p，16:9 或 9:16。不能指定时长，暂不支持参考图。",
+   "tags": "视频",
+   "vendor_id": 4,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 1,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"按次\", 1)",
+   "billing_usage_schema": {
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 8s",
+     "facts": {
+      "resolution": "720p",
+      "seconds": 8
+     }
+    },
+    {
+     "label": "1080p 8s",
+     "facts": {
+      "resolution": "1080p",
+      "seconds": 8
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "claude-sonnet-4-5",
+   "vendor_id": 1,
+   "quota_type": 0,
+   "model_ratio": 1.5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "claude-kiro"
+   ],
+   "supported_endpoint_types": [
+    "anthropic",
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "len <= 200000 ? tier(\"short_context\", p*3 + c*15 + cr*0.3 + cc*3.75 + cc1h*6) : tier(\"long_context\", p*6 + c*22.5 + cr*0.6 + cc*7.5 + cc1h*12)"
+  },
+  {
+   "model_name": "kimi-k3",
+   "vendor_id": 29,
+   "quota_type": 0,
+   "model_ratio": 10,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 0,
+   "enable_groups": [
+    "国模",
+    "国模-原厂"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "claude-sonnet-4-5-20250929-thinking",
+   "vendor_id": 1,
+   "quota_type": 0,
+   "model_ratio": 1.5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "claude-kiro"
+   ],
+   "supported_endpoint_types": [
+    "anthropic",
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "len <= 200000 ? tier(\"short_context\", p*3 + c*15 + cr*0.3 + cc*3.75 + cc1h*6) : tier(\"long_context\", p*6 + c*22.5 + cr*0.6 + cc*7.5 + cc1h*12)"
+  },
+  {
+   "model_name": "gpt-image-2.5-flare-2k",
+   "description": "GPT Image 2.5 Flare，原生 2K 出图（非超分），按张计费。不传 size 默认 2048×2048。",
+   "tags": "图像",
+   "vendor_id": 2,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.3,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "image-generation",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "hy4-preview",
+   "quota_type": 0,
+   "model_ratio": 3,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 3,
+   "cache_ratio": 0.05,
+   "create_cache_ratio": 0,
+   "enable_groups": [
+    "国模",
+    "国模-原厂"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "claude-sonnet-4-6",
+   "description": "Claude Sonnet 系列早期版本，性能与成本均衡，适合日常编码与内容生成。",
+   "tags": "Claude",
+   "vendor_id": 1,
+   "quota_type": 0,
+   "model_ratio": 1.5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "claude-kiro正价",
+    "claude-max企业",
+    "claude-cursor",
+    "claude-kiro"
+   ],
+   "supported_endpoint_types": [
+    "anthropic",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "codex-auto-review",
+   "description": "OpenAI Codex 自动代码审查模型，用于 PR/diff 自动化审阅场景。",
+   "tags": "GPT",
+   "vendor_id": 2,
+   "quota_type": 0,
+   "model_ratio": 0.1,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 6,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 0.1,
+   "enable_groups": [
+    "gpt-pro",
+    "gpt-promax"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"standard\", p * 0.2 + c * 1.2 + cr * 0.02) * (param(\"service_tier\") == \"priority\" ? 2 : 1) * (param(\"service_tier\") == \"fast\" ? 2 : 1) * (param(\"service_tier\") == \"ultrafast\" ? 2 : 1)"
+  },
+  {
+   "model_name": "gpt-image-2.5-flare-ad",
+   "vendor_id": 2,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.12,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "image-generation",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "claude-opus-4-6",
+   "description": "Claude Opus 系列早期版本，主打深度推理与复杂任务处理，位于 max 分组。",
+   "tags": "Claude",
+   "vendor_id": 1,
+   "quota_type": 0,
+   "model_ratio": 2.5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "claude-cursor",
+    "claude-kiro",
+    "claude-kiro正价",
+    "claude-max企业"
+   ],
+   "supported_endpoint_types": [
+    "anthropic",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "grok-4.6",
+   "description": "Grok 4.6，xAI 旗舰模型，500k 上下文，≥200k tokens 走长上下文档。",
+   "tags": "Grok",
+   "vendor_id": 11,
+   "quota_type": 0,
+   "model_ratio": 1,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 3,
+   "cache_ratio": 0.25,
+   "enable_groups": [
+    "grok"
+   ],
+   "supported_endpoint_types": [
+    "openai",
+    "openai-response"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "len < 200000 ? tier(\"short_context\", p*2 + c*6 + cr*0.5) : tier(\"long_context\", p*4 + c*12 + cr*1)"
+  },
+  {
+   "model_name": "seedance-2.0-per-call-max",
+   "description": "按次 ¥6.25/次，4–15 秒同价。Seedance 2.0 满血，720p。支持首尾帧和参考素材链接，素材不另收费。",
+   "tags": "视频",
+   "vendor_id": 10,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 6.25,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"按次\", 6.25)",
+   "billing_usage_schema": {
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 8s",
+     "facts": {
+      "resolution": "720p",
+      "seconds": 8
+     }
+    },
+    {
+     "label": "1080p 8s",
+     "facts": {
+      "resolution": "1080p",
+      "seconds": 8
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "claude-opus-4-5-20251101-thinking",
+   "vendor_id": 1,
+   "quota_type": 0,
+   "model_ratio": 2.5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "claude-kiro"
+   ],
+   "supported_endpoint_types": [
+    "anthropic",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "mimo-v2.5-pro",
+   "quota_type": 0,
+   "model_ratio": 1.55,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 1.9677419355,
+   "cache_ratio": 0.0322580645,
+   "create_cache_ratio": 0,
+   "enable_groups": [
+    "国模"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "kimi-k3.1-pro-highspeed",
+   "vendor_id": 29,
+   "quota_type": 0,
+   "model_ratio": 6.5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5.230769230769231,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 1,
+   "enable_groups": [
+    "国模-原厂"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"flat\", p*13 + c*68 + cr*1.3 + cc*13 + cc1h*26)"
+  },
+  {
+   "model_name": "claude-opus-4-8",
+   "description": "Claude Opus 4.8，Anthropic 深度推理旗舰，适合复杂架构决策与高难度分析。",
+   "tags": "Claude",
+   "vendor_id": 1,
+   "quota_type": 0,
+   "model_ratio": 2.5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "claude-cursor",
+    "claude-kiro",
+    "claude-kiro正价",
+    "claude-max企业"
+   ],
+   "supported_endpoint_types": [
+    "anthropic",
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"standard\", p * 5 + c * 25 + cr * 0.5 + cc * 6.25 + cc1h * 10) * (param(\"speed\") == \"fast\" ? 2 : 1)"
+  },
+  {
+   "model_name": "claude-opus-5",
+   "vendor_id": 1,
+   "quota_type": 0,
+   "model_ratio": 2.5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "claude-max企业",
+    "claude-cursor",
+    "claude-kiro",
+    "claude-kiro正价"
+   ],
+   "supported_endpoint_types": [
+    "anthropic",
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"standard\", p * 5 + c * 25 + cr * 0.5 + cc * 6.25 + cc1h * 10) * (param(\"speed\") == \"fast\" ? 2 : 1)"
+  },
+  {
+   "model_name": "gpt-image-2.5-sunburst-4k",
+   "description": "GPT Image 2.5 Sunburst，原生 4K 出图（非超分），按张计费。不传 size 默认 3840×2160，可传 size 自选尺寸。",
+   "tags": "图像",
+   "vendor_id": 2,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.3,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "image-generation",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "glm-5.3",
+   "vendor_id": 23,
+   "quota_type": 0,
+   "model_ratio": 4,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 3.5,
+   "cache_ratio": 0.25,
+   "create_cache_ratio": 0,
+   "enable_groups": [
+    "国模",
+    "国模-原厂"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "glm-5.3-flash",
+   "vendor_id": 23,
+   "quota_type": 0,
+   "model_ratio": 0.4,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 3.5,
+   "cache_ratio": 0.2875,
+   "create_cache_ratio": 0,
+   "enable_groups": [
+    "国模",
+    "国模-原厂"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "seedance-2.0-fast",
+   "description": "支持参考素材；480p ¥0.055／720p ¥0.20每秒。参考视频另计：480p ¥0.035／720p ¥0.20每秒。首帧/首尾帧：720p ¥0.22每秒。",
+   "tags": "视频",
+   "vendor_id": 10,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.2,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "u(\"spec\") == \"portrait\" && u(\"resolution\") == \"720p\" ? tier(\"720p-portrait\", u(\"seconds\") * 0.14) : (u(\"spec\") == \"plus\" && u(\"resolution\") == \"720p\" ? tier(\"720p-plus\", u(\"seconds\") * 0.22 + u(\"reference_video_seconds\") * 0.22) : (u(\"resolution\") == \"480p\" ? tier(\"480p\", u(\"seconds\") * 0.055 + u(\"reference_video_seconds\") * 0.035) : (tier(\"720p\", u(\"seconds\") * 0.2 + u(\"reference_video_seconds\") * 0.2))))",
+   "billing_usage_schema": {
+    "reference_video_seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Reference video duration",
+      "zh": "参考视频时长"
+     }
+    },
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k",
+      "4k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    },
+    "spec": {
+     "enum": [
+      "standard",
+      "portrait",
+      "plus"
+     ],
+     "description": {
+      "en": "Capability tier",
+      "zh": "能力档"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 4s",
+     "facts": {
+      "reference_video_seconds": 0,
+      "resolution": "720p",
+      "seconds": 4,
+      "spec": "standard"
+     }
+    },
+    {
+     "label": "720p 4s + 5s reference video",
+     "facts": {
+      "reference_video_seconds": 5,
+      "resolution": "720p",
+      "seconds": 4,
+      "spec": "standard"
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "seedance-2.0-per-call-720p",
+   "description": "按次 ¥3.90/次，5–15 秒同价。Seedance 2.0，720p，16:9、9:16、1:1，仅文生视频。可能排队较久，提交后不能取消。",
+   "tags": "视频",
+   "vendor_id": 10,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 3.9,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"按次\", 3.9)",
+   "billing_usage_schema": {
+    "reference_video_seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Reference video duration",
+      "zh": "参考视频时长"
+     }
+    },
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k",
+      "4k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    },
+    "spec": {
+     "enum": [
+      "standard",
+      "portrait",
+      "plus"
+     ],
+     "description": {
+      "en": "Capability tier",
+      "zh": "能力档"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 4s",
+     "facts": {
+      "reference_video_seconds": 0,
+      "resolution": "720p",
+      "seconds": 4,
+      "spec": "standard"
+     }
+    },
+    {
+     "label": "720p 4s + 5s reference video",
+     "facts": {
+      "reference_video_seconds": 5,
+      "resolution": "720p",
+      "seconds": 4,
+      "spec": "standard"
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "gpt-image-2-2k",
+   "description": "GPT Image 2（2K 分辨率），新一代 OpenAI 文生图模型。",
+   "tags": "图像",
+   "vendor_id": 2,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.1,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "image-generation",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "deepseek-v4-flash",
+   "vendor_id": 21,
+   "quota_type": 0,
+   "model_ratio": 1,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 4,
+   "cache_ratio": 0.02,
+   "create_cache_ratio": 0,
+   "enable_groups": [
+    "国模",
+    "国模-原厂"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"flat\", p*2 + c*8 + cr*0.04)"
+  },
+  {
+   "model_name": "muse-video",
+   "description": "按次 ¥0.65/次。Muse Video 文生视频，720p，16:9 或 9:16。不能指定时长，暂不支持参考图。",
+   "tags": "视频",
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.65,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"按次\", 0.65)",
+   "billing_usage_schema": {
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 8s",
+     "facts": {
+      "resolution": "720p",
+      "seconds": 8
+     }
+    },
+    {
+     "label": "1080p 8s",
+     "facts": {
+      "resolution": "1080p",
+      "seconds": 8
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "omni-flash-video",
+   "description": "按次 ¥0.60/次。Omni Flash 文生视频，720p，16:9 或 9:16。不能指定时长，暂不支持参考图。",
+   "tags": "视频",
+   "vendor_id": 4,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.6,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"按次\", 0.6)",
+   "billing_usage_schema": {
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 8s",
+     "facts": {
+      "resolution": "720p",
+      "seconds": 8
+     }
+    },
+    {
+     "label": "1080p 8s",
+     "facts": {
+      "resolution": "1080p",
+      "seconds": 8
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "gpt-6-astra",
+   "vendor_id": 2,
+   "quota_type": 0,
+   "model_ratio": 5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.1,
+   "enable_groups": [
+    "gpt-特惠",
+    "gpt-plus",
+    "gpt-pro",
+    "gpt-promax"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "(len <= 272000 ? tier(\"short_context\", p*10 + cr*1 + cc*12.5 + c*50) : tier(\"long_context\", p*20 + cr*2 + cc*25 + c*75)) * (param(\"service_tier\") == \"priority\" ? 2 : 1) * (param(\"service_tier\") == \"fast\" ? 2 : 1) * (param(\"service_tier\") == \"ultrafast\" ? 6 : 1)"
+  },
+  {
+   "model_name": "banana-pro-4k",
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.11,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "deepseek-v4.1-flash",
+   "vendor_id": 21,
+   "quota_type": 0,
+   "model_ratio": 1,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 4,
+   "cache_ratio": 0.02,
+   "create_cache_ratio": 0,
+   "enable_groups": [
+    "国模",
+    "国模-原厂"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "(weekday(\"Asia/Shanghai\") >= 1 && weekday(\"Asia/Shanghai\") <= 5 && ((hour(\"Asia/Shanghai\") >= 9 && hour(\"Asia/Shanghai\") < 12) || (hour(\"Asia/Shanghai\") >= 14 && hour(\"Asia/Shanghai\") < 18))) ? tier(\"peak\", p*2 + c*8 + cr*0.04) : tier(\"offpeak\", p*1 + c*4 + cr*0.02)"
+  },
+  {
+   "model_name": "seedance-2.0-fast-per-call",
+   "description": "按次 ¥3.50/次，4–15 秒同价。Seedance 2.0 Fast，720p，16:9、9:16、1:1。支持首尾帧和参考素材链接，素材不另收费。",
+   "tags": "视频",
+   "vendor_id": 10,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 3.5,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"按次\", 3.5)",
+   "billing_usage_schema": {
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 8s",
+     "facts": {
+      "resolution": "720p",
+      "seconds": 8
+     }
+    },
+    {
+     "label": "1080p 8s",
+     "facts": {
+      "resolution": "1080p",
+      "seconds": 8
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "seedance-2.0-per-call",
+   "description": "按次 ¥4.75/次，5–15 秒同价。Seedance 2.0，720p。支持首尾帧和参考素材链接，素材不另收费。",
+   "tags": "视频",
+   "vendor_id": 10,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 4.75,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"按次\", 4.75)",
+   "billing_usage_schema": {
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 8s",
+     "facts": {
+      "resolution": "720p",
+      "seconds": 8
+     }
+    },
+    {
+     "label": "1080p 8s",
+     "facts": {
+      "resolution": "1080p",
+      "seconds": 8
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "claude-sonnet-5-5",
+   "vendor_id": 1,
+   "quota_type": 0,
+   "model_ratio": 1,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.05,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "claude-cursor",
+    "claude-kiro",
+    "claude-kiro正价",
+    "claude-max企业"
+   ],
+   "supported_endpoint_types": [
+    "anthropic",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "claude-opus-4-5",
+   "vendor_id": 1,
+   "quota_type": 0,
+   "model_ratio": 2.5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "claude-kiro",
+    "claude-kiro正价",
+    "claude-max企业"
+   ],
+   "supported_endpoint_types": [
+    "anthropic",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "gpt-image-2.5-sunburst-2k",
+   "description": "GPT Image 2.5 Sunburst，原生 2K 出图（非超分），按张计费。不传 size 默认 2048×2048。",
+   "tags": "图像",
+   "vendor_id": 2,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.3,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "image-generation",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "claude-opus-5-thinking",
+   "vendor_id": 1,
+   "quota_type": 0,
+   "model_ratio": 2.5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "claude-kiro"
+   ],
+   "supported_endpoint_types": [
+    "anthropic",
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"standard\", p * 5 + c * 25 + cr * 0.5 + cc * 6.25 + cc1h * 10) * (param(\"speed\") == \"fast\" ? 2 : 1)"
+  },
+  {
+   "model_name": "nano-banana-2.1-1k",
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.08,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "seedance-2.5-draft",
+   "description": "官方key 5.21折。支持参考素材；480p ¥0.35每秒。参考视频按同单价另计。首帧/首尾帧：480p ¥0.35每秒。",
+   "tags": "视频",
+   "vendor_id": 10,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.35,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "u(\"spec\") == \"plus\" && u(\"resolution\") == \"480p\" ? tier(\"480p-plus\", u(\"seconds\") * 0.35 + u(\"reference_video_seconds\") * 0.35) : (tier(\"480p\", u(\"seconds\") * 0.35 + u(\"reference_video_seconds\") * 0.35))",
+   "billing_usage_schema": {
+    "reference_video_seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Reference video duration",
+      "zh": "参考视频时长"
+     }
+    },
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k",
+      "4k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    },
+    "spec": {
+     "enum": [
+      "standard",
+      "portrait",
+      "plus"
+     ],
+     "description": {
+      "en": "Capability tier",
+      "zh": "能力档"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 4s",
+     "facts": {
+      "reference_video_seconds": 0,
+      "resolution": "720p",
+      "seconds": 4,
+      "spec": "standard"
+     }
+    },
+    {
+     "label": "720p 4s + 5s reference video",
+     "facts": {
+      "reference_video_seconds": 5,
+      "resolution": "720p",
+      "seconds": 4,
+      "spec": "standard"
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "grok-imagine-image-quality",
+   "vendor_id": 11,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.2,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "openai",
+    "openai-response"
+   ]
+  },
+  {
+   "model_name": "seedance-2.5",
+   "description": "官方key 720p 4.30折。支持参考素材；480p ¥0.30／720p ¥0.65／1080p ¥1.60每秒。参考视频按同单价另计。",
+   "tags": "视频",
+   "vendor_id": 10,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.65,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "u(\"resolution\") == \"480p\" ? tier(\"480p\", u(\"seconds\") * 0.3 + u(\"reference_video_seconds\") * 0.3) : (u(\"resolution\") == \"1080p\" ? tier(\"1080p\", u(\"seconds\") * 1.6 + u(\"reference_video_seconds\") * 1.6) : (tier(\"720p\", u(\"seconds\") * 0.65 + u(\"reference_video_seconds\") * 0.65)))",
+   "billing_usage_schema": {
+    "reference_video_seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Reference video duration",
+      "zh": "参考视频时长"
+     }
+    },
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k",
+      "4k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    },
+    "spec": {
+     "enum": [
+      "standard",
+      "portrait",
+      "plus"
+     ],
+     "description": {
+      "en": "Capability tier",
+      "zh": "能力档"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 4s",
+     "facts": {
+      "reference_video_seconds": 0,
+      "resolution": "720p",
+      "seconds": 4,
+      "spec": "standard"
+     }
+    },
+    {
+     "label": "720p 4s + 5s reference video",
+     "facts": {
+      "reference_video_seconds": 5,
+      "resolution": "720p",
+      "seconds": 4,
+      "spec": "standard"
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "wan3.0-video-p",
+   "description": "按秒。Wan 3.0 P，5–30 秒，480p/720p/1080p ¥0.37/0.57/1.00 每秒。支持参考图、音频链接，暂不支持参考视频。",
+   "tags": "视频",
+   "vendor_id": 16,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.57,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "u(\"resolution\") == \"480p\" ? tier(\"480p\", u(\"seconds\") * 0.37) : (u(\"resolution\") == \"1080p\" ? tier(\"1080p\", u(\"seconds\") * 1) : tier(\"720p\", u(\"seconds\") * 0.57))",
+   "billing_usage_schema": {
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 8s",
+     "facts": {
+      "resolution": "720p",
+      "seconds": 8
+     }
+    },
+    {
+     "label": "1080p 8s",
+     "facts": {
+      "resolution": "1080p",
+      "seconds": 8
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "claude-opus-4-5-20251101",
+   "vendor_id": 1,
+   "quota_type": 0,
+   "model_ratio": 2.5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "claude-kiro正价",
+    "claude-kiro"
+   ],
+   "supported_endpoint_types": [
+    "anthropic",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "nano-banana-2.1-2k",
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.09,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "seedance-1.5-pro",
+   "description": "支持参考素材；480p ¥0.39／720p ¥0.02／1080p ¥1.50每秒。",
+   "tags": "视频",
+   "vendor_id": 10,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.02,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "u(\"resolution\") == \"480p\" ? tier(\"480p\", u(\"seconds\") * 0.39) : (u(\"resolution\") == \"1080p\" ? tier(\"1080p\", u(\"seconds\") * 1.5) : (tier(\"720p\", u(\"seconds\") * 0.02)))",
+   "billing_usage_schema": {
+    "reference_video_seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Reference video duration",
+      "zh": "参考视频时长"
+     }
+    },
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k",
+      "4k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    },
+    "spec": {
+     "enum": [
+      "standard",
+      "portrait",
+      "plus"
+     ],
+     "description": {
+      "en": "Capability tier",
+      "zh": "能力档"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 4s",
+     "facts": {
+      "reference_video_seconds": 0,
+      "resolution": "720p",
+      "seconds": 4,
+      "spec": "standard"
+     }
+    },
+    {
+     "label": "720p 4s + 5s reference video",
+     "facts": {
+      "reference_video_seconds": 5,
+      "resolution": "720p",
+      "seconds": 4,
+      "spec": "standard"
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "wan3.0-video",
+   "description": "按秒。Wan 3.0，2–30 秒，480p/720p/1080p ¥0.38/0.40/0.43 每秒。支持参考图、视频、音频链接，不另收费。",
+   "tags": "视频",
+   "vendor_id": 16,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.4,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "u(\"resolution\") == \"480p\" ? tier(\"480p\", u(\"seconds\") * 0.38) : (u(\"resolution\") == \"1080p\" ? tier(\"1080p\", u(\"seconds\") * 0.43) : tier(\"720p\", u(\"seconds\") * 0.4))",
+   "billing_usage_schema": {
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 8s",
+     "facts": {
+      "resolution": "720p",
+      "seconds": 8
+     }
+    },
+    {
+     "label": "1080p 8s",
+     "facts": {
+      "resolution": "1080p",
+      "seconds": 8
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "claude-haiku-4-5-20251001",
+   "description": "Claude Haiku 4.5，轻量快速模型，适合低延迟、低成本的简单问答与批量处理场景。",
+   "tags": "Claude",
+   "vendor_id": 1,
+   "quota_type": 0,
+   "model_ratio": 0.5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "claude-kiro正价",
+    "claude-kiro"
+   ],
+   "supported_endpoint_types": [
+    "anthropic",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "qwen3.7-max",
+   "vendor_id": 20,
+   "quota_type": 0,
+   "model_ratio": 6,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 3,
+   "cache_ratio": 0.2,
+   "enable_groups": [
+    "国模"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "veo-3.1-fast",
+   "description": "按次 ¥1.00/次。Veo 3.1 Fast 文生视频，720p，16:9 或 9:16。不能指定时长，暂不支持参考图。",
+   "tags": "视频",
+   "vendor_id": 4,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 1,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"按次\", 1)",
+   "billing_usage_schema": {
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 8s",
+     "facts": {
+      "resolution": "720p",
+      "seconds": 8
+     }
+    },
+    {
+     "label": "1080p 8s",
+     "facts": {
+      "resolution": "1080p",
+      "seconds": 8
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "seedance-2.0-fast-per-call-wide",
+   "description": "按次 ¥4.40/次，4–15 秒同价。Seedance 2.0 Fast，720p，六种比例。支持首尾帧和参考素材链接，素材不另收费。",
+   "tags": "视频",
+   "vendor_id": 10,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 4.4,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"按次\", 4.4)",
+   "billing_usage_schema": {
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 8s",
+     "facts": {
+      "resolution": "720p",
+      "seconds": 8
+     }
+    },
+    {
+     "label": "1080p 8s",
+     "facts": {
+      "resolution": "1080p",
+      "seconds": 8
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "gpt-5.6-sol",
+   "description": "GPT-5.6 系列子版本（渠道内部代号 sol），面向 plus/pro 分组的对话与推理任务。",
+   "tags": "GPT",
+   "vendor_id": 2,
+   "quota_type": 0,
+   "model_ratio": 1.875,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 8,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "gpt-plus",
+    "gpt-pro",
+    "gpt-promax",
+    "gpt-特惠"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "(len <= 272000 ? tier(\"short_context\", p*5 + cr*0.5 + cc*6.25 + c*30) : tier(\"long_context\", p*10 + cr*1 + cc*12.5 + c*45)) * (param(\"service_tier\") == \"priority\" ? 2 : 1) * (param(\"service_tier\") == \"fast\" ? 2 : 1) * (param(\"service_tier\") == \"ultrafast\" ? 2 : 1)"
+  },
+  {
+   "model_name": "gpt-5.6-terra",
+   "description": "GPT-5.6 系列子版本（渠道内部代号 terra），面向 plus/pro 分组的对话与推理任务。",
+   "tags": "GPT",
+   "vendor_id": 2,
+   "quota_type": 0,
+   "model_ratio": 0.9375,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 8,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "gpt-promax",
+    "gpt-特惠",
+    "gpt-plus",
+    "gpt-pro"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "(len <= 272000 ? tier(\"0_272k\", p * 2 + c * 12 + cr * 0.2 + cc * 2.5) : tier(\"272k_plus\", p * 4 + c * 18 + cr * 0.4 + cc * 5)) * (param(\"service_tier\") == \"priority\" ? 2 : 1) * (param(\"service_tier\") == \"fast\" ? 2 : 1) * (param(\"service_tier\") == \"ultrafast\" ? 2 : 1)"
+  },
+  {
+   "model_name": "gemini-3.1-flash-image-preview",
+   "description": "Gemini 3.1 Flash 图像生成预览版。",
+   "tags": "图像",
+   "vendor_id": 4,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.12,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "gemini",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "gemini-nano-banana-2.1",
+   "vendor_id": 4,
+   "quota_type": 0,
+   "model_ratio": 37.5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 4,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "gemini",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "grok-imagine-image",
+   "vendor_id": 11,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.2,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "openai",
+    "openai-response"
+   ]
+  },
+  {
+   "model_name": "deepseek-v4.1-flash-1017",
+   "vendor_id": 21,
+   "quota_type": 0,
+   "model_ratio": 1,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 4,
+   "cache_ratio": 0.02,
+   "create_cache_ratio": 0,
+   "enable_groups": [
+    "国模-原厂"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "(weekday(\"Asia/Shanghai\") >= 1 && weekday(\"Asia/Shanghai\") <= 5 && ((hour(\"Asia/Shanghai\") >= 9 && hour(\"Asia/Shanghai\") < 12) || (hour(\"Asia/Shanghai\") >= 14 && hour(\"Asia/Shanghai\") < 18))) ? tier(\"peak\", p*2 + c*8 + cr*0.04) : tier(\"offpeak\", p*1 + c*4 + cr*0.02)"
+  },
+  {
+   "model_name": "gpt-image-2.5",
+   "vendor_id": 2,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.04,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "image-generation",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "gpt-image-2.6",
+   "vendor_id": 2,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.04,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "image-generation",
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"image\", fixed(0.04)) * image_count"
+  },
+  {
+   "model_name": "kimi-k2.7-code",
+   "vendor_id": 29,
+   "quota_type": 0,
+   "model_ratio": 3.25,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 4.1538461538,
+   "cache_ratio": 0.2,
+   "create_cache_ratio": 0,
+   "enable_groups": [
+    "国模",
+    "国模-原厂"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "claude-opus-5-5",
+   "vendor_id": 1,
+   "quota_type": 0,
+   "model_ratio": 2,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.05,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "claude-cursor",
+    "claude-kiro",
+    "claude-kiro正价",
+    "claude-max企业"
+   ],
+   "supported_endpoint_types": [
+    "anthropic",
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"standard\", p * 4 + c * 20 + cr * 0.2 + cc * 5 + cc1h * 8) * (param(\"speed\") == \"fast\" ? 2 : 1)"
+  },
+  {
+   "model_name": "banana-pro-2k",
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.11,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "qwen3.8-flash",
+   "vendor_id": 20,
+   "quota_type": 0,
+   "model_ratio": 0.4,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 3.375,
+   "enable_groups": [
+    "国模",
+    "国模-原厂"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "seedance-2.5-express",
+   "description": "按秒，不排队。Seedance 2.5 满血，提交后直接开始生成，不受高峰排队影响。4–30 秒，480p/720p/1080p ¥1.06/1.63/3.38 每秒（例：480p 5 秒 ¥5.30）。画幅 16:9、9:16、1:1，仅文生视频，暂不支持参考图和首尾帧。不赶时间可用 seedance-2.5（¥0.25/0.55/1.35 每秒，高峰可能排队）。",
+   "tags": "视频",
+   "vendor_id": 10,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 1.63,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "u(\"resolution\") == \"480p\" ? tier(\"480p\", u(\"seconds\") * 1.06) : (u(\"resolution\") == \"1080p\" ? tier(\"1080p\", u(\"seconds\") * 3.38) : tier(\"720p\", u(\"seconds\") * 1.63))",
+   "billing_usage_schema": {
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 8s",
+     "facts": {
+      "resolution": "720p",
+      "seconds": 8
+     }
+    },
+    {
+     "label": "1080p 8s",
+     "facts": {
+      "resolution": "1080p",
+      "seconds": 8
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "banana2-2k",
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.1,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "kimi-k2.6",
+   "vendor_id": 29,
+   "quota_type": 0,
+   "model_ratio": 3.25,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 4.1538461538,
+   "cache_ratio": 0.1692307692,
+   "create_cache_ratio": 0,
+   "enable_groups": [
+    "国模-原厂"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "claude-haiku-4-5",
+   "vendor_id": 1,
+   "quota_type": 0,
+   "model_ratio": 0.5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "claude-cursor",
+    "claude-max企业"
+   ],
+   "supported_endpoint_types": [
+    "anthropic",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "seedance-2.5-per-call-full",
+   "description": "按次 ¥18.75/次，4–30 秒同价。Seedance 2.5，720p，仅文生视频，可能排队较久。",
+   "tags": "视频",
+   "vendor_id": 10,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 18.75,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"按次\", 18.75)",
+   "billing_usage_schema": {
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 8s",
+     "facts": {
+      "resolution": "720p",
+      "seconds": 8
+     }
+    },
+    {
+     "label": "1080p 8s",
+     "facts": {
+      "resolution": "1080p",
+      "seconds": 8
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "claude-haiku-5-5",
+   "vendor_id": 1,
+   "quota_type": 0,
+   "model_ratio": 0.05,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 1.25,
+   "enable_groups": [
+    "claude-cursor",
+    "claude-kiro",
+    "claude-max企业"
+   ],
+   "supported_endpoint_types": [
+    "anthropic",
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "len <= 100000 ? tier(\"short_context\", p*0.1 + c*0.5 + cr*0.01 + cc*0.125 + cc1h*0.2) : tier(\"long_context\", p*0.5 + c*2.5 + cr*0.05 + cc*0.625 + cc1h*1)"
+  },
+  {
+   "model_name": "gemini-4-argon-low",
+   "vendor_id": 4,
+   "quota_type": 0,
+   "model_ratio": 1,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.049999999999999996,
+   "create_cache_ratio": 0,
+   "enable_groups": [
+    "gemini"
+   ],
+   "supported_endpoint_types": [
+    "gemini",
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"flat\", p*2 + c*10 + cr*0.1)"
+  },
+  {
+   "model_name": "gpt-image-2.5-flare",
+   "description": "GPT Image 2.5 Flare，OpenAI 文生图模型。",
+   "tags": "图像",
+   "vendor_id": 2,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.04,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "image-generation",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "seedance-2.0",
+   "description": "支持参考素材；480p ¥0.14／720p ¥0.45／1080p ¥1.00／4k ¥2.35每秒。参考视频另计：480p ¥0.095／720p ¥0.45／1080p ¥1.00／4k ¥2.35每秒。首帧/首尾帧：720p ¥0.49／1080p ¥1.15／4k ¥2.45每秒；竖屏 720p ¥0.18每秒。",
+   "tags": "视频",
+   "vendor_id": 10,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.45,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "u(\"spec\") == \"portrait\" && u(\"resolution\") == \"720p\" ? tier(\"720p-portrait\", u(\"seconds\") * 0.18) : (u(\"spec\") == \"plus\" && u(\"resolution\") == \"720p\" ? tier(\"720p-plus\", u(\"seconds\") * 0.49 + u(\"reference_video_seconds\") * 0.49) : (u(\"spec\") == \"plus\" && u(\"resolution\") == \"1080p\" ? tier(\"1080p-plus\", u(\"seconds\") * 1.15 + u(\"reference_video_seconds\") * 1.15) : (u(\"spec\") == \"plus\" && u(\"resolution\") == \"4k\" ? tier(\"4k-plus\", u(\"seconds\") * 2.45 + u(\"reference_video_seconds\") * 2.45) : (u(\"resolution\") == \"480p\" ? tier(\"480p\", u(\"seconds\") * 0.14 + u(\"reference_video_seconds\") * 0.095) : (u(\"resolution\") == \"1080p\" ? tier(\"1080p\", u(\"seconds\") * 1.0 + u(\"reference_video_seconds\") * 1.0) : (u(\"resolution\") == \"4k\" ? tier(\"4k\", u(\"seconds\") * 2.35 + u(\"reference_video_seconds\") * 2.35) : (tier(\"720p\", u(\"seconds\") * 0.45 + u(\"reference_video_seconds\") * 0.45))))))))",
+   "billing_usage_schema": {
+    "reference_video_seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Reference video duration",
+      "zh": "参考视频时长"
+     }
+    },
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k",
+      "4k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    },
+    "spec": {
+     "enum": [
+      "standard",
+      "portrait",
+      "plus"
+     ],
+     "description": {
+      "en": "Capability tier",
+      "zh": "能力档"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 4s",
+     "facts": {
+      "reference_video_seconds": 0,
+      "resolution": "720p",
+      "seconds": 4,
+      "spec": "standard"
+     }
+    },
+    {
+     "label": "720p 4s + 5s reference video",
+     "facts": {
+      "reference_video_seconds": 5,
+      "resolution": "720p",
+      "seconds": 4,
+      "spec": "standard"
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "seedance-2.0-mini",
+   "description": "官方key 720p 3.03折。支持参考素材；480p ¥0.035／720p ¥0.15每秒。参考视频另计：480p ¥0.025／720p ¥0.15每秒。首帧/首尾帧：720p ¥0.16每秒。",
+   "tags": "视频",
+   "vendor_id": 10,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.15,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "u(\"spec\") == \"portrait\" && u(\"resolution\") == \"720p\" ? tier(\"720p-portrait\", u(\"seconds\") * 0.105) : (u(\"spec\") == \"plus\" && u(\"resolution\") == \"720p\" ? tier(\"720p-plus\", u(\"seconds\") * 0.16 + u(\"reference_video_seconds\") * 0.16) : (u(\"resolution\") == \"480p\" ? tier(\"480p\", u(\"seconds\") * 0.035 + u(\"reference_video_seconds\") * 0.025) : (tier(\"720p\", u(\"seconds\") * 0.15 + u(\"reference_video_seconds\") * 0.15))))",
+   "billing_usage_schema": {
+    "reference_video_seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Reference video duration",
+      "zh": "参考视频时长"
+     }
+    },
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k",
+      "4k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    },
+    "spec": {
+     "enum": [
+      "standard",
+      "portrait",
+      "plus"
+     ],
+     "description": {
+      "en": "Capability tier",
+      "zh": "能力档"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 4s",
+     "facts": {
+      "reference_video_seconds": 0,
+      "resolution": "720p",
+      "seconds": 4,
+      "spec": "standard"
+     }
+    },
+    {
+     "label": "720p 4s + 5s reference video",
+     "facts": {
+      "reference_video_seconds": 5,
+      "resolution": "720p",
+      "seconds": 4,
+      "spec": "standard"
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "seedance-2.5-per-call-720p",
+   "description": "按次 ¥7.00/次，5–30 秒同价。Seedance 2.5，720p，16:9、9:16、1:1，仅文生视频。可能排队较久，提交后不能取消。",
+   "tags": "视频",
+   "vendor_id": 10,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 7,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"按次\", 7.0)",
+   "billing_usage_schema": {
+    "reference_video_seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Reference video duration",
+      "zh": "参考视频时长"
+     }
+    },
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k",
+      "4k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    },
+    "spec": {
+     "enum": [
+      "standard",
+      "portrait",
+      "plus"
+     ],
+     "description": {
+      "en": "Capability tier",
+      "zh": "能力档"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 4s",
+     "facts": {
+      "reference_video_seconds": 0,
+      "resolution": "720p",
+      "seconds": 4,
+      "spec": "standard"
+     }
+    },
+    {
+     "label": "720p 4s + 5s reference video",
+     "facts": {
+      "reference_video_seconds": 5,
+      "resolution": "720p",
+      "seconds": 4,
+      "spec": "standard"
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "wan3.0-video-prime-p",
+   "description": "按秒。Wan 3.0 Prime P，5–30 秒，480p/720p/1080p ¥0.49/0.87/1.57 每秒。支持参考图、音频链接，暂不支持参考视频。",
+   "tags": "视频",
+   "vendor_id": 16,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.87,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "u(\"resolution\") == \"480p\" ? tier(\"480p\", u(\"seconds\") * 0.49) : (u(\"resolution\") == \"1080p\" ? tier(\"1080p\", u(\"seconds\") * 1.57) : tier(\"720p\", u(\"seconds\") * 0.87))",
+   "billing_usage_schema": {
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 8s",
+     "facts": {
+      "resolution": "720p",
+      "seconds": 8
+     }
+    },
+    {
+     "label": "1080p 8s",
+     "facts": {
+      "resolution": "1080p",
+      "seconds": 8
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "gemini-4-argon-medium",
+   "vendor_id": 4,
+   "quota_type": 0,
+   "model_ratio": 1,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.049999999999999996,
+   "create_cache_ratio": 0,
+   "enable_groups": [
+    "gemini"
+   ],
+   "supported_endpoint_types": [
+    "gemini",
+    "openai"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"flat\", p*2 + c*10 + cr*0.1)"
+  },
+  {
+   "model_name": "gpt-image-2.5-sunburst",
+   "description": "GPT Image 2.5 Sunburst，OpenAI 文生图模型。",
+   "tags": "图像",
+   "vendor_id": 2,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.04,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "image-generation",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "veo-3.1",
+   "description": "按次 ¥1.00/次。Veo 3.1 文生视频，720p，16:9 或 9:16。不能指定时长，暂不支持参考图。",
+   "tags": "视频",
+   "vendor_id": 4,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 1,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"按次\", 1)",
+   "billing_usage_schema": {
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 8s",
+     "facts": {
+      "resolution": "720p",
+      "seconds": 8
+     }
+    },
+    {
+     "label": "1080p 8s",
+     "facts": {
+      "resolution": "1080p",
+      "seconds": 8
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "grok-4.7",
+   "vendor_id": 11,
+   "quota_type": 0,
+   "model_ratio": 1,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 3,
+   "cache_ratio": 0.25,
+   "enable_groups": [
+    "grok"
+   ],
+   "supported_endpoint_types": [
+    "openai",
+    "openai-response"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "len < 200000 ? tier(\"short_context\", p*2 + c*6 + cr*0.5) : tier(\"long_context\", p*4 + c*12 + cr*1)"
+  },
+  {
+   "model_name": "banana2-4k",
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.1,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "grok-imagine-image-2.0",
+   "vendor_id": 11,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.2,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "openai",
+    "openai-response"
+   ]
+  },
+  {
+   "model_name": "kimi-k3.1-pro",
+   "vendor_id": 29,
+   "quota_type": 0,
+   "model_ratio": 6.5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5.230769230769231,
+   "cache_ratio": 0.1,
+   "enable_groups": [
+    "国模",
+    "国模-原厂"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "gpt-image-2.5-ext-4k",
+   "description": "GPT Image 2.5 Ext，原生 4K 出图（非超分），按张计费。不传 size 默认 3840×2160，可传 size 自选尺寸。",
+   "tags": "图像",
+   "vendor_id": 2,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.3,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "image-generation",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "MiniMax-M2.7",
+   "vendor_id": 15,
+   "quota_type": 0,
+   "model_ratio": 1.05,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 4,
+   "cache_ratio": 0.2,
+   "create_cache_ratio": 1.2523809524,
+   "enable_groups": [
+    "国模",
+    "国模-原厂"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "qwen3.8-max",
+   "vendor_id": 20,
+   "quota_type": 0,
+   "model_ratio": 6,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 3,
+   "enable_groups": [
+    "国模",
+    "国模-原厂"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "gpt-image-2",
+   "description": "GPT Image 2，新一代 OpenAI 文生图模型。",
+   "tags": "图像",
+   "vendor_id": 2,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.04,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "image-generation",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "glm-5.3-flashx",
+   "vendor_id": 23,
+   "quota_type": 0,
+   "model_ratio": 1,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 3.5,
+   "cache_ratio": 0.285,
+   "enable_groups": [
+    "国模",
+    "国模-原厂"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "gemini-4-argon",
+   "vendor_id": 4,
+   "quota_type": 0,
+   "model_ratio": 1,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 5,
+   "cache_ratio": 0.05,
+   "enable_groups": [
+    "gemini"
+   ],
+   "supported_endpoint_types": [
+    "gemini",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "gemini-3-pro-image-preview",
+   "description": "Gemini 3 Pro 图像生成预览版。",
+   "tags": "图像",
+   "vendor_id": 4,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.12,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "cache_ratio": 0.1,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "gemini",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "mimo-v2.5",
+   "quota_type": 0,
+   "model_ratio": 0.5,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 2,
+   "cache_ratio": 0.1,
+   "create_cache_ratio": 0,
+   "enable_groups": [
+    "国模"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "gpt-image-2-4k",
+   "description": "GPT Image 2（4K 分辨率），新一代 OpenAI 文生图模型。",
+   "tags": "图像",
+   "vendor_id": 2,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.1,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "image-generation",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "gpt-image-2.5-flare-4k",
+   "description": "GPT Image 2.5 Flare，原生 4K 出图（非超分），按张计费。不传 size 默认 3840×2160，可传 size 自选尺寸。",
+   "tags": "图像",
+   "vendor_id": 2,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.3,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "image-generation",
+    "openai"
+   ]
+  },
+  {
+   "model_name": "nano-banana-2.1-4k",
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.1,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "image"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "model_name": "glm-5.1",
+   "vendor_id": 23,
+   "quota_type": 0,
+   "model_ratio": 4,
+   "model_price": 0,
+   "owner_by": "",
+   "completion_ratio": 3.5,
+   "cache_ratio": 0.25,
+   "create_cache_ratio": 0,
+   "enable_groups": [
+    "国模"
+   ],
+   "supported_endpoint_types": [
+    "openai"
+   ]
+  },
+  {
+   "billing_plugin_variants": [
+    {
+     "plugin_key": "dragon_video_bridge",
+     "plugin_name": "DragonAPI 视频",
+     "billing_expr": "u(\"resolution\") == \"1080p\" ? tier(\"1080p\", u(\"seconds\") * 0.24) : (u(\"resolution\") == \"2k\" ? tier(\"2k\", u(\"seconds\") * 0.25) : tier(\"768p\", u(\"seconds\") * 0.18))",
+     "billing_mode": "tiered_expr",
+     "billing_usage_schema": {
+      "reference_video_seconds": {
+       "type": "number",
+       "unit": "second",
+       "description": {
+        "en": "Reference video duration",
+        "zh": "参考视频时长"
+       }
+      },
+      "resolution": {
+       "enum": [
+        "480p",
+        "720p",
+        "768p",
+        "1080p",
+        "2k",
+        "4k"
+       ],
+       "description": {
+        "en": "Resolution",
+        "zh": "分辨率"
+       }
+      },
+      "seconds": {
+       "type": "number",
+       "unit": "second",
+       "description": {
+        "en": "Output duration",
+        "zh": "输出时长"
+       }
+      },
+      "spec": {
+       "enum": [
+        "standard",
+        "portrait",
+        "plus"
+       ],
+       "description": {
+        "en": "Capability tier",
+        "zh": "能力档"
+       }
+      }
+     },
+     "billing_usage_examples": [
+      {
+       "label": "720p 4s",
+       "facts": {
+        "reference_video_seconds": 0,
+        "resolution": "720p",
+        "seconds": 4,
+        "spec": "standard"
+       }
+      },
+      {
+       "label": "720p 4s + 5s reference video",
+       "facts": {
+        "reference_video_seconds": 5,
+        "resolution": "720p",
+        "seconds": 4,
+        "spec": "standard"
+       }
+      }
+     ]
+    },
+    {
+     "plugin_key": "zhimeng_video",
+     "plugin_name": "DragonAPI 聚合视频",
+     "billing_expr": "u(\"resolution\") == \"1080p\" ? tier(\"1080p\", u(\"seconds\") * 0.24) : (u(\"resolution\") == \"2k\" ? tier(\"2k\", u(\"seconds\") * 0.25) : tier(\"768p\", u(\"seconds\") * 0.18))",
+     "billing_mode": "tiered_expr",
+     "billing_usage_schema": {
+      "resolution": {
+       "enum": [
+        "480p",
+        "720p",
+        "768p",
+        "1080p",
+        "2k"
+       ],
+       "description": {
+        "en": "Resolution",
+        "zh": "分辨率"
+       }
+      },
+      "seconds": {
+       "type": "number",
+       "unit": "second",
+       "description": {
+        "en": "Output duration",
+        "zh": "输出时长"
+       }
+      }
+     },
+     "billing_usage_examples": [
+      {
+       "label": "720p 8s",
+       "facts": {
+        "resolution": "720p",
+        "seconds": 8
+       }
+      },
+      {
+       "label": "1080p 8s",
+       "facts": {
+        "resolution": "1080p",
+        "seconds": 8
+       }
+      }
+     ]
+    }
+   ],
+   "model_name": "minimax-h3",
+   "description": "官方价 768p 3.36折／2K 2.88折。H3 文生和图片参考（最多9张，不另收费），4–30秒；768p/1080p/2K分别¥0.18/0.24/0.25每秒。",
+   "tags": "视频",
+   "vendor_id": 15,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 0.18,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "u(\"resolution\") == \"1080p\" ? tier(\"1080p\", u(\"seconds\") * 0.24) : (u(\"resolution\") == \"2k\" ? tier(\"2k\", u(\"seconds\") * 0.25) : tier(\"768p\", u(\"seconds\") * 0.18))",
+   "billing_usage_schema": {
+    "reference_video_seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Reference video duration",
+      "zh": "参考视频时长"
+     }
+    },
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k",
+      "4k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    },
+    "spec": {
+     "enum": [
+      "standard",
+      "portrait",
+      "plus"
+     ],
+     "description": {
+      "en": "Capability tier",
+      "zh": "能力档"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 4s",
+     "facts": {
+      "reference_video_seconds": 0,
+      "resolution": "720p",
+      "seconds": 4,
+      "spec": "standard"
+     }
+    },
+    {
+     "label": "720p 4s + 5s reference video",
+     "facts": {
+      "reference_video_seconds": 5,
+      "resolution": "720p",
+      "seconds": 4,
+      "spec": "standard"
+     }
+    }
+   ]
+  },
+  {
+   "model_name": "seedance-2.5-per-call",
+   "description": "按次 ¥12.50/次，4–30 秒同价。Seedance 2.5，720p，仅文生视频。",
+   "tags": "视频",
+   "vendor_id": 10,
+   "quota_type": 1,
+   "model_ratio": 0,
+   "model_price": 12.5,
+   "owner_by": "",
+   "completion_ratio": 0,
+   "enable_groups": [
+    "视频"
+   ],
+   "supported_endpoint_types": [
+    "视频任务"
+   ],
+   "billing_mode": "tiered_expr",
+   "billing_expr": "tier(\"按次\", 12.5)",
+   "billing_usage_schema": {
+    "resolution": {
+     "enum": [
+      "480p",
+      "720p",
+      "768p",
+      "1080p",
+      "2k"
+     ],
+     "description": {
+      "en": "Resolution",
+      "zh": "分辨率"
+     }
+    },
+    "seconds": {
+     "type": "number",
+     "unit": "second",
+     "description": {
+      "en": "Output duration",
+      "zh": "输出时长"
+     }
+    }
+   },
+   "billing_usage_examples": [
+    {
+     "label": "720p 8s",
+     "facts": {
+      "resolution": "720p",
+      "seconds": 8
+     }
+    },
+    {
+     "label": "1080p 8s",
+     "facts": {
+      "resolution": "1080p",
+      "seconds": 8
+     }
+    }
+   ]
+  }
+ ],
+ "group_order": [
+  "gpt-promax",
+  "gpt-pro",
+  "国模",
+  "gpt-特惠",
+  "gemini",
+  "grok",
+  "claude-max企业",
+  "claude-kiro正价",
+  "gpt-plus",
+  "claude-kiro",
+  "image",
+  "claude-cursor",
+  "国模-原厂",
+  "视频",
+  "auto"
+ ],
+ "group_ratio": {
+  "claude-cursor": 0.55,
+  "claude-kiro": 0.1,
+  "claude-kiro正价": 0.35,
+  "claude-max企业": 1.2,
+  "gemini": 0.3,
+  "gpt-plus": 0.1,
+  "gpt-pro": 0.16,
+  "gpt-promax": 0.16,
+  "gpt-特惠": 0.06,
+  "grok": 0.2,
+  "image": 1,
+  "国模": 0.15,
+  "国模-原厂": 0.5,
+  "视频": 1
+ },
+ "pricing_version": "a42d372ccf0b5dd13ecf71203521f9d2",
+ "success": true,
+ "supported_endpoint": {
+  "anthropic": {
+   "path": "/v1/messages",
+   "method": "POST"
+  },
+  "gemini": {
+   "path": "/v1beta/models/{model}:generateContent",
+   "method": "POST"
+  },
+  "image-generation": {
+   "path": "/v1/images/generations",
+   "method": "POST"
+  },
+  "openai": {
+   "path": "/v1/chat/completions",
+   "method": "POST"
+  },
+  "openai-response": {
+   "path": "/v1/responses",
+   "method": "POST"
+  },
+  "视频任务": {
+   "path": "/v1/videos",
+   "method": "POST"
+  }
+ },
+ "usable_group": {
+  "auto": "自动聚合 · 全部模型可用 · 自动选择最优通道（费率以实际命中通道为准）",
+  "claude-cursor": "cursor反代来的",
+  "claude-kiro": "Claude 低价档 · 智商不能保证，小白尽量不用 · 第三方上游，质量和稳定性会波动",
+  "claude-kiro正价": "智力接近 claude-max企业，价格更低",
+  "claude-max企业": "本站自建 Claude 号池 · 最稳，重要任务首选",
+  "gemini": "Gemini 对话模型 · Vertex AI 正价渠道",
+  "gpt-plus": "GPT 日常档 · 便宜，缓存命中和稳定性不如 pro",
+  "gpt-pro": "GPT 主力档 · 缓存命中、速度和稳定性最好，长任务首选，可订阅",
+  "gpt-promax": "GPT 超高缓存档 · 缓存命中率最高，长上下文/长会话最省钱，可订阅",
+  "gpt-特惠": "GPT 最低价档 · 波动较大，出问题请反馈，别催",
+  "grok": "Grok 对话模型 · super 正价渠道",
+  "image": "生图 · GPT Image 系列，要单独建 Key，不能写代码",
+  "国模": "国产模型低价档 · DeepSeek、GLM、Kimi、MiniMax 等",
+  "国模-原厂": "官方key",
+  "视频": "视频生成 · Grok、Seedance 等视频模型"
+ },
+ "vendors": [
+  {
+   "id": 19,
+   "name": "Mistral",
+   "icon": "Mistral.Color"
+  },
+  {
+   "id": 27,
+   "name": "即梦",
+   "icon": "Jimeng.Color"
+  },
+  {
+   "id": 1,
+   "name": "Anthropic",
+   "icon": "Claude.Color"
+  },
+  {
+   "id": 10,
+   "name": "字节跳动",
+   "icon": "Doubao.Color"
+  },
+  {
+   "id": 13,
+   "name": "Vidu",
+   "icon": "Vidu"
+  },
+  {
+   "id": 16,
+   "name": "阿里云"
+  },
+  {
+   "id": 11,
+   "name": "xAI",
+   "icon": "XAI"
+  },
+  {
+   "id": 14,
+   "name": "Black Forest Labs"
+  },
+  {
+   "id": 3,
+   "name": "讯飞",
+   "icon": "Spark.Color"
+  },
+  {
+   "id": 15,
+   "name": "MiniMax"
+  },
+  {
+   "id": 20,
+   "name": "阿里巴巴",
+   "icon": "Qwen.Color"
+  },
+  {
+   "id": 24,
+   "name": "Cohere",
+   "icon": "Cohere.Color"
+  },
+  {
+   "id": 29,
+   "name": "Moonshot",
+   "icon": "Moonshot"
+  },
+  {
+   "id": 28,
+   "name": "Jina",
+   "icon": "Jina"
+  },
+  {
+   "id": 2,
+   "name": "OpenAI",
+   "icon": "OpenAI"
+  },
+  {
+   "id": 6,
+   "name": "routing.run"
+  },
+  {
+   "id": 25,
+   "name": "百度",
+   "icon": "Wenxin.Color"
+  },
+  {
+   "id": 26,
+   "name": "腾讯",
+   "icon": "Hunyuan.Color"
+  },
+  {
+   "id": 5,
+   "name": "Vivgrid"
+  },
+  {
+   "id": 7,
+   "name": "Xpersona"
+  },
+  {
+   "id": 8,
+   "name": "Snowflake Cortex"
+  },
+  {
+   "id": 17,
+   "name": "Cloudflare",
+   "icon": "Cloudflare.Color"
+  },
+  {
+   "id": 23,
+   "name": "智谱",
+   "icon": "Zhipu.Color"
+  },
+  {
+   "id": 9,
+   "name": "Venice AI",
+   "icon": "VeniceAI"
+  },
+  {
+   "id": 21,
+   "name": "DeepSeek",
+   "icon": "DeepSeek.Color"
+  },
+  {
+   "id": 22,
+   "name": "零一万物",
+   "icon": "Yi.Color"
+  },
+  {
+   "id": 4,
+   "name": "Google"
+  },
+  {
+   "id": 12,
+   "name": "快手",
+   "icon": "Kling.Color"
+  },
+  {
+   "id": 18,
+   "name": "Meta",
+   "icon": "Ollama"
+  }
+ ]
+}

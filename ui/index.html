@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>DragonAPI · 本地控制台</title>
+<!-- 页面由插件自起的本地服务提供（http://127.0.0.1:<port>/），
+     没有构建步骤，所以只引同目录的静态文件。 -->
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path d="M12 2.6 20.4 6v6.1c0 4.4-3.5 7.6-8.4 9.3-4.9-1.7-8.4-4.9-8.4-9.3V6L12 2.6Z"
+                fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+          <path d="M12 7.2 16 9v3.4c0 2.4-1.8 4.2-4 5.1-2.2-.9-4-2.7-4-5.1V9l4-1.8Z"
+                fill="currentColor" opacity=".26"/>
+          <circle cx="12" cy="11.3" r="1.15" fill="currentColor"/>
+        </svg>
+      </span>
+      <div class="brand-text">
+        <h1>DragonAPI</h1>
+        <a class="brand-site" id="site-link" href="https://newapi.dragon3api.com" target="_blank" rel="noopener noreferrer">newapi.dragon3api.com</a>
+      </div>
+    </div>
+
+    <div class="topbar-meta">
+      <span class="pill" id="conn-pill" title="本地服务与站点连接状态">
+        <span class="dot" id="conn-dot" aria-hidden="true"></span>
+        <span id="conn-text">连接中…</span>
+      </span>
+      <span class="pill pill-mono" id="currency-pill" title="站点币种">—</span>
+      <button class="btn ghost" id="refresh-btn" type="button" title="强制重新拉取全部数据">刷新</button>
+      <button class="btn" id="pat-shortcut" type="button">访问令牌</button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="功能分页">
+    <button class="tab" role="tab" type="button" id="tab-catalog" data-tab="catalog"
+            aria-controls="panel-catalog" aria-selected="true" tabindex="0">模型广场</button>
+    <button class="tab" role="tab" type="button" id="tab-wallet" data-tab="wallet"
+            aria-controls="panel-wallet" aria-selected="false" tabindex="0">余额与用量</button>
+    <button class="tab" role="tab" type="button" id="tab-keys" data-tab="keys"
+            aria-controls="panel-keys" aria-selected="false" tabindex="0">密钥</button>
+    <button class="tab" role="tab" type="button" id="tab-pat" data-tab="pat"
+            aria-controls="panel-pat" aria-selected="false" tabindex="0">访问令牌</button>
+  </nav>
+
+  <div class="banners" id="banners" aria-live="polite"></div>
+
+  <main class="panels">
+
+    <!-- 1. 模型广场：纯展示。这里刻意没有任何勾选框、开关或「已选」状态。 -->
+    <section class="panel" id="panel-catalog" role="tabpanel" aria-labelledby="tab-catalog" data-panel="catalog">
+      <div class="card toolbar-card">
+        <div class="filter-row" role="group" aria-label="按分组筛选">
+          <span class="filter-label">分组</span>
+          <div class="chips" id="group-chips"></div>
+        </div>
+        <div class="filter-row">
+          <div class="field grow">
+            <label class="sr-only" for="catalog-search">搜索模型</label>
+            <input id="catalog-search" type="search" autocomplete="off" spellcheck="false"
+                   placeholder="搜索模型名 / 厂商 / 说明…">
+          </div>
+          <div class="field">
+            <label class="sr-only" for="catalog-kind">模型类型</label>
+            <select id="catalog-kind">
+              <option value="">全部类型</option>
+              <option value="chat">对话 chat</option>
+              <option value="image">生图 image</option>
+              <option value="video">视频 video</option>
+              <option value="audio">音频 audio</option>
+              <option value="embedding">向量 embedding</option>
+            </select>
+          </div>
+          <button class="btn ghost" id="catalog-reset" type="button">重置筛选</button>
+        </div>
+      </div>
+
+      <div class="meta-row" id="catalog-meta"></div>
+      <div class="card flush" id="catalog-body">
+        <p class="loading">正在读取模型目录…</p>
+      </div>
+      <p class="foot-note">只读展示：价格由站点 <code>/api/pricing</code> 解析而来，解析不出来就标「价格未知」，不猜。</p>
+    </section>
+
+    <!-- 2. 余额与用量 -->
+    <section class="panel" id="panel-wallet" role="tabpanel" aria-labelledby="tab-wallet" data-panel="wallet" hidden>
+      <div class="grid-2">
+        <div class="card">
+          <header class="card-head">
+            <h2>账户余额</h2>
+            <span class="card-sub" id="account-sub"></span>
+          </header>
+          <div id="account-body"><p class="loading">正在读取…</p></div>
+        </div>
+
+        <div class="card">
+          <header class="card-head">
+            <h2>用量汇总</h2>
+            <div class="segmented" role="group" aria-label="统计区间">
+              <button type="button" data-range="day" aria-pressed="true">日</button>
+              <button type="button" data-range="week" aria-pressed="false">周</button>
+              <button type="button" data-range="month" aria-pressed="false">月</button>
+            </div>
+          </header>
+          <div id="usage-body"><p class="loading">正在读取…</p></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <header class="card-head">
+          <h2>用量流水</h2>
+          <div class="card-tools">
+            <label class="sr-only" for="flow-account">按账号查看</label>
+            <select id="flow-account"></select>
+            <span class="card-sub" id="flow-count"></span>
+          </div>
+        </header>
+        <div id="flow-body"><p class="loading">正在读取…</p></div>
+      </div>
+    </section>
+
+    <!-- 3. 密钥 -->
+    <section class="panel" id="panel-keys" role="tabpanel" aria-labelledby="tab-keys" data-panel="keys" hidden>
+      <div class="grid-2 keys-grid">
+        <div class="card">
+          <header class="card-head"><h2>新建钥匙</h2></header>
+          <form id="key-form" class="form" novalidate>
+            <div class="field">
+              <label for="key-group">分组</label>
+              <select id="key-group" name="group" required></select>
+            </div>
+            <div class="field">
+              <label for="key-name">名称</label>
+              <input id="key-name" name="name" type="text" maxlength="64" autocomplete="off"
+                     placeholder="例如 Magpie-gpt-plus" required>
+            </div>
+            <div class="field">
+              <label class="check" for="key-unlimited">
+                <input type="checkbox" id="key-unlimited" checked>
+                <span>无限额度</span>
+              </label>
+            </div>
+            <div class="field">
+              <label for="key-quota">额度</label>
+              <input id="key-quota" name="quota" type="number" min="0" step="0.01" inputmode="decimal"
+                     placeholder="例如 10" disabled>
+              <p class="hint">按站点币种填写；取消「无限额度」后才生效。</p>
+            </div>
+            <div class="form-actions">
+              <button class="btn primary" id="key-submit" type="submit">创建钥匙</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <header class="card-head"><h2>怎么绑进 magpie</h2></header>
+          <div id="bind-info-body"><p class="loading">正在读取绑定说明…</p></div>
+        </div>
+      </div>
+
+      <div id="secret-slot"></div>
+
+      <div class="card">
+        <header class="card-head">
+          <h2>已有钥匙</h2>
+          <span class="card-sub" id="keys-count"></span>
+        </header>
+        <div id="keys-body"><p class="loading">正在读取…</p></div>
+      </div>
+    </section>
+
+    <!-- 4. 访问令牌（PAT） -->
+    <section class="panel" id="panel-pat" role="tabpanel" aria-labelledby="tab-pat" data-panel="pat" hidden>
+      <div class="grid-2">
+        <div class="card">
+          <header class="card-head">
+            <h2>访问令牌 PAT</h2>
+            <span class="card-sub" id="pat-badge"></span>
+          </header>
+          <div id="pat-state" class="pat-state"><p class="loading">正在读取…</p></div>
+
+          <form id="pat-form" class="form" novalidate>
+            <div class="field">
+              <label for="pat-input">粘贴 PAT（<code>nap_…</code>）</label>
+              <input id="pat-input" name="pat" type="password" autocomplete="off" spellcheck="false"
+                     placeholder="nap_xxxxxxxxxxxxxxxx">
+            </div>
+            <div class="form-actions">
+              <button class="btn primary" id="pat-save" type="submit">保存</button>
+              <button class="btn ghost" id="pat-clear" type="button">清除 PAT</button>
+            </div>
+            <p class="hint">PAT 只存在插件本地服务里，页面不保存任何凭据。</p>
+          </form>
+        </div>
+
+        <div class="card">
+          <header class="card-head"><h2>需要哪些权限</h2></header>
+          <div class="table-wrap">
+            <table class="data-table scope-table">
+              <caption class="sr-only">PAT scope 与对应能力</caption>
+              <thead>
+                <tr><th scope="col">Scope</th><th scope="col">用来做什么</th></tr>
+              </thead>
+              <tbody>
+                <tr><td class="mono">profile:read</td><td>读取账户资料（<code>/api/user/self</code>）</td></tr>
+                <tr><td class="mono">api_key:read</td><td>列出已有钥匙</td></tr>
+                <tr><td class="mono">api_key:write</td><td>新建 / 删除钥匙</td></tr>
+                <tr><td class="mono">api_key:reveal</td><td>查看完整钥匙（<code>reveal</code>）</td></tr>
+                <tr><td class="mono">usage:read</td><td>看用量与流水</td></tr>
+                <tr><td class="mono">wallet:read</td><td>看余额与邀请</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="hint">
+            PAT 只能在浏览器里登录 DragonAPI 控制台后，于「安全 → 访问令牌」页创建；
+            插件无法代登录，也不会替你签发。
+          </p>
+        </div>
+      </div>
+
+      <div class="card">
+        <header class="card-head"><h2>健康与诊断</h2></header>
+        <div id="diag-body"><p class="loading">正在读取…</p></div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="foot">
+    <span>请求一律 <code>credentials: "omit"</code>；页面不使用任何浏览器存储，状态只在内存里。</span>
+  </footer>
+</div>
+
+<!-- 单模型详情：只读抽屉，数据来自 GET /api/model -->
+<div class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" hidden>
+  <div class="drawer-backdrop" data-drawer-close="1"></div>
+  <div class="drawer-panel" role="document">
+    <header class="drawer-head">
+      <div>
+        <h2 id="drawer-title">模型详情</h2>
+        <p class="drawer-sub" id="drawer-sub"></p>
+      </div>
+      <button class="btn ghost" id="drawer-close" type="button" data-drawer-close="1">关闭</button>
+    </header>
+    <div class="drawer-body" id="drawer-body"></div>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

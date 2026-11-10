@@ -1,0 +1,182 @@
+// 插件入口的契约测试：完全按宿主的调用方式走一遍。
+//
+// 这些用例守的是一类最致命的 bug：插件「能加载」但返回空表。宿主拿不到
+// 模型就判定「这个供应商没有模型」，插件根本不出现——而且因为 provider.models
+// 里的 catch 会兜住异常，日志里什么都没有，只能靠这种按宿主方式的调用来发现。
+//
+// 曾经真的发生过：lastGood 声明在 makeContext 里，provider.models 引用它时
+// 抛 ReferenceError，被 catch 吞成空表，插件显示 0 个模型。
+
+import { test, before, after } from 'node:test'
+import assert from 'node:assert/strict'
+import { mkdtempSync, rmSync, readFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+import dragonapi from '../index.mjs'
+
+const here = dirname(fileURLToPath(import.meta.url))
+let dir
+let plugin
+let bad
+
+before(async () => {
+  dir = mkdtempSync(join(tmpdir(), 'dragonapi-entry-'))
+  // 用真目录桩，不打站点：入口测试关心的是形状与作用域，不是网络。
+  const env = JSON.parse(readFileSync(join(here, '..', '证据-站点定价快照-2026-11-10.json'), 'utf8'))
+  plugin = await dragonapi({ directory: dir }, { port: 3631, site: 'https://example.test', catalogStub: env })
+
+  // 一个必然在 buildCatalog 里炸的目录源：data 的 getter 直接抛。
+  bad = await dragonapi({ directory: dir }, {
+    port: 3632,
+    site: 'https://example.test',
+    catalogStub: { get data() { throw new Error('故意炸') } },
+  })
+})
+
+after(async () => {
+  // 必须关掉本地服务，否则监听端口让事件循环不退出，node --test 会挂住
+  await plugin?.dispose()
+  await bad?.dispose()
+  try { rmSync(dir, { recursive: true, force: true }) } catch { /* 忽略 */ }
+})
+
+test('入口返回 config / auth / provider 三块', () => {
+  for (const k of ['config', 'auth', 'provider']) {
+    assert.ok(k in plugin, `缺少 ${k}`)
+  }
+  assert.equal(typeof plugin.config, 'function')
+  assert.equal(typeof plugin.auth, 'object')
+  assert.equal(typeof plugin.provider, 'object')
+})
+
+test('auth.provider 与 provider.id 一致', () => {
+  assert.equal(plugin.auth.provider, 'dragonapi')
+  assert.equal(plugin.provider.id, 'dragonapi')
+})
+
+test('auth.methods 至少有一条 api 登录，且带 placeholder', () => {
+  const methods = plugin.auth.methods
+  assert.ok(methods.length >= 1)
+  const api = methods.find((m) => m.type === 'api')
+  assert.ok(api, '必须有一条 type=api 的登录方式')
+  assert.match(String(api.placeholder || ''), /sk-/, '贴钥匙的输入框要提示 sk- 前缀')
+})
+
+test('config 声明了供应商名、npm 与 base', async () => {
+  const cfg = {}
+  await plugin.config(cfg)
+  const p = cfg.provider.dragonapi
+  assert.ok(p, 'config 必须声明 dragonapi')
+  assert.equal(p.name, 'DragonAPI')
+  assert.ok(p.npm, '必须给 npm 方言')
+  assert.match(p.api, /\/v1$/, 'base 要以 /v1 结尾')
+})
+
+test('config 不声明空 models（会被理解成 0 个模型）', async () => {
+  const cfg = {}
+  await plugin.config(cfg)
+  assert.equal('models' in cfg.provider.dragonapi, false, 'config 里不该出现 models 键')
+})
+
+test('provider.models 无账号时返回全量目录，绝不是空表', async () => {
+  const models = await plugin.provider.models({}, {})
+  const ids = Object.keys(models)
+  assert.ok(ids.length > 100, `模型数太少：${ids.length}（空表说明插件装上会显示 0 个模型）`)
+  assert.equal(ids.length, 195)
+})
+
+test('provider.models 有账号时只给该分组的模型', async () => {
+  const key = 'sk-' + 'a'.repeat(48)
+  const models = await plugin.provider.models({}, { auth: { key, metadata: { group: 'gpt-plus' } } })
+  const ids = Object.keys(models)
+  assert.ok(ids.length > 0, 'gpt-plus 账号拿不到模型')
+  assert.equal(ids.every((id) => id.startsWith('gpt-plus/')), true, '不能混入别的分组')
+  assert.equal(ids.length, 5)
+})
+
+test('模型形状符合宿主预期：id / name / api.id / api.url', async () => {
+  const models = await plugin.provider.models({}, {})
+  const one = models['gpt-plus/gpt-6-sol']
+  assert.ok(one, '缺少 gpt-plus/gpt-6-sol')
+  assert.equal(one.id, 'gpt-plus/gpt-6-sol')
+  assert.ok(one.name)
+  // api.id 必须是站点认的裸模型名，否则请求会被站点拒
+  assert.equal(one.api.id, 'gpt-6-sol')
+  assert.match(one.api.url, /\/v1$/)
+  assert.ok(one.api.npm)
+})
+
+test('对话模型带 reasoning 与 variants，功能模型带 kind', async () => {
+  const models = await plugin.provider.models({}, {})
+  const chat = models['gpt-plus/gpt-6-sol']
+  assert.equal(chat.capabilities.reasoning, true)
+  assert.ok(chat.variants)
+  const video = Object.values(models).find((m) => m.kind === 'video')
+  assert.ok(video, '应该有视频模型')
+  assert.equal(video.capabilities.output.video, true)
+})
+
+test('loader 给出 baseURL 与钥匙，且把「分组/模型」还原成裸模型名', async () => {
+  const key = 'sk-' + 'b'.repeat(48)
+  const loader = await plugin.auth.loader(async () => ({ key, metadata: { group: 'gpt-plus' } }))
+  assert.equal(loader.baseURL, 'https://example.test/v1')
+  assert.equal(loader.apiKey, key)
+  assert.equal(typeof loader.fetch, 'function')
+
+  // 拦下真实 fetch，检查发出去的 body 里模型名被还原了
+  let sent = null
+  const realFetch = globalThis.fetch
+  globalThis.fetch = async (_url, init) => {
+    sent = JSON.parse(init.body)
+    return new Response('{}', { status: 200 })
+  }
+  try {
+    await loader.fetch('https://example.test/v1/chat/completions', {
+      method: 'POST',
+      body: JSON.stringify({ model: 'gpt-plus/gpt-6-sol', messages: [] }),
+    })
+  } finally {
+    globalThis.fetch = realFetch
+  }
+  assert.equal(sent.model, 'gpt-6-sol', '发出去的必须是裸模型名，否则站点不认')
+})
+
+test('loader 不动没有分组前缀的模型名', async () => {
+  const loader = await plugin.auth.loader(async () => ({ key: 'sk-x', metadata: {} }))
+  let sent = null
+  const realFetch = globalThis.fetch
+  globalThis.fetch = async (_url, init) => {
+    sent = JSON.parse(init.body)
+    return new Response('{}', { status: 200 })
+  }
+  try {
+    await loader.fetch('https://example.test/v1/chat/completions', {
+      method: 'POST',
+      body: JSON.stringify({ model: 'plain-model', messages: [] }),
+    })
+  } finally {
+    globalThis.fetch = realFetch
+  }
+  assert.equal(sent.model, 'plain-model')
+})
+
+test('usage 在没有可用钥匙时报错，而不是返回假余额', async () => {
+  await assert.rejects(
+    () => plugin.auth.usage(async () => ({ key: 'sk-' + 'c'.repeat(48), metadata: {} })),
+    (err) => {
+      // 假钥匙打真站点会 401；这里只要求「报错」，不能静默返回 0 余额
+      assert.ok(err instanceof Error)
+      return true
+    },
+  )
+})
+
+test('provider.models 出错时不抛、但也不静默（错误要记下来）', async () => {
+  const models = await bad.provider.models({}, {})
+  // 不抛（抛了宿主就掉供应商）
+  assert.equal(typeof models, 'object')
+  // 但错误要能查到
+  assert.match(String(bad.__lastModelsError || ''), /故意/)
+})

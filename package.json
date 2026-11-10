@@ -1,6 +1,6 @@
 {
   "name": "@fish-under-sea/magpie-dragonapi",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "DragonAPI for magpie: a provider plugin whose models, groups and prices come from the site's public /api/pricing, with balance and per-call usage from an sk- key, plus a local page that lists the market (read-only), shows usage and can mint new keys for a group.",
   "type": "module",
   "main": "index.mjs",

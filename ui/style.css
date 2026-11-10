@@ -405,6 +405,30 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 }
 .card.flush { padding: 0; overflow: hidden; }
 
+/* 页面级标题：四个标签页共用一套节奏。
+   没有它的时候每页都是「一堆卡片」，卡片标题还跟标签名重复；有了它，
+   标签是导航、页头是身份、卡片标题是分区，三层才分得开。 */
+.page-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 14px;
+}
+.page-head h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -.01em;
+}
+.page-sub {
+  margin: 0;
+  max-width: 72ch;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
 .card-head {
   display: flex;
   align-items: center;
@@ -414,7 +438,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 }
 .card.flush > .card-head { margin: 0; padding: 12px 14px; border-bottom: 1px solid var(--line); }
 
-.card-head h2 {
+.card-head :is(h2, h3) {
   margin: 0;
   font-size: 13.5px;
   font-weight: 650;
@@ -1041,9 +1065,9 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   background: var(--sunken);
 }
 .ma-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.ma-head h2 { margin: 0; font-size: 13px; }
+.ma-head :is(h2, h3) { margin: 0; font-size: 12.5px; font-weight: 600; }
 .ma-note { margin: 4px 0 10px; font-size: 11px; line-height: 1.5; color: var(--muted); }
-.market-aside h3 {
+.market-aside :is(h3, h4) {
   margin: 12px 0 7px;
   font-size: 11px;
   font-weight: 600;

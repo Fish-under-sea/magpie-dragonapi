@@ -57,15 +57,19 @@
 
     <!-- 1. 模型广场：纯展示。这里刻意没有任何勾选框、开关或「已选」状态。 -->
     <section class="panel" id="panel-catalog" role="tabpanel" aria-labelledby="tab-catalog" data-panel="catalog">
+      <header class="page-head">
+        <h2>模型广场</h2>
+        <p class="page-sub">站点公开目录：分组、倍率与价格。只读展示，不改站点任何设置。</p>
+      </header>
       <div class="market-body">
         <aside class="market-aside" aria-label="筛选">
           <div class="ma-head">
-            <h2>筛选</h2>
+            <h3>筛选</h3>
             <button class="link" id="catalog-reset" type="button">重置</button>
           </div>
           <p class="ma-note">按分组与类型细化。分组决定倍率，也决定你需要哪把钥匙。</p>
 
-          <h3 id="aside-group-head">分组</h3>
+          <h4 id="aside-group-head">分组</h4>
           <div class="market-chips" id="group-chips" role="group" aria-labelledby="aside-group-head"></div>
         </aside>
 
@@ -90,10 +94,14 @@
 
     <!-- 2. 余额与用量 -->
     <section class="panel" id="panel-wallet" role="tabpanel" aria-labelledby="tab-wallet" data-panel="wallet" hidden>
+      <header class="page-head">
+        <h2>余额与用量</h2>
+        <p class="page-sub">每个账号的余额、按日周月汇总，以及逐条调用流水。金额按站点币种显示。</p>
+      </header>
       <div class="grid-2">
         <div class="card">
           <header class="card-head">
-            <h2>账户余额</h2>
+            <h3>账户余额</h3>
             <span class="card-sub" id="account-sub"></span>
           </header>
           <div id="account-body"><p class="loading">正在读取…</p></div>
@@ -101,7 +109,7 @@
 
         <div class="card">
           <header class="card-head">
-            <h2>用量汇总</h2>
+            <h3>用量汇总</h3>
             <div class="segmented" role="group" aria-label="统计区间">
               <button type="button" data-range="day" aria-pressed="true">日</button>
               <button type="button" data-range="week" aria-pressed="false">周</button>
@@ -114,7 +122,7 @@
 
       <div class="card">
         <header class="card-head">
-          <h2>用量流水</h2>
+          <h3>用量流水</h3>
           <div class="card-tools">
             <label class="sr-only" for="flow-account">按账号查看</label>
             <select id="flow-account"></select>
@@ -127,9 +135,13 @@
 
     <!-- 3. 密钥 -->
     <section class="panel" id="panel-keys" role="tabpanel" aria-labelledby="tab-keys" data-panel="keys" hidden>
+      <header class="page-head">
+        <h2>密钥</h2>
+        <p class="page-sub">按分组建钥匙、看一次性明文、删掉不再用的。一把钥匙只属于一个分组。</p>
+      </header>
       <div class="grid-2 keys-grid">
         <div class="card">
-          <header class="card-head"><h2>新建钥匙</h2></header>
+          <header class="card-head"><h3>新建钥匙</h3></header>
           <form id="key-form" class="form" novalidate>
             <div class="field">
               <label for="key-group">分组</label>
@@ -159,7 +171,7 @@
         </div>
 
         <div class="card">
-          <header class="card-head"><h2>怎么绑进 magpie</h2></header>
+          <header class="card-head"><h3>怎么绑进 magpie</h3></header>
           <div id="bind-info-body"><p class="loading">正在读取绑定说明…</p></div>
         </div>
       </div>
@@ -168,7 +180,7 @@
 
       <div class="card">
         <header class="card-head">
-          <h2>已有钥匙</h2>
+          <h3>已有钥匙</h3>
           <span class="card-sub" id="keys-count"></span>
         </header>
         <div id="keys-body"><p class="loading">正在读取…</p></div>
@@ -177,10 +189,14 @@
 
     <!-- 4. 访问令牌（PAT） -->
     <section class="panel" id="panel-pat" role="tabpanel" aria-labelledby="tab-pat" data-panel="pat" hidden>
+      <header class="page-head">
+        <h2>访问令牌</h2>
+        <p class="page-sub">PAT 用来读账户、建密钥、看余额。它只能由你在浏览器里创建，插件无法代登录。</p>
+      </header>
       <div class="grid-2">
         <div class="card">
           <header class="card-head">
-            <h2>访问令牌 PAT</h2>
+            <h3>访问令牌 PAT</h3>
             <span class="card-sub" id="pat-badge"></span>
           </header>
           <div id="pat-state" class="pat-state"><p class="loading">正在读取…</p></div>
@@ -200,7 +216,7 @@
         </div>
 
         <div class="card">
-          <header class="card-head"><h2>需要哪些权限</h2></header>
+          <header class="card-head"><h3>需要哪些权限</h3></header>
           <div class="table-wrap">
             <table class="data-table scope-table">
               <caption class="sr-only">PAT scope 与对应能力</caption>
@@ -225,7 +241,7 @@
       </div>
 
       <div class="card">
-        <header class="card-head"><h2>健康与诊断</h2></header>
+        <header class="card-head"><h3>健康与诊断</h3></header>
         <div id="diag-body"><p class="loading">正在读取…</p></div>
       </div>
     </section>

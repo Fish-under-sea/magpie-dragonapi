@@ -792,19 +792,30 @@ function renderAccounts() {
     return;
   }
 
-  box.replaceChildren(...accounts.map((a) => h('div', { class: 'acct' },
-    h('div', { class: 'acct-top' },
-      h('span', { class: 'acct-label', text: a.label || a.tokenName || '未命名账号' }),
-      a.group ? h('span', { class: 'tag', text: a.group }) : null,
-      h('span', { class: 'acct-mask', text: a.masked || '' }),
-    ),
-    h('div', { class: 'acct-figs' },
-      fig('余额', a.balance ?? '—', 'big pos', Number.isFinite(a.balanceRaw) ? `${fmtInt(a.balanceRaw)} quota` : ''),
-      fig('已用', a.used ?? '—', '', Number.isFinite(a.usedRaw) ? `${fmtInt(a.usedRaw)} quota` : ''),
-      fig('模型数', Number.isFinite(a.models) ? fmtInt(a.models) : '—'),
-      fig('绑定于', fmtAt(a.boundAt)),
-    ),
-  )));
+  box.replaceChildren(...accounts.map((a) => {
+    const mask = a.masked || '';
+    // 服务端的 label 本身就是「分组 · 打码钥匙」，再单列一次打码就是重复。
+    // 只在 label 里没有它时才单独显示。
+    const showMask = mask && !String(a.label || '').includes(mask);
+    // 余额是「—」不是因为没有余额，而是插件进程还没拿到这把钥匙的明文
+    // （冷启动后要等宿主调一次 models/usage 才会填）。说清楚，别让人以为没钱了。
+    const noKeyHint = a.balance === '—'
+      ? '插件还没拿到这把钥匙的明文：在 magpie 里发一次请求、或点右上角「刷新」即可'
+      : '';
+    return h('div', { class: 'acct' },
+      h('div', { class: 'acct-top' },
+        h('span', { class: 'acct-label', text: a.label || a.tokenName || '未命名账号' }),
+        a.group ? h('span', { class: 'tag', text: a.group }) : null,
+        showMask ? h('span', { class: 'acct-mask', text: mask }) : null,
+      ),
+      h('div', { class: 'acct-figs' },
+        fig('余额', a.balance ?? '—', 'big pos', noKeyHint || (Number.isFinite(a.balanceRaw) ? `${fmtInt(a.balanceRaw)} quota` : '')),
+        fig('已用', a.used ?? '—', '', Number.isFinite(a.usedRaw) ? `${fmtInt(a.usedRaw)} quota` : ''),
+        fig('模型数', Number.isFinite(a.models) ? fmtInt(a.models) : '—'),
+        fig('绑定于', fmtAt(a.boundAt)),
+      ),
+    );
+  }));
 }
 
 function fig(k, v, cls = '', title = '') {

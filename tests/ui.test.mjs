@@ -326,3 +326,27 @@ test('没设 PAT 时给引导式空态，不甩红色错误横幅', async () => 
   assert.match(js, /err\.status === 400/, '应按状态码区分「未配置」与「真失败」')
   assert.match(js, /去设置访问令牌/, '应给一条通往 PAT 页的路')
 })
+
+test('四个标签页各有页面级标题（h2），卡片标题用 h3', async () => {
+  const html = await (await fetch(base + '/')).text()
+
+  // 每个面板都要有 page-head + h2 + page-sub
+  const heads = [...html.matchAll(/class="page-head"[\s\S]{0,220}?<h2>([^<]+)<\/h2>[\s\S]{0,120}?class="page-sub"/g)]
+  assert.equal(heads.length, 4, `应有 4 个页面级标题，实际 ${heads.length}`)
+  const titles = heads.map((m) => m[1])
+  for (const want of ['模型广场', '余额与用量', '密钥', '访问令牌']) {
+    assert.ok(titles.includes(want), `缺少页面标题「${want}」：${titles.join(', ')}`)
+  }
+
+  // 卡片标题必须降到 h3：card-head 里不该再出现 h2，否则层级和页头打平
+  assert.equal(/class="card-head"[\s\S]{0,80}?<h2>/.test(html), false, 'card-head 里不该有 h2')
+  const cardH3 = (html.match(/<header class="card-head">[\s\S]{0,60}?<h3>/g) || []).length
+  assert.ok(cardH3 >= 4, `卡片标题应统一为 h3，实际匹配 ${cardH3}`)
+})
+
+test('账户卡不重复显示打码钥匙', async () => {
+  const js = await (await fetch(base + '/ui/app.js')).text()
+  // 服务端 label 本身就是「分组 · 打码钥匙」，再单列一次就是重复
+  assert.match(js, /showMask/, '缺少去重判断')
+  assert.match(js, /!String\(a\.label \|\| ''\)\.includes\(mask\)/, '应按 label 是否已含打码来判断')
+})

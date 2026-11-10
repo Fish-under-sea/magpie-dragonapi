@@ -2,7 +2,7 @@
 
 把 [DragonAPI](https://newapi.dragon3api.com/) 接进 magpie：模型广场、余额、用量，外加一个能按分组建钥匙的本地界面。
 
-> 当前版本 **0.1.4**。只做供应商插件 + 只读看板 + 密钥管理，不做「页面里点充值」。
+> 当前版本 **0.1.5**。只做供应商插件 + 只读看板 + 密钥管理，不做「页面里点充值」。
 
 ## 它是什么
 
@@ -25,7 +25,7 @@
 | **命令行** | `magpie plugin add @fish-under-sea/magpie-dragonapi` |
 
 npm 拉不到时（内网、镜像抽风）：到 [Releases](https://github.com/Fish-under-sea/magpie-dragonapi/releases) 下
-`fish-under-sea-magpie-dragonapi-0.1.4.tgz`，解包成目录，再 `magpie plugin add <那个目录>` ——
+`fish-under-sea-magpie-dragonapi-0.1.5.tgz`，解包成目录，再 `magpie plugin add <那个目录>` ——
 `plugin add` 认 `path`，和从文件夹加插件是同一条路。
 
 装好后：Settings → Plugins 里出现 **DragonAPI** 行（带一张页面），供应商列表里出现 **DragonAPI**。

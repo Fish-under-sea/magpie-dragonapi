@@ -2,7 +2,7 @@
 
 把 [DragonAPI](https://newapi.dragon3api.com/) 接进 magpie：模型广场、余额、用量，外加一个能按分组建钥匙的本地界面。
 
-> 当前版本 **0.1.0**（首个可用版本）。只做供应商插件 + 只读看板 + 密钥管理，不做「页面里点充值」。
+> 当前版本 **0.1.2**。只做供应商插件 + 只读看板 + 密钥管理，不做「页面里点充值」。
 
 ## 它是什么
 
@@ -12,6 +12,26 @@
 | --- | --- |
 | **供应商插件** | 把站点 `/api/pricing` 的目录折成 magpie 的模型表；`sk-` 钥匙直接读余额与逐条用量；视频模型走 magpie 的 `/v1/videos` 三件套 |
 | **页面插件 + 本地服务** | magpie 的插件页是 `connect-src 'none'` 的沙箱，页面自己发不出请求。所以插件起一个只监听 `127.0.0.1` 的 HTTP 服务，页面导航过去，界面由服务提供 |
+
+## 安装
+
+包已发布到 npm：`@fish-under-sea/magpie-dragonapi`（[npm](https://www.npmjs.com/package/@fish-under-sea/magpie-dragonapi) · [GitHub](https://github.com/Fish-under-sea/magpie-dragonapi)）。
+
+两种装法，任选其一：
+
+| 方式 | 怎么做 |
+| --- | --- |
+| **Discover（推荐）** | magpie 窗口 → Discover → Unofficial。这个仓库打了 `magpie-plugin` topic，`package.json` 里也有已提交的 `magpie.page.file`，所以会按 `magpie.name` / `magpie.summary` 列出卡片，点它安装 |
+| **命令行** | `magpie plugin add @fish-under-sea/magpie-dragonapi` |
+
+npm 拉不到时（内网、镜像抽风）：到 [Releases](https://github.com/Fish-under-sea/magpie-dragonapi/releases) 下
+`fish-under-sea-magpie-dragonapi-0.1.2.tgz`，解包成目录，再 `magpie plugin add <那个目录>` ——
+`plugin add` 认 `path`，和从文件夹加插件是同一条路。
+
+装好后：Settings → Plugins 里出现 **DragonAPI** 行（带一张页面），供应商列表里出现 **DragonAPI**。
+
+> 只装不配也能看到模型广场——目录走站点公开的 `/api/pricing`，不需要任何凭据。
+> 要看余额、读用量、建钥匙，才需要下面的钥匙与 PAT。
 
 ## 为什么不照抄 NearToken
 

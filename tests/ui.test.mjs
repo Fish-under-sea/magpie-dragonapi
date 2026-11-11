@@ -647,8 +647,22 @@ test('使用日志页：筛选条 + 统计条 + 明细表都在，且列与 Near
   assert.match(html, /id="logs-chips"/, '缺少统计条')
   assert.match(html, /id="logs-body"/, '缺少明细表容器')
 
-  // 表头列名随 NearToken：请求体大小 / Token（入/出）等
-  assert.match(js, /'时间', '分组', '模型', '费用', '请求体大小', '流', 'Token', '耗时', '详情'/, '九列表头不符')
+  // 表头 8 列：请求体大小已移除；令牌与分组叠在同一列（上游版式）
+  assert.match(js, /'时间', '分组', '模型', '费用', '流', 'Token', '耗时', '详情'/, '八列表头不符')
+  assert.equal(js.includes('请求体大小'), false, '请求体大小列应已移除')
+  // 费用 / 模型 / 令牌都做成胶囊；费用按钱包/订阅换图标，金额 6 位小数
+  assert.match(js, /lg-cost-pill/, '费用应是胶囊')
+  assert.match(js, /lg-model-pill/, '模型应是胶囊')
+  assert.match(js, /lg-group-pill/, '令牌/分组应是胶囊')
+  assert.match(js, /billingSource/, '费用要区分钱包与订阅扣费')
+  assert.match(js, /vendorOfModel/, '模型胶囊要带厂商标记')
+  assert.match(js, /toFixed\(6\)/, '费用金额按上游给 6 位小数')
+  // 原生 select 的候选列表是系统白底，必须换成主题内的下拉
+  assert.match(js, /function enhanceSelect\(/, '缺少主题内下拉组件')
+  assert.match(js, /enhanceSelect\(sizeSel, 'sel-sm'\)/, '每页行数下拉也要换')
+  const css2 = await (await fetch(base + '/ui/style.css')).text()
+  assert.match(css2, /\.sel-pop\s*\{[^}]*background:\s*var\(--card\)/, '下拉弹层要用主题底色')
+  assert.match(css2, /\.sel-native/, '原生 select 应被隐藏')
   assert.match(js, /function fillLogFilters\(/, '缺少下拉填充')
   assert.match(js, /fillLogFilters\(\(cache\.usage/, '渲染前要按实际行填充下拉')
 })

@@ -1843,22 +1843,9 @@ function spentText(raw) {
 // 数据仍走 /api/usage 的行，只做前端筛选；不新开接口。
 
 const LOG_KIND_ORDER = ['消耗', '充值', '退款', '管理', '系统', '错误'];
-const LOG_COLS = [['time', '时间'], ['group', '分组'], ['model', '模型'], ['cost', '费用'],
-  ['bytes', '请求体大小'], ['flow', '流'], ['tokenCount', 'Token'], ['duration', '耗时'], ['detail', '详情']];
-const LOG_COL_CLASS = { time: 'hide-c1', group: 'hide-c2', model: 'hide-c3', cost: 'hide-c4',
-  bytes: 'hide-c5', flow: 'hide-c6', tokenCount: 'hide-c7', duration: 'hide-c8', detail: 'hide-c9' };
 
 const logFilter = { model: '', group: '', kind: '', tokenName: '', requestId: '' };
 const logView = { page: 1, pageSize: 20, more: false, private: false };
-
-/** fmtBytes 把请求体大小折成人话。 */
-function fmtBytes(n) {
-  const v = Number(n);
-  if (!Number.isFinite(v) || v <= 0) return '—';
-  if (v >= 1024 * 1024) return `${(v / 1024 / 1024).toFixed(1)} MB`;
-  if (v >= 1024) return `${(v / 1024).toFixed(1)} KB`;
-  return `${Math.round(v)} B`;
-}
 
 /** secs 秒数带单位：4.5 → 4.5s。 */
 function logSecs(v) {
@@ -1946,6 +1933,8 @@ function renderLogs() {
           const m = $('#logs-model'); if (m) m.value = '';
           const g = $('#logs-group'); if (g) g.value = '';
           const k = $('#logs-kind'); if (k) k.value = '';
+          refreshSelect(g);
+          refreshSelect(k);
           const t = $('#logs-token'); if (t) t.value = '';
           const r2 = $('#logs-request'); if (r2) r2.value = '';
           logView.page = 1;
@@ -1976,12 +1965,13 @@ function renderLogs() {
       pageBtn('›', '下一页', logView.page >= pageCount, () => { logView.page += 1 }),
       pageBtn('»', '最后一页', logView.page >= pageCount, () => { logView.page = pageCount }),
     );
+    enhanceSelect(sizeSel, 'sel-sm');
   }
 
   const slice = rows.slice((logView.page - 1) * logView.pageSize, logView.page * logView.pageSize);
   const table = h('div', { class: 'lg-table', role: 'table', 'aria-label': '使用日志明细' },
     h('div', { class: 'lg-row lg-head', role: 'row' },
-      ...['时间', '分组', '模型', '费用', '请求体大小', '流', 'Token', '耗时', '详情']
+      ...['时间', '分组', '模型', '费用', '流', 'Token', '耗时', '详情']
         .map((c) => h('span', { role: 'columnheader', text: c }))),
     ...slice.map((r) => logRowEl(r)),
   );
@@ -1994,54 +1984,139 @@ function renderLogs() {
   );
 }
 
-/** logRowEl 一行九列，与 NearToken 的 lg-row 同构。 */
+/** vendorOfModel 日志行只有模型名，按系列反推厂商，用来给模型胶囊挂图标。 */
+function vendorOfModel(model) {
+  const n = String(model || '');
+  const rules = [
+    [/gpt|^o\d|codex|dall-e|sora|text-embedding/i, 'OpenAI'],
+    [/claude/i, 'Anthropic'],
+    [/gemini|imagen|nano-?banana/i, 'Google'],
+    [/deepseek/i, 'DeepSeek'],
+    [/kimi|moonshot/i, 'Moonshot'],
+    [/qwen|qwq|wanx|通义/i, '阿里云'],
+    [/glm/i, '智谱'],
+    [/grok/i, 'xAI'],
+    [/minimax|hailuo/i, 'MiniMax'],
+    [/seedance|doubao/i, '字节跳动'],
+    [/jimeng/i, '即梦'],
+    [/ideogram/i, 'Ideogram'],
+  ];
+  for (const [re, vendor] of rules) if (re.test(n)) return vendor;
+  return '';
+}
+
+/** lineIcon 细线图标（钱包 / 订阅），颜色跟随父级 currentColor。 */
+function lineIcon(paths, size = 12) {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', String(size));
+  svg.setAttribute('height', String(size));
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '1.7');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  for (const d of paths) {
+    const p = document.createElementNS(ns, 'path');
+    p.setAttribute('d', d);
+    svg.appendChild(p);
+  }
+  return svg;
+}
+
+/** 钱包 / 订阅两种扣费来源的图标：额度口径不同，不能长一个样。 */
+const walletGlyph = () => lineIcon([
+  'M3 7a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
+  'M3 10h18',
+  'M16.5 14.5h.01',
+]);
+const subscriptionGlyph = () => lineIcon([
+  'M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1a2 2 0 0 0 0 4v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1a2 2 0 0 0 0-4z',
+  'M9 7v10',
+]);
+
+/** logCostText 费用金额：上游给 6 位小数，这里跟着它，小额差异才看得出来。 */
+function logCostText(raw) {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return '';
+  const cur = (cache.state && cache.state.currency) || {};
+  const per = Number(cur.per) > 0 ? Number(cur.per) : 1;
+  const base = n / per;
+  const value = cur.display && Number(cur.rate) > 0 ? base * Number(cur.rate) : base;
+  return `${cur.symbol || '$'}${value.toFixed(6)}`;
+}
+
+/** logRowEl 一行八列：时间 / 令牌·分组 / 模型 / 费用 / 流 / Token / 耗时 / 详情。 */
 function logRowEl(r) {
   const dash = (cls = '') => h('span', { class: `lg-dash ${cls}`.trim(), 'aria-hidden': 'true' }, '—');
   const hasMap = Boolean(r.upModel || r.respModel);
   const mask = (v) => (logView.private ? '••••' : (v || '—'));
+  const vendor = vendorOfModel(r.model);
+  const costText = logCostText(r.costRaw);
+  const bySubscription = r.billingSource === 'subscription';
+  const paidBy = bySubscription ? '订阅扣费' : r.billingSource === 'wallet' ? '钱包扣费' : '扣费来源未标注';
+  const ratio = Number.isFinite(Number(r.groupRatio)) ? `${Number(r.groupRatio)}×` : '';
+  // 「none」不是思考强度，是没开；摆一个金色 none 反而像有档位
+  const effort = r.effort && !/^(none|无|default)$/i.test(String(r.effort)) ? r.effort : '';
 
   return h('div', { class: 'lg-row', role: 'row' },
-    // 1 时间：时间 + 类型标签 + 令牌胶囊（令牌跟着消耗走，不单独占列）
+    // 1 时间 + 类型
     h('span', { class: 'lg-cell-stack', role: 'cell' },
       h('span', { class: 'lg-time-str', text: r.atText || fmtAt(r.at) }),
       h('span', { class: 'lg-meta-row' },
-        h('span', { class: `lg-tag${r.kind === '消耗' ? ' ok' : ''}`, text: r.kind || '消费' }),
-        h('button', {
-          class: 'lg-pill lg-copyable', type: 'button', title: '点击复制令牌名称',
-          onclick: (ev) => copyText(r.tokenName || '', ev.currentTarget),
-        }, '⚿ ', h('span', { text: mask(r.tokenName) })))),
-    // 2 分组
-    h('span', { class: 'lg-group-cell', role: 'cell' },
-      r.group ? h('span', { class: 'lg-gb', title: r.group, text: r.group }) : dash()),
-    // 3 模型 + 思考强度 + 映射（title 里给上游/响应模型）
+        h('span', { class: `lg-tag${r.kind === '消耗' ? ' ok' : ''}`, text: r.kind || '消费' }))),
+
+    // 2 令牌胶囊 + 分组：上游把两者叠在一列——上面是令牌，下面是分组与倍率
     h('span', { class: 'lg-cell-stack', role: 'cell' },
-      h('span', { class: 'lg-model-inline' },
+      h('button', {
+        class: 'lg-group-pill', type: 'button',
+        title: r.tokenName ? `点击复制令牌名称：${r.tokenName}` : (r.group ? `分组 ${r.group}` : ''),
+        onclick: (ev) => copyText(r.tokenName || '', ev.currentTarget),
+      },
+      h('span', { class: 'lg-key', 'aria-hidden': 'true', text: '⚿' }),
+      h('span', { class: 'lg-gb-name', text: mask(r.tokenName || r.group || '') })),
+      h('span', { class: 'lg-group-meta' },
+        h('span', { class: 'lg-group-name', title: r.group || '', text: r.group || '—' }),
+        ratio ? h('span', { class: 'lg-group-ratio', text: ratio }) : null)),
+
+    // 3 模型胶囊（厂商图标）+ 思考强度（金色无包边）+ 映射标记
+    h('span', { class: 'lg-cell-stack', role: 'cell' },
+      h('span', { class: 'lg-model-line' },
         h('span', {
-          class: 'lg-model', title: hasMap
+          class: 'lg-model-pill',
+          title: hasMap
             ? [`请求模型 ${r.model}`, r.upModel ? `上游 ${r.upModel}` : '', r.respModel ? `响应 ${r.respModel}` : ''].filter(Boolean).join('\n')
             : r.model,
-          text: r.model || '—',
-        }),
-        r.effort ? h('span', { class: 'lg-effort', text: r.effort }) : null,
+        },
+        vendor ? vendorBadge(vendor, { size: 12 }) : null,
+        h('span', { class: 'lg-model', text: r.model || '—' })),
+        r.effort && effort ? h('span', { class: 'lg-effort', text: effort }) : null,
         hasMap ? h('span', { class: 'lg-map-mark', title: '查看模型映射', 'aria-hidden': 'true' }, '⇄') : null)),
-    // 4 费用
+
+    // 4 费用：钱包 / 订阅各用各的图标，金额 6 位小数（与上游一致）
     h('span', { class: 'lg-cell-stack', role: 'cell' },
-      h('span', { class: 'lg-cost', text: mask(r.cost) })),
-    // 5 请求体大小
-    h('span', { class: 'lg-num', role: 'cell', text: fmtBytes(r.bytes) }),
-    // 6 流：流/非流 + t/s
+      h('span', { class: `lg-cost-pill${bySubscription ? ' sub' : ''}`, title: paidBy },
+        bySubscription ? subscriptionGlyph() : walletGlyph(),
+        h('span', { text: costText ? mask(costText) : '—' }))),
+
+    // 5 流：流/非流 + t/s
     h('span', { class: 'lg-cell-stack', role: 'cell' },
       h('span', { class: `lg-flow${r.isStream ? '' : ' off'}`, text: r.isStream ? '流' : '非流' }),
       h('span', { class: 'lg-sub', text: Number.isFinite(r.tps) && r.tps > 0 ? `${fmtInt(r.tps)} t/s` : '—' })),
-    // 7 Token：入/出 + 缓存（0 也显式写出，空值会被读成「没数据」）
+
+    // 6 Token：入/出 + 缓存（0 也显式写出，空值会被读成「没数据」）
     h('span', { class: 'lg-cell-stack', role: 'cell' },
       h('span', { class: 'lg-num', text: `${r.input != null ? fmtInt(r.input) : '—'} / ${r.output != null ? fmtInt(r.output) : '—'}` }),
       h('span', { class: 'lg-sub', text: `缓存 ${fmtInt(Number(r.cache) || 0)}` })),
-    // 8 耗时：首字与耗时各自分档
+
+    // 7 耗时：首字与耗时各自分档
     h('span', { class: 'lg-cell-stack lg-time-col', role: 'cell' },
       h('span', { class: `lg-dur ${logTierClass(r.ttft)}` }, '首字 ', logSecs(r.ttft) ? h('b', { text: logSecs(r.ttft) }) : dash('in')),
       h('span', { class: `lg-dur ${logTierClass(r.dur)}` }, '耗时 ', logSecs(r.dur) ? h('b', { text: logSecs(r.dur) }) : dash('in'))),
-    // 9 详情：站点真实计价条件
+
+    // 8 详情：站点真实计价条件
     h('span', { class: 'lg-detail', role: 'cell', title: r.detail || '' }, r.detail || dash()),
   );
 }
@@ -2069,6 +2144,8 @@ function fillLogFilters(rows) {
     kindSel.dataset.filled = '1';
   }
   if (kindSel) kindSel.value = logFilter.kind;
+  refreshSelect(groupSel);
+  refreshSelect(kindSel);
 }
 
 function bindLogControls() {
@@ -2151,13 +2228,127 @@ function eyeIcon(off) {
   return svg;
 }
 
-/** syncRangeButtons 让日志页与账户页的区间按钮保持一致（两处共用 filters.range）。 */
+/**
+ * syncRangeButtons 让日志页与账户页的区间按钮保持一致（两处共用 filters.range）。
+ */
 function syncRangeButtons() {
   for (const btn of $$('.segmented [data-range]')) {
     btn.setAttribute('aria-pressed', String(btn.dataset.range === filters.range));
   }
   for (const btn of $$('#logs-range [data-log-range]')) {
     btn.setAttribute('aria-pressed', String(btn.dataset.logRange === filters.range));
+  }
+}
+
+// ── 通用下拉：替掉原生 select 的系统白底弹层 ──────────────────
+// 原生 <select> 的候选列表由系统画，深色页面里必定是一块白底（截图里的
+// 「所有分组 / 所有类型」）。这里保留 <select> 作为值与表单校验的载体，
+// 只把视觉层换成本主题的按钮 + listbox：选中后写回 select.value 并派发
+// change，原有的筛选与表单逻辑一行都不用改。
+
+let openSelWrap = null;
+
+/** closeOpenSelect 同一时间只允许开一个下拉。 */
+function closeOpenSelect() {
+  if (!openSelWrap) return;
+  const pop = openSelWrap.querySelector('.sel-pop');
+  const trigger = openSelWrap.querySelector('.sel-trigger');
+  if (pop) pop.hidden = true;
+  if (trigger) trigger.setAttribute('aria-expanded', 'false');
+  openSelWrap.classList.remove('open');
+  openSelWrap = null;
+}
+document.addEventListener('click', () => closeOpenSelect());
+
+/**
+ * refreshSelect 在选项或值被程序改动后，重画触发器文案与候选列表。
+ * 旧实现依赖原生 select 自己同步显示，换成自绘之后必须显式调用。
+ */
+function refreshSelect(sel) {
+  if (!sel || typeof sel.closest !== 'function') return;
+  const wrap = sel.closest('.sel');
+  if (!wrap) return;
+  const text = wrap.querySelector('.sel-text');
+  const pop = wrap.querySelector('.sel-pop');
+  const trigger = wrap.querySelector('.sel-trigger');
+  const selected = [...sel.options].find((o) => o.value === sel.value) || null;
+  if (text) {
+    text.textContent = selected ? selected.textContent : '—';
+    text.classList.toggle('is-placeholder', !sel.value);
+  }
+  if (pop) {
+    pop.replaceChildren(...[...sel.options].map((o) => h('button', {
+      class: 'sel-opt' + (o.value === sel.value ? ' on' : ''), type: 'button', role: 'option',
+      'aria-selected': String(o.value === sel.value), 'data-value': o.value, tabindex: '-1',
+    }, o.textContent)));
+  }
+  if (trigger) trigger.disabled = Boolean(sel.disabled);
+}
+
+/** enhanceSelect 把一个原生 select 换成主题内下拉；可重复调用（幂等）。 */
+function enhanceSelect(sel, extraClass = '') {
+  if (!sel || sel.dataset.enhanced === '1') return;
+  sel.dataset.enhanced = '1';
+  sel.classList.add('sel-native');
+  sel.setAttribute('tabindex', '-1');
+  const wrap = h('div', { class: `sel ${extraClass}`.trim() });
+  const trigger = h('button', {
+    class: 'sel-trigger', type: 'button', 'aria-haspopup': 'listbox', 'aria-expanded': 'false',
+  }, h('span', { class: 'sel-text' }), h('span', { class: 'sel-caret', 'aria-hidden': 'true' }, '▾'));
+  const pop = h('div', { class: 'sel-pop', role: 'listbox', hidden: true });
+  // 触发器要有自己的可读名字：可见的 label 指向的是原生 select
+  const label = sel.id ? document.querySelector(`label[for="${sel.id}"]`) : null;
+  const labelText = (label && label.textContent.trim()) || sel.getAttribute('aria-label') || '';
+  if (labelText) trigger.setAttribute('aria-label', labelText);
+
+  const parent = sel.parentNode;
+  parent.insertBefore(wrap, sel);
+  wrap.append(sel, trigger, pop);
+
+  const choose = (value) => {
+    sel.value = value;
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    refreshSelect(sel);
+    closeOpenSelect();
+    trigger.focus();
+  };
+
+  trigger.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    if (openSelWrap === wrap) { closeOpenSelect(); return; }
+    closeOpenSelect();
+    pop.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+    wrap.classList.add('open');
+    openSelWrap = wrap;
+    const on = pop.querySelector('.sel-opt.on') || pop.querySelector('.sel-opt');
+    if (on) on.focus();
+  });
+
+  pop.addEventListener('click', (ev) => {
+    const opt = ev.target.closest('.sel-opt');
+    if (opt) choose(opt.dataset.value);
+  });
+
+  pop.addEventListener('keydown', (ev) => {
+    const opts = [...pop.querySelectorAll('.sel-opt')];
+    const i = opts.indexOf(document.activeElement);
+    if (ev.key === 'ArrowDown') { ev.preventDefault(); (opts[i + 1] || opts[0])?.focus(); }
+    else if (ev.key === 'ArrowUp') { ev.preventDefault(); (opts[i - 1] || opts[opts.length - 1])?.focus(); }
+    else if (ev.key === 'Home') { ev.preventDefault(); opts[0]?.focus(); }
+    else if (ev.key === 'End') { ev.preventDefault(); opts[opts.length - 1]?.focus(); }
+    else if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); if (i >= 0) choose(opts[i].dataset.value); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); closeOpenSelect(); trigger.focus(); }
+    else if (ev.key === 'Tab') closeOpenSelect();
+  });
+
+  refreshSelect(sel);
+}
+
+/** enhanceSelects 把所有「值从服务端来」的原生下拉换成主题内下拉。 */
+function enhanceSelects() {
+  for (const id of ['logs-group', 'logs-kind', 'keys-filter-group', 'key-group']) {
+    enhanceSelect($('#' + id));
   }
 }
 
@@ -2234,6 +2425,7 @@ function renderKeyGroupOptions() {
 
   sel.disabled = groups.length === 0;
   if (submit) submit.disabled = groups.length === 0;
+  refreshSelect(sel);
 
   if (!groups.length) {
     const hasPat = Boolean(cache.state && cache.state.pat && cache.state.pat.set);
@@ -2309,6 +2501,7 @@ function fillKeyGroupFilter(keys) {
   );
   sel.value = groups.includes(keep) ? keep : '';
   keysFilter.group = sel.value;
+  refreshSelect(sel);
 }
 
 function bindKeysFilter() {
@@ -2330,6 +2523,7 @@ function bindKeysFilter() {
       if (name) name.value = '';
       const g = $('#keys-filter-group');
       if (g) g.value = '';
+      refreshSelect(g);
       renderKeys();
     });
   }
@@ -3381,6 +3575,7 @@ async function boot() {
   bindTabs();
   bindCatalogControls();
   bindWalletControls();
+  enhanceSelects();
   bindLogControls();
   bindKeyForm();
   bindKeyModal();

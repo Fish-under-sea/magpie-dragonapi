@@ -84,6 +84,17 @@ test('rowsOf：没有 quota 时费用留空，不写 0', () => {
   assert.equal(rows[0].costRaw, undefined)
 })
 
+test('rowsOf：带出扣费来源与分组倍率（费用图标与分组副行要用）', () => {
+  const sub = rowsOf([{
+    created_at: 1, model_name: 'a', quota: 1000,
+    other: { billing_source: 'subscription', group_ratio: 1.2 },
+  }], CUR)[0]
+  assert.equal(sub.billingSource, 'subscription')
+  assert.equal(sub.groupRatio, 1.2)
+  const wallet = rowsOf([{ created_at: 1, model_name: 'a', quota: 1000, other: { billing_source: 'wallet' } }], CUR)[0]
+  assert.equal(wallet.billingSource, 'wallet')
+})
+
 test('rowsOf：type 映射成中文，未知值原样说明', () => {
   assert.equal(rowsOf([{ created_at: 1, model_name: 'a', type: 1 }], CUR)[0].kind, '充值')
   assert.equal(rowsOf([{ created_at: 1, model_name: 'a', type: 2 }], CUR)[0].kind, '消耗')

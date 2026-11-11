@@ -1571,6 +1571,81 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 .menu-pop [role="option"]:hover { background: var(--card-hover); }
 .menu-pop [role="option"][aria-selected="true"] { color: var(--accent); background: var(--accent-soft); }
 
+/* ── 主题内下拉：原生 select 的候选列表由系统画成白底，这里整体换掉 ── */
+.sel { position: relative; display: inline-flex; min-width: 0; flex: none; }
+/* 原生 select 仍是值与表单校验的载体，只把它藏到 1px */
+.sel-native {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.sel-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 120px;
+  max-width: 170px;
+  height: 30px;
+  padding: 0 9px;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 12px;
+  color: var(--fg);
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.sel-trigger:disabled { opacity: .55; cursor: not-allowed; }
+.sel-trigger[aria-expanded="true"] { border-color: var(--accent-line); }
+.sel-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sel-text.is-placeholder { color: var(--muted); }
+.sel-caret { flex: none; font-size: 9px; line-height: 1; color: var(--muted); }
+.sel-pop {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .35);
+  scrollbar-width: thin;
+}
+.sel-pop[hidden] { display: none; }
+.sel-opt {
+  padding: 7px 9px;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  white-space: nowrap;
+  color: var(--fg);
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.sel-opt:hover { background: var(--card-hover); }
+.sel-opt.on { color: var(--accent); background: var(--accent-soft); }
+.sel-opt:focus-visible { outline: 2px solid var(--accent-line); outline-offset: -2px; }
+/* 弹窗表单里的分组下拉要铺满整行 */
+.field .sel { display: flex; width: 100%; }
+.field .sel .sel-trigger { width: 100%; max-width: none; height: 34px; }
+/* 分页里的「每页行数」小一号 */
+.sel.sel-sm .sel-trigger { height: 26px; min-width: 88px; padding: 0 7px; font-size: 11px; }
+
 /* 选中分组时的横幅：分组名 + 倍率 + 站点说明，横跨模型区顶部 */
 .group-banner {
   margin: 0 0 12px;
@@ -2173,6 +2248,8 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   gap: 8px;
   flex-wrap: wrap;
 }
+/* hidden 的默认 display:none 会被上面的 display:flex 压掉，这里显式补回 */
+.logs-bar[hidden] { display: none; }
 /* 属性选择器（input[type=search] 等）比特异性更高，会压回 34px 高度——
    带元素前缀提权，并重置 min-height */
 input.logs-input, select.logs-select {
@@ -2225,18 +2302,18 @@ input.logs-input:focus-visible, select.logs-select:focus-visible {
 .lg-dot.violet { background: var(--violet, var(--accent)); }
 .lg-icon-btn.on { color: var(--warn); border-color: var(--warn); }
 
-/* ── 9 列网格表 ─────────────────────────────────────────────── */
+/* ── 8 列网格表（请求体大小已移除） ─────────────────────────── */
 .logs-body { min-width: 0; overflow-x: auto; }
 .lg-table {
   display: grid;
-  min-width: 980px;
+  min-width: 900px;
   font-size: 11.5px;
 }
 .lg-row {
   display: grid;
-  grid-template-columns: minmax(118px, 1.1fr) minmax(84px, .9fr) minmax(140px, 1.5fr)
-    minmax(72px, .7fr) minmax(70px, .6fr) minmax(72px, .7fr) minmax(120px, 1.1fr)
-    minmax(96px, .8fr) minmax(130px, 1.2fr);
+  grid-template-columns: minmax(104px, .9fr) minmax(128px, 1.1fr) minmax(160px, 1.5fr)
+    minmax(112px, .9fr) minmax(60px, .5fr) minmax(110px, .9fr) minmax(92px, .7fr)
+    minmax(120px, 1fr);
   gap: 0 12px;
   align-items: center;
   padding: 7px 12px;
@@ -2263,40 +2340,48 @@ input.logs-input:focus-visible, select.logs-select:focus-visible {
   border-radius: 4px;
 }
 .lg-tag.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
-.lg-pill {
+/* 令牌 / 模型 / 费用三处都用胶囊：与上游日志表一致 */
+.lg-group-pill,
+.lg-model-pill,
+.lg-cost-pill {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  padding: 0 6px;
-  height: 16px;
-  font-size: 9.5px;
-  font-family: var(--code);
-  color: var(--muted);
+  gap: 5px;
+  min-width: 0;
+  min-height: 20px;
+  padding: 0 8px;
+  font-size: 10.5px;
+  color: var(--fg);
   background: var(--sunken);
   border: 1px solid var(--line);
   border-radius: 999px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.lg-group-pill {
+  font: inherit;
+  font-size: 10.5px;
+  text-align: left;
   cursor: pointer;
-  max-width: 100%;
+}
+.lg-group-pill:hover { border-color: var(--accent-line); }
+.lg-key { flex: none; font-size: 9.5px; color: var(--muted); }
+.lg-gb-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.lg-group-meta { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 10px; }
+.lg-group-name {
+  min-width: 0;
+  color: var(--violet, var(--accent));
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.lg-pill:hover { color: var(--fg); border-color: var(--accent-line); }
-.lg-gb {
-  display: inline-block;
-  max-width: 100%;
-  padding: 1px 7px;
-  font-size: 10px;
-  color: var(--muted);
-  background: var(--sunken);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.lg-model-inline { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.lg-group-ratio { flex: none; font-family: var(--code); color: var(--muted); }
+.lg-model-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.lg-model-pill { flex: 0 1 auto; font-family: var(--code); }
+.lg-model-pill .vendor-icon,
+.lg-model-pill .vendor-letter { flex: none; width: 12px; height: 12px; }
 .lg-model {
+  min-width: 0;
   font-family: var(--code);
   font-size: 11px;
   color: var(--fg);
@@ -2304,16 +2389,23 @@ input.logs-input:focus-visible, select.logs-select:focus-visible {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+/* 思考强度：金色、无包边（上游只在模型旁点一下，不做成标签块） */
 .lg-effort {
   flex: none;
-  padding: 0 5px;
+  padding: 0;
   font-size: 9.5px;
-  color: var(--violet, var(--accent));
-  border: 1px solid color-mix(in srgb, var(--violet, var(--accent)) 40%, transparent);
-  border-radius: 4px;
+  color: var(--warn);
+  background: transparent;
+  border: 0;
 }
 .lg-map-mark { flex: none; color: var(--muted); font-size: 10px; }
-.lg-cost { font-family: var(--code); font-size: 11px; color: var(--fg); }
+.lg-cost-pill { font-family: var(--code); font-variant-numeric: tabular-nums; }
+.lg-cost-pill svg { flex: none; color: var(--muted); }
+.lg-cost-pill.sub {
+  color: var(--violet, var(--accent));
+  border-color: color-mix(in srgb, var(--violet, var(--accent)) 45%, transparent);
+}
+.lg-cost-pill.sub svg { color: var(--violet, var(--accent)); }
 .lg-num {
   font-family: var(--code);
   font-size: 11px;
@@ -2378,7 +2470,7 @@ input.logs-input:focus-visible, select.logs-select:focus-visible {
 }
 
 @media (max-width: 720px) {
-  .lg-row { grid-template-columns: repeat(9, minmax(96px, 1fr)); }
+  .lg-row { grid-template-columns: repeat(8, minmax(96px, 1fr)); }
   .logs-tools { margin-left: 0; }
 }
 /* ── 账户卡：照站点控制台的版式（大字余额 → 一行元信息 → 明细 → 标签行） ──

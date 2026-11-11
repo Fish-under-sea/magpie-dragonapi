@@ -65,12 +65,48 @@ test('auth.provider 与 provider.id 一致', () => {
   assert.equal(plugin.provider.id, 'dragonapi')
 })
 
-test('auth.methods 至少有一条 api 登录，且带 placeholder', () => {
+test('auth.methods 至少有一条 api 登录，且 key 提示与校验都在', () => {
   const methods = plugin.auth.methods
   assert.ok(methods.length >= 1)
   const api = methods.find((m) => m.type === 'api')
   assert.ok(api, '必须有一条 type=api 的登录方式')
-  assert.match(String(api.placeholder || ''), /sk-/, '贴钥匙的输入框要提示 sk- 前缀')
+  const hint = api.placeholder || (api.prompts || []).find((p) => p.key === 'key')?.placeholder || ''
+  assert.match(String(hint), /sk-/, '钥匙输入框要提示 sk- 前缀')
+  assert.equal(typeof api.authorize, 'function', '手动钥匙必须先 authorize 校验，不能直接存')
+})
+
+test('auth.icon 能从包目录读到品牌图标，不是灰方块', () => {
+  const icon = plugin.auth.icon
+  assert.match(icon, /^data:image\/png;base64,/, '供应商图标必须是 png data URI')
+  assert.ok(icon.length > 1000, '图标内容为空会让宿主显示灰方块')
+})
+
+test('手动钥匙 authorize 空 key 直接拒绝，不会存成账号', async () => {
+  const api = plugin.auth.methods.find((m) => m.type === 'api')
+  await assert.rejects(() => api.authorize({}), /请填写|钥匙/)
+})
+
+test('手动钥匙 authorize 验证站点并只记下 /v1/models 给的模型', async () => {
+  const api = plugin.auth.methods.find((m) => m.type === 'api')
+  const realFetch = globalThis.fetch
+  globalThis.fetch = async (url) => {
+    const u = String(url)
+    if (u.includes('/api/usage/token/')) {
+      return new Response(JSON.stringify({ success: true, data: { name: 'key', total_available: 1, total_used: 0, unlimited_quota: true } }), { status: 200, headers: { 'content-type': 'application/json' } })
+    }
+    if (u.includes('/v1/models')) {
+      return new Response(JSON.stringify({ data: [{ id: 'gpt-6-sol' }] }), { status: 200, headers: { 'content-type': 'application/json' } })
+    }
+    return realFetch(url)
+  }
+  try {
+    const r = await api.authorize({ key: 'sk-' + 'e'.repeat(48) })
+    assert.equal(r.type, 'success')
+    assert.deepEqual(r.metadata.allowed, ['gpt-6-sol'])
+    assert.equal(r.metadata.modelCount, 1)
+  } finally {
+    globalThis.fetch = realFetch
+  }
 })
 
 test('config 声明了供应商名、npm 与 base', async () => {
@@ -103,6 +139,14 @@ test('provider.models 有账号时只给该分组的模型', async () => {
   assert.ok(ids.length > 0, 'gpt-plus 账号拿不到模型')
   assert.equal(ids.every((id) => id.startsWith('gpt-plus/')), true, '不能混入别的分组')
   assert.equal(ids.length, 5)
+})
+
+test('手动钥匙有 allowed 时只给该钥匙的模型，不摊整组目录', async () => {
+  const key = 'sk-' + 'd'.repeat(48)
+  const models = await plugin.provider.models({}, {
+    auth: { key, metadata: { group: 'gpt-plus', allowed: ['gpt-6-sol'] } },
+  })
+  assert.deepEqual(Object.keys(models), ['gpt-plus/gpt-6-sol'])
 })
 
 test('模型形状符合宿主预期：id / name / api.id / api.url', async () => {

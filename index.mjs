@@ -16,9 +16,10 @@
 // 的沙箱，页面自己发不出任何请求，只能把自己导航过去。界面由那个服务提供。
 
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-import { DEFAULT_SITE, currencyOf, readTokenUsage, createKey, revealKey, readKeys } from './lib/site.mjs'
+import { DEFAULT_SITE, currencyOf, readTokenUsage, readTokenModels, createKey, revealKey, readKeys } from './lib/site.mjs'
 import { buildCatalog } from './lib/catalog.mjs'
 import { createCatalogSource } from './lib/catalog-source.mjs'
 import { createStatusSource } from './lib/status-source.mjs'
@@ -83,19 +84,24 @@ function makeContext(input, options) {
     if (tail) secrets.set(tail, secret)
     const md = auth.metadata && typeof auth.metadata === 'object' ? auth.metadata : {}
     const group = String(md.group || '')
-    if (tail && group) {
+    const allowed = Array.isArray(md.allowed)
+      ? md.allowed.map((v) => String(v)).filter(Boolean)
+      : (Array.isArray(state.accounts[tail]?.allowed) ? state.accounts[tail].allowed : null)
+    if (tail && (group || (allowed && allowed.length))) {
       const had = state.accounts[tail] || {}
       state.accounts[tail] = {
-        label: String(md.label || had.label || `${group} · ${maskKey(secret)}`),
+        label: String(md.label || had.label || (group ? `${group} · ${maskKey(secret)}` : maskKey(secret))),
         group,
         masked: maskKey(secret),
         tail,
-        models: Number(md.models) || had.models || 0,
+        // models 是数量，allowed 是这把钥匙实际可用的模型名（不含分组前缀）。
+        models: Number(md.modelCount) || Number(md.models) || had.models || (allowed ? allowed.length : 0),
+        allowed: allowed || had.allowed,
         boundAt: Number(had.boundAt) || Number(md.boundAt) || Date.now(),
       }
       persist()
     }
-    return { secret, tail, group }
+    return { secret, tail, group, allowed: allowed || null }
   }
 
   return {
@@ -194,16 +200,20 @@ export default async function dragonapi(input, options) {
       get icon() {
         // 站点图标（Ciallo 立绘）：包内 png 编成 data URI。宿主只收 https 与
         // data:image，联网抓会在断网时变成灰书页。
-        try {
-          const png = readFileSync(join(ctx.dir, 'page', 'icon.png'))
-          return 'data:image/png;base64,' + png.toString('base64')
-        } catch {
+        //
+        // 不能拼 `new URL('.', import.meta.url).pathname`：Windows 上 pathname
+        // 是 `/C:/...`，join 出来是 `\C:\...`，读不到文件，供应商图标就退成
+        // 灰方块。ctx.dir 在宿主里是配置目录，不是包目录，也不能当包根用。
+        const roots = []
+        try { roots.push(dirname(fileURLToPath(import.meta.url))) } catch { /* 不是 file URL */ }
+        if (ctx.dir) roots.push(String(ctx.dir))
+        for (const root of roots) {
           try {
-            const here = new URL('.', import.meta.url).pathname
-            const png = readFileSync(join(here, 'page', 'icon.png'))
+            const png = readFileSync(join(root, 'page', 'icon.png'))
             return 'data:image/png;base64,' + png.toString('base64')
-          } catch { return '' }
+          } catch { /* 换下一个根目录 */ }
         }
+        return ''
       },
 
       get methods() {
@@ -211,8 +221,16 @@ export default async function dragonapi(input, options) {
           {
             type: 'api',
             label: 'DragonAPI API Key',
-            placeholder: 'sk-…',
-            // 不写 authorize：宿主直接把用户粘的钥匙存下来，这是最常见也最稳的路。
+            // 自己问 key（KeyAsked）：这样 authorize 能拿到输入、先向站点验证，
+            // 而不是宿主把任意字符串当成钥匙存下来、再给它挂上整张目录。
+            prompts: [
+              { type: 'password', key: 'key', message: 'DragonAPI API Key', placeholder: 'sk-…' },
+            ],
+            async authorize(inputs) {
+              const key = String(inputs?.key || inputs?.apiKey || inputs?.token || '').trim()
+              if (!key) throw new Error('请填写 DragonAPI 的 sk- 钥匙')
+              return authorizeKey(ctx, key)
+            },
           },
         ]
         // 有 PAT 才出现第二条：用访问令牌按分组建一把新钥匙，并自动绑成账号。
@@ -333,10 +351,12 @@ export default async function dragonapi(input, options) {
        */
       async models(_given, hookCtx) {
         let group = ''
+        let allowed = null
         try {
           const auth = hookCtx?.auth
           const found = ctx.remember(auth)
           group = found?.group || ''
+          allowed = Array.isArray(found?.allowed) ? found.allowed : null
         } catch { /* auth 形状不对就按「无分组」处理 */ }
 
         try {
@@ -350,8 +370,12 @@ export default async function dragonapi(input, options) {
           // 保护 1：列表单调不减。站点偶发少给几个模型时用上一次实时表补齐，
           // 否则宿主会把这些「消失」的模型从用户选择里移除。
           let table = group ? pickGroup(built.models, group) : built.models
+          // 用户手动添加的钥匙：只留 /v1/models 说它能用的那些，而不是整组目录。
+          if (allowed && allowed.length) table = pickAllowed(table, allowed, group)
           const lastGood = ctx.memory.lastGood
-          if (lastGood) {
+          // allowed 是站点对这把钥匙的精确授权：不能再把上一次的全组表补回来，
+          // 否则「只导入钥匙包含的模型」又被 lastGood 破坏了。
+          if (lastGood && !(allowed && allowed.length)) {
             for (const id of Object.keys(lastGood)) {
               if (!table[id] && (!group || id.startsWith(group + '/'))) table[id] = lastGood[id]
             }
@@ -427,6 +451,114 @@ function pickGroup(models, group) {
 /** pickGroupIf：group 为空时返回整表，否则只留那一组。 */
 function pickGroupIf(models, group) {
   return group ? pickGroup(models, group) : { ...models }
+}
+
+/** pickAllowed 只留钥匙在站点上真正可用的模型，按裸模型名去重。 */
+function pickAllowed(models, allowed, group) {
+  const want = new Set(allowed.map((v) => String(v)))
+  const seen = new Set()
+  const out = {}
+  for (const [id, m] of Object.entries(models)) {
+    const cut = id.indexOf('/')
+    const bare = cut >= 0 ? id.slice(cut + 1) : id
+    if (!want.has(bare)) continue
+    if (group && (cut < 0 || id.slice(0, cut) !== group)) continue
+    if (seen.has(bare)) continue
+    seen.add(bare)
+    out[id] = m
+  }
+  return out
+}
+
+/**
+ * authorizeKey 验证一把 sk- 钥匙，并算出它实际能用的模型。
+ *
+ * 站点 `/api/usage/token/` 是钥匙可访问的，用它做鉴权；模型列表用
+ * `/v1/models` 拿（会按分组、model_limits、启用状态过滤）。只把交集写进
+ * auth metadata，provider.models 之后就不会再给整张目录。
+ */
+async function authorizeKey(ctx, key) {
+  let usage
+  try {
+    usage = await readTokenUsage(ctx.site, key)
+  } catch (e) {
+    throw new Error(`钥匙验证失败：${String(e?.message || e)}。请确认这是 DragonAPI 的 sk- 钥匙，且没有被禁用/过期。`)
+  }
+  let allowed = []
+  let modelsError = ''
+  try {
+    allowed = await readTokenModels(ctx.site, key)
+  } catch (e) {
+    modelsError = String(e?.message || e)
+  }
+  // 站点没开 /v1/models 时，model_limits 是同一把钥匙的授权清单，可以兜底；
+  // 两者都没有才拒绝，不能因为接口缺失就把有效钥匙挡在门外。
+  if (!allowed.length && usage.modelLimitsEnabled && usage.modelLimits) {
+    allowed = Object.keys(usage.modelLimits)
+  }
+  if (usage.modelLimitsEnabled && usage.modelLimits) {
+    const limits = Object.keys(usage.modelLimits)
+    if (limits.length && allowed.length) {
+      const set = new Set(limits)
+      allowed = allowed.filter((m) => set.has(m))
+    }
+  }
+  if (!allowed.length) {
+    throw new Error(modelsError
+      ? `钥匙有效，但读不到它的模型：${modelsError}`
+      : '这把钥匙在站点上没有可用模型：先在控制台给它开放模型/分组，再重新添加。')
+  }
+
+  const cat = await ctx.catalog.get({})
+  const st = await ctx.status.get({})
+  const built = cat.env
+    ? buildCatalog(cat.env, { cur: currencyOf(st), enabledGroups: [], site: ctx.site })
+    : { models: {} }
+  const known = new Set(Object.keys(built.models).map((id) => {
+    const cut = id.indexOf('/')
+    return cut >= 0 ? id.slice(cut + 1) : id
+  }))
+  allowed = [...new Set(allowed.filter((m) => known.has(m)))]
+  if (!allowed.length) {
+    throw new Error('站点返回的模型和当前模型目录对不上，稍后重试；如果一直这样，把插件页面里的模型目录刷新一次。')
+  }
+
+  const tail = tailOf(key)
+  let group = ''
+  if (ctx.state.pat) {
+    try {
+      const keys = await readKeys(ctx.site, ctx.state.pat)
+      const hit = keys.find((k) => k.key && tail && k.key.endsWith(tail))
+      if (hit?.group) group = hit.group
+    } catch { /* 没有 PAT 或不给读列表，就走下面的模型匹配 */ }
+  }
+  if (!group) {
+    const want = new Set(allowed)
+    const score = new Map()
+    for (const id of Object.keys(built.models)) {
+      const cut = id.indexOf('/')
+      if (cut < 0) continue
+      const g = id.slice(0, cut)
+      const bare = id.slice(cut + 1)
+      if (!want.has(bare)) continue
+      score.set(g, (score.get(g) || 0) + 1)
+    }
+    group = [...score.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] || ''
+  }
+
+  return {
+    type: 'success',
+    key,
+    metadata: {
+      group,
+      label: group ? `${group} · ${maskKey(key)}` : maskKey(key),
+      masked: maskKey(key),
+      tail,
+      boundAt: Date.now(),
+      modelCount: allowed.length,
+      allowed,
+    },
+  }
 }
 
 /** 金额：读不到站点参数时也不把额度原值当钱。 */

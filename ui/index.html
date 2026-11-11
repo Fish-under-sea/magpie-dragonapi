@@ -67,10 +67,13 @@
             <h3>筛选</h3>
             <button class="link" id="catalog-reset" type="button">重置</button>
           </div>
-          <p class="ma-note">按分组与类型细化。分组决定倍率，也决定你需要哪把钥匙。</p>
+          <p class="ma-note">分组决定倍率，也决定你需要哪把钥匙。</p>
 
-          <h4 id="aside-group-head">分组</h4>
+          <h4 id="aside-group-head"><span>分组</span><span class="h4-count" id="group-total"></span></h4>
           <div class="market-chips" id="group-chips" role="group" aria-labelledby="aside-group-head"></div>
+
+          <h4 id="aside-vendor-head"><span>厂商</span><span class="h4-count" id="vendor-total"></span></h4>
+          <div class="market-chips" id="vendor-chips" role="group" aria-labelledby="aside-vendor-head"></div>
         </aside>
 
         <div class="market-main">
@@ -80,8 +83,10 @@
               <input id="catalog-search" type="search" autocomplete="off" spellcheck="false"
                      placeholder="搜索模型名、厂商、端点或说明…">
             </div>
-            <div class="market-chips chips-row" id="kind-chips" role="group" aria-label="按类型筛选"></div>
+            <div class="market-seg" id="kind-chips" role="group" aria-label="按类型筛选"></div>
           </div>
+
+          <div class="group-banner" id="group-banner" hidden></div>
 
           <div class="market-count" id="catalog-meta"></div>
           <div class="model-grid" id="catalog-body">
@@ -258,11 +263,14 @@
   <div class="drawer-backdrop" data-drawer-close="1"></div>
   <div class="drawer-panel" role="document">
     <header class="drawer-head">
-      <div>
+      <span class="dh-icon" id="drawer-icon" aria-hidden="true"></span>
+      <div class="dh-main">
         <h2 id="drawer-title">模型详情</h2>
         <p class="drawer-sub" id="drawer-sub"></p>
       </div>
-      <button class="btn ghost" id="drawer-close" type="button" data-drawer-close="1">关闭</button>
+      <div class="actions">
+        <button class="btn ghost" id="drawer-close" type="button" data-drawer-close="1">关闭</button>
+      </div>
     </header>
     <div class="drawer-body" id="drawer-body"></div>
   </div>

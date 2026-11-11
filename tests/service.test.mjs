@@ -31,6 +31,7 @@ const STATUS = {
 const CATALOG = {
   data: [
     { model_name: 'gpt-6-sol', enable_groups: ['gpt-plus'], model_ratio: 1, completion_ratio: 5, cache_ratio: 0.1, supported_endpoint_types: ['openai'], vendor_id: 2 },
+    { model_name: 'gpt-6-sol-tiered', enable_groups: ['gpt-plus'], billing_mode: 'tiered_expr', billing_expr: 'tier("short_context", p*2 + c*10 + cr*0.2) * (param("service_tier") == "priority" ? 2 : 1)', supported_endpoint_types: ['openai'], vendor_id: 2 },
     { model_name: 'claude-sonnet-5', enable_groups: ['claude-max企业'], model_ratio: 1, completion_ratio: 5, supported_endpoint_types: ['anthropic'], vendor_id: 1 },
   ],
   group_ratio: { 'gpt-plus': 0.1, 'claude-max企业': 1.2 },
@@ -244,6 +245,19 @@ test('状态文件是 0600，且不含任何钥匙明文', () => {
   assert.equal(statePath(dir).endsWith('dragonapi-state.json'), true)
 })
 
+test('/api/model 给出每档真实单价与整单倍率（详情页要用）', async () => {
+  const r = await fetch(base + '/api/model?group=gpt-plus&model=gpt-6-sol-tiered')
+  assert.equal(r.status, 200)
+  const j = await r.json()
+  assert.equal(j.ok, true)
+  assert.equal(j.billing.mode, 'tiered_expr')
+  assert.match(j.billing.modeLabel, /分档/)
+  // p*2 × 分组倍率 0.1 = 0.2 → $0.20/M；c*10 × 0.1 = 1.0
+  assert.equal(j.billing.tiers[0].prices.input, '$0.20/M')
+  assert.equal(j.billing.tiers[0].prices.output, '$1.00/M')
+  assert.deepEqual(j.billing.multipliers, [{ param: 'service_tier', value: 'priority', factor: 2 }])
+})
+
 test('maskKey / tailOf 的边界', () => {
   assert.equal(maskKey(''), '')
   assert.equal(maskKey('ab'), '**')
@@ -251,4 +265,202 @@ test('maskKey / tailOf 的边界', () => {
   assert.equal(maskKey('sk-1234567890abcd'), 'sk-1**********abcd')
   assert.equal(tailOf('sk-1234567890abcd'), 'abcd')
   assert.equal(tailOf('short'), '')
+})
+
+// ── PAT 保存：该收的收、该拒的拒、写不进去要说出来 ──────────────
+//
+// 站点的每个只读端点卡不同 scope。之前只用 /api/user/self 做准入，于是
+// 一份「只能读钥匙」的 PAT 会被整份拒收；usage:read 又是拿空钥匙探的，
+// 永远探不出来；而落盘失败被吞掉，页面照样弹「已保存」。
+
+const PAT = 'nap_test_valid_pat'
+const SELF = { success: true, data: { id: 7, username: 'fish', display_name: 'Fish', group: 'gpt-plus', quota: 0, used_quota: 0 } }
+const AUTH_FAIL = { success: false, code: 'AUTH_UNAUTHORIZED', message: 'Unauthorized, invalid access token' }
+const FORBIDDEN = { success: false, code: 'AUTH_FORBIDDEN', message: 'access token missing required scope: profile:read' }
+
+const jsonRes = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
+
+/**
+ * siteStub 只接管 `https://example.test` 的请求，本地服务照常走真 fetch。
+ * 不这么做的话，把 globalThis.fetch 整个换掉会连测试自己的本地请求一起拦。
+ */
+async function siteStub(handler, fn) {
+  const real = globalThis.fetch
+  globalThis.fetch = (input, init) => {
+    const url = typeof input === 'string' ? input : String(input?.url || input)
+    if (!url.startsWith('https://example.test')) return real(input, init)
+    return Promise.resolve(handler(new URL(url), init || {}))
+  }
+  try { return await fn() } finally { globalThis.fetch = real }
+}
+
+/** startPatService 起一个把状态真的写进临时目录的服务，和插件里的行为一致。 */
+async function startPatService({ port, dir: fixedDir, setPat } = {}) {
+  const d = fixedDir || mkdtempSync(join(tmpdir(), 'dragonapi-pat-'))
+  const st = loadState(d)
+  st.status = STATUS
+  const calls = []
+  const svc = await startService({
+    port,
+    dir: d,
+    site: 'https://example.test',
+    catalog: createCatalogSource({ site: 'https://example.test', stub: CATALOG }),
+    status: createStatusSource({ site: 'https://example.test', seed: STATUS }),
+    getState: async () => ({
+      accounts: {}, pat: st.pat, patHint: st.patHint, patScopes: st.patScopes,
+      patVerified: st.patVerified, enabledGroups: [],
+    }),
+    setPat: setPat || (async (patch) => {
+      calls.push(patch)
+      st.pat = patch.pat
+      st.patHint = patch.hint
+      st.patScopes = patch.scopes
+      st.patVerified = patch.verified
+      return saveState(d, st)
+    }),
+    keyOf: () => '',
+  })
+  return { svc, base: `http://127.0.0.1:${svc.port}`, dir: d, st, calls }
+}
+
+const savePat = (base, pat) => fetch(base + '/api/pat', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ pat }),
+})
+
+test('PAT 三条只读端点都通：收下并记全 scope', async () => {
+  const { svc, base: b, dir: d, calls } = await startPatService({ port: 3610 })
+  try {
+    await siteStub((url) => {
+      if (url.pathname === '/api/user/self') return jsonRes(SELF)
+      if (url.pathname === '/api/token/') return jsonRes({ success: true, data: [] })
+      if (url.pathname === '/api/log/self') return jsonRes({ success: true, data: [] })
+      return jsonRes({ success: false, message: 'no route' }, 404)
+    }, async () => {
+      const r = await savePat(b, PAT)
+      assert.equal(r.status, 200)
+      const j = await r.json()
+      assert.equal(j.ok, true)
+      assert.deepEqual(j.pat.scopes.sort(), ['api_key:read', 'profile:read', 'usage:read'])
+      assert.equal(j.pat.verified, true)
+      assert.equal(j.pat.persisted, true)
+      assert.equal(j.user.name, 'fish')
+      assert.equal(j.warning, '')
+    })
+    assert.equal(calls.length, 1)
+    assert.equal(calls[0].verified, true)
+    // 真的落盘了，不是只在内存里
+    assert.equal(loadState(d).pat, PAT)
+    assert.equal(loadState(d).patVerified, true)
+  } finally {
+    await svc.close()
+  }
+})
+
+test('PAT 缺 profile:read 但能读钥匙：仍然收下，并说清哪一格没放行', async () => {
+  const { svc, base: b, dir: d } = await startPatService({ port: 3611 })
+  try {
+    await siteStub((url) => {
+      if (url.pathname === '/api/user/self') return jsonRes(FORBIDDEN, 403)
+      if (url.pathname === '/api/token/') return jsonRes({ success: true, data: [] })
+      if (url.pathname === '/api/log/self') return jsonRes({ success: true, data: [] })
+      return jsonRes({ success: false, message: 'no route' }, 404)
+    }, async () => {
+      const r = await savePat(b, PAT)
+      assert.equal(r.status, 200, '缺一格 scope 不该把整份令牌打回')
+      const j = await r.json()
+      assert.equal(j.ok, true)
+      assert.equal(j.pat.verified, true)
+      assert.ok(!j.pat.scopes.includes('profile:read'))
+      assert.match(j.warning, /profile:read/)
+      assert.match(j.warning, /读账户资料与建钥匙/, '要说清丢的是哪件事，不是笼统一句「权限不足」')
+      assert.equal(j.user, null, 'self 没读到就不该编一个账户名')
+    })
+    assert.equal(loadState(d).pat, PAT, '令牌必须真的写进状态文件')
+  } finally {
+    await svc.close()
+  }
+})
+
+test('PAT 三个端点全 401：拒收，且不写盘、不调 setPat', async () => {
+  const { svc, base: b, dir: d, calls } = await startPatService({ port: 3612 })
+  try {
+    await siteStub(() => jsonRes(AUTH_FAIL, 401), async () => {
+      const r = await savePat(b, PAT)
+      assert.equal(r.status, 400)
+      const j = await r.json()
+      assert.equal(j.ok, false)
+      assert.match(j.error, /访问令牌/)
+      assert.match(j.hint, /profile:read/)
+      assert.ok(Array.isArray(j.failures) && j.failures.length === 3)
+    })
+    assert.equal(calls.length, 0, '鉴权失败时不该把令牌收进状态')
+    assert.equal(loadState(d).pat, '')
+  } finally {
+    await svc.close()
+  }
+})
+
+test('站点连不上：令牌照存，但明确标成「未验证」', async () => {
+  const { svc, base: b, dir: d } = await startPatService({ port: 3613 })
+  try {
+    await siteStub(() => { throw new TypeError('fetch failed') }, async () => {
+      const r = await savePat(b, PAT)
+      assert.equal(r.status, 200, '连不上站点不等于令牌无效')
+      const j = await r.json()
+      assert.equal(j.pat.verified, false)
+      assert.match(j.warning, /没能连上站点验证/)
+    })
+    assert.equal(loadState(d).pat, PAT)
+    assert.equal(loadState(d).patVerified, false)
+  } finally {
+    await svc.close()
+  }
+})
+
+test('落盘失败：回 500 并给出状态文件路径，不许假装保存成功', async () => {
+  const { svc, base: b } = await startPatService({
+    port: 3614,
+    setPat: async () => ({ saved: false, path: 'C:\\blocked\\dragonapi-state.json', error: 'EACCES: permission denied' }),
+  })
+  try {
+    await siteStub((url) => {
+      if (url.pathname === '/api/user/self') return jsonRes(SELF)
+      return jsonRes({ success: true, data: [] })
+    }, async () => {
+      const r = await savePat(b, PAT)
+      assert.equal(r.status, 500)
+      const j = await r.json()
+      assert.equal(j.ok, false)
+      assert.match(j.error, /dragonapi-state\.json/)
+      assert.match(j.error, /EACCES/)
+      assert.equal(j.pat.persisted, false)
+    })
+  } finally {
+    await svc.close()
+  }
+})
+
+test('真实写盘失败也会被抓到（目录不可写）', async () => {
+  // 拿一个「父级是文件」的路径当配置目录：mkdirSync 必然失败，而不是碰巧成功。
+  const blocker = mkdtempSync(join(tmpdir(), 'dragonapi-block-'))
+  writeFileSync(join(blocker, 'not-a-dir'), 'x')
+  const badDir = join(blocker, 'not-a-dir', 'state')
+  const { svc, base: b } = await startPatService({ port: 3615, dir: badDir })
+  try {
+    await siteStub((url) => {
+      if (url.pathname === '/api/user/self') return jsonRes(SELF)
+      return jsonRes({ success: true, data: [] })
+    }, async () => {
+      const r = await savePat(b, PAT)
+      assert.equal(r.status, 500)
+      const j = await r.json()
+      assert.equal(j.ok, false)
+      assert.match(j.error, /没能写进/)
+    })
+  } finally {
+    await svc.close()
+    try { rmSync(blocker, { recursive: true, force: true }) } catch { /* 忽略 */ }
+  }
 })

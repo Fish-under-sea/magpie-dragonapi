@@ -84,14 +84,17 @@ const info = await startService({
     pat: state.pat || '',
     patHint: state.patHint || '',
     patScopes: state.patScopes || [],
+    patVerified: state.patVerified === true,
     enabledGroups: state.enabledGroups || [],
   }),
-  setPat: async ({ pat, hint, scopes, user }) => {
+  setPat: async ({ pat, hint, scopes, user, verified }) => {
     state.pat = pat
     state.patHint = hint
     state.patScopes = scopes
+    state.patVerified = verified === true
     if (user) state.user = { id: user.id, name: user.username }
-    saveState(dir, state)
+    // 返回落盘结果，让服务能把「写失败」如实报给页面。
+    return saveState(dir, state)
   },
   // 单独跑时没有 magpie 的钥匙，余额会显示为 —。
   keyOf: () => '',

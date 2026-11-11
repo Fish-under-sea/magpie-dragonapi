@@ -68,7 +68,10 @@ function makeContext(input, options) {
   })
 
   function persist() {
-    saveState(dir, state)
+    const r = saveState(dir, state)
+    // 存不下不抛（插件不能因此停摆），但必须留痕：页面按返回值报错，日志留一份。
+    if (!r.saved) console.error(`[dragonapi] 状态没能写进 ${r.path}：${r.error}`)
+    return r
   }
 
   /** 从一份 auth 里把钥匙记进内存，并把账号元数据补进 state。 */
@@ -146,14 +149,17 @@ export default async function dragonapi(input, options) {
       pat: ctx.state.pat,
       patHint: ctx.state.patHint,
       patScopes: ctx.state.patScopes,
+      patVerified: ctx.state.patVerified === true,
       enabledGroups: ctx.state.enabledGroups || [],
     }),
-    setPat: async ({ pat, hint, scopes, user }) => {
+    setPat: async ({ pat, hint, scopes, user, verified }) => {
       ctx.state.pat = pat
       ctx.state.patHint = hint
       ctx.state.patScopes = scopes
+      ctx.state.patVerified = verified === true
       if (user) ctx.state.user = { id: user.id, name: user.username }
-      ctx.persist()
+      // 把落盘结果交回去：写失败时页面必须知道，不能弹「已保存」。
+      return ctx.persist()
     },
   })
     .then((s) => {

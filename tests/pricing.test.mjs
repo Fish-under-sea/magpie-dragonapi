@@ -181,3 +181,82 @@ test('billingOf 给出档位、用量变量与 schema', () => {
   assert.ok(b.schema.seconds)
   assert.equal(b.examples.length, 1)
 })
+
+// ── 详情页要「能读」：每档真实单价、服务档倍率、用量字段 ──────────────
+//
+// 之前的抽屉直接把 mode / tier(...) / 空数组倒出来，分档表的输入输出两列
+// 读的是 tiers[].input（服务端从来没给过这个字段），所以永远显示「—」。
+// 下面这些用例钉住「详情页拿到的是数字，不是表达式」。
+
+test('billingOf：每档给出折好的单价，不是原始系数', () => {
+  const row = {
+    quota_type: 0,
+    billing_mode: 'tiered_expr',
+    billing_expr: 'len <= 272000 ? tier("short_context", p*2 + c*10 + cr*0.2) : tier("long_context", p*4 + c*20)',
+  }
+  const b = billingOf(row, 0.16, CUR)
+  assert.equal(b.tiers.length, 2)
+  // 0.2 × 0.16 = 0.032 → 两位小数不够看，走四位
+  assert.equal(b.tiers[0].prices.input, '$0.32/M')
+  assert.equal(b.tiers[0].prices.output, '$1.60/M')
+  assert.equal(b.tiers[0].prices.cacheRead, '$0.03/M')
+  assert.equal(b.tiers[1].prices.input, '$0.64/M')
+  assert.equal(b.tiers[1].prices.cacheRead, undefined, '这档没有 cr，就不该给一个缓存价')
+})
+
+test('billingOf：把 service_tier 这类 param 倍率单独取出来', () => {
+  const row = {
+    quota_type: 0,
+    billing_mode: 'tiered_expr',
+    billing_expr: 'tier("standard", p * 0.2 + c * 1.2) * (param("service_tier") == "priority" ? 2 : 1) * (param("service_tier") == "ultrafast" ? 3 : 1)',
+  }
+  const b = billingOf(row, 1, CUR)
+  assert.deepEqual(b.multipliers, [
+    { param: 'service_tier', value: 'priority', factor: 2 },
+    { param: 'service_tier', value: 'ultrafast', factor: 3 },
+  ])
+})
+
+test('billingOf：用量字段带上站点给的中文名与单位', () => {
+  const row = {
+    quota_type: 1,
+    billing_mode: 'tiered_expr',
+    billing_expr: 'u("seconds") * 0.16',
+    billing_usage_schema: {
+      seconds: { type: 'number', unit: 'second', unitLabel: { en: 'second', zh: '秒' }, description: { en: 'Duration', zh: '时长' } },
+    },
+  }
+  const b = billingOf(row, 1, CUR)
+  assert.equal(b.usageRows.length, 1)
+  assert.equal(b.usageRows[0].field, 'seconds')
+  assert.equal(b.usageRows[0].label, '时长')
+  assert.equal(b.usageRows[0].unit, '秒')
+  assert.equal(b.usageRows[0].price, '$0.1600/秒')
+})
+
+test('billingOf：没有 cur 时也不抛，符号退回 $', () => {
+  const b = billingOf({ quota_type: 0, model_ratio: 1 }, 1)
+  assert.equal(b.groupRatio, 1)
+  assert.equal(b.tiers.length, 0)
+  assert.deepEqual(b.usageRows, [])
+  assert.deepEqual(b.multipliers, [])
+})
+
+test('billingOf：站点只给英文 unit 时也翻成中文单位', () => {
+  const row = {
+    quota_type: 1,
+    billing_mode: 'tiered_expr',
+    billing_expr: 'u("seconds") * 0.16',
+    billing_usage_schema: { seconds: { type: 'number', unit: 'second' } },
+  }
+  const b = billingOf(row, 1, CUR)
+  assert.equal(b.usageRows[0].unit, '秒', 'second 应翻成「秒」，不能把英文单位直接甩给用户')
+  assert.equal(b.usageRows[0].price, '$0.1600/秒')
+
+  // 真实站点常见形态：只给 unitLabel.en，没有 zh。英文 unitLabel 不能盖过单位表。
+  const row2 = {
+    ...row,
+    billing_usage_schema: { seconds: { type: 'number', unit: 'second', unitLabel: { en: 'second' } } },
+  }
+  assert.equal(billingOf(row2, 1, CUR).usageRows[0].unit, '秒', 'unitLabel.en 不该盖过中文单位表')
+})

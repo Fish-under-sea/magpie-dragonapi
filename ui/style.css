@@ -378,6 +378,13 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 
 .banner-close {
   flex: none;
+  /* 命中区补到 24×24（WCAG 2.2 AA）：15px 的字加 2px 内边距只有 19px 高，
+     手指点不准。用 min-* 扩命中区，视觉大小不变。 */
+  min-width: 24px;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   background: transparent;
   color: var(--muted);
@@ -915,7 +922,13 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 
 .row-actions { display: inline-flex; gap: 6px; flex-wrap: wrap; }
 
-/* ── 抽屉（单模型详情） ─────────────────────────────────── */
+/* ── 抽屉（单模型详情） ───────────────────────────────────
+ *
+ * 排版原则：**说明用无衬线、数字与标识符才用等宽**。
+ * 之前 `.kv-grid dd` 把所有值都设成等宽，中文值（如「对话」）就掉进
+ * 等宽字体的 CJK 回退字形里，看起来像乱码；这里只给真正需要对齐的
+ * 数字加 `.mono`。
+ */
 
 .drawer { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; }
 .drawer[hidden] { display: none; }
@@ -932,7 +945,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 
 .drawer-panel {
   position: relative;
-  width: min(760px, calc(100vw - 32px));
+  width: min(820px, calc(100vw - 32px));
   max-height: calc(100vh - 64px);
   /* 抽屉内部滚到底不应把滚动传给背后的页面 */
   overscroll-behavior: contain;
@@ -947,17 +960,74 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 
 .drawer-head {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
+  align-items: center;
+  gap: 11px;
   padding: 13px 16px;
   border-bottom: 1px solid var(--line);
 }
-.drawer-head h2 { margin: 0; font-size: 14px; font-weight: 650; }
-.drawer-sub { margin: 2px 0 0; font-size: 11.5px; color: var(--muted); font-family: var(--code); }
-.drawer-head .btn { margin-left: auto; flex: none; }
-.drawer-body { padding: 14px 16px 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
-.drawer-h3 {
-  margin: 4px 0 0;
+.dh-icon { width: 30px; height: 30px; flex: none; border-radius: 8px; }
+.dh-icon img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.dh-main { flex: 1; min-width: 0; }
+.drawer-head h2 {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.drawer-sub {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.drawer-head .btn { flex: none; }
+.drawer-head .actions { display: flex; gap: 8px; flex: none; }
+
+.drawer-body {
+  padding: 15px 16px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 首屏价签：详情页里最该被先看到的东西 */
+.dtl-prices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.dtl-prices.one { grid-template-columns: minmax(0, 1fr); }
+.dtl-price {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--sunken);
+}
+.dtl-price span { font-size: 10.5px; color: var(--muted); }
+.dtl-price b {
+  font-family: var(--code);
+  font-size: 16px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dtl-price.is-unknown b { font-family: inherit; font-size: 13px; color: var(--warn); }
+
+.dtl-section { display: flex; flex-direction: column; gap: 9px; }
+.dtl-h3 {
+  margin: 0;
   font-size: 12px;
   font-weight: 650;
   color: var(--muted);
@@ -967,11 +1037,54 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 .kv-grid {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
-  gap: 6px 14px;
+  gap: 7px 16px;
+  margin: 0;
   font-size: 12.5px;
 }
 .kv-grid dt { color: var(--muted); font-size: 11.5px; }
-.kv-grid dd { margin: 0; font-family: var(--code); font-variant-numeric: tabular-nums; word-break: break-word; }
+.kv-grid dd { margin: 0; word-break: break-word; }
+.kv-grid dd.mono { font-family: var(--code); font-variant-numeric: tabular-nums; }
+
+/* 计费因子的解释：一条一句，读得懂比排版花哨重要 */
+.dtl-facts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--fg);
+}
+.dtl-facts li { display: flex; gap: 7px; }
+.dtl-facts li::before {
+  content: "·";
+  flex: none;
+  color: var(--accent);
+  font-weight: 700;
+}
+.dtl-facts code { font-size: 11px; }
+
+/* 原始表达式默认折叠：它是证据，不是正文 */
+.raw {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--sunken);
+  overflow: hidden;
+}
+.raw summary {
+  padding: 8px 11px;
+  font-size: 11.5px;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+}
+.raw summary::-webkit-details-marker { display: none; }
+.raw summary::before { content: "▸ "; color: var(--accent); }
+.raw[open] summary::before { content: "▾ "; }
+.raw summary:hover { color: var(--fg); }
+.raw .expr { border: 0; border-top: 1px solid var(--line); border-radius: 0; }
 
 .expr {
   margin: 0;
@@ -987,6 +1100,20 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   max-height: 220px;
   overflow: auto;
 }
+
+/* 详情里的标签：分组 / 类型 / 服务档 */
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  font-size: 10.5px;
+  color: var(--fg);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--card);
+}
+.tag-chip .ratio { font-family: var(--code); font-size: 10px; color: var(--muted); }
 
 /* ── 页脚 ───────────────────────────────────────────────── */
 
@@ -1039,8 +1166,13 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 
 /* ── 模型广场：筛选栏 + 卡片网格 ────────────────────────────
  *
- * 结构参照 NearToken 的模型广场（左侧筛选、右侧双列卡片），因为它服务的
- * 是同一件事：在一两百个模型里比价格。等高靠三处配合，缺一不可：
+ * 结构照 NearToken 的模型广场：左侧固定筛选栏（分组 / 厂商），右侧是
+ * 搜索 + 分段控件 + 分组横幅 + 双列卡片。两处服务的是同一件事——在一两百
+ * 个模型里比价格——所以信息位顺序也保持一致：
+ *
+ *   厂商图标 / 名称 → 说明 → 计费方式 → 三格价格 → 分组 → 端点 → 详情
+ *
+ * 等高靠三处配合，缺一不可：
  *   .model-grid 的 align-items: stretch
  *   .mc 的 display:flex; flex-direction:column
  *   .mc-foot 的 margin-top:auto
@@ -1048,8 +1180,8 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 
 .market-body {
   display: grid;
-  grid-template-columns: 208px minmax(0, 1fr);
-  gap: var(--gap);
+  grid-template-columns: 216px minmax(0, 1fr);
+  gap: 16px;
   /* 这一层可以 start：侧栏本来就该比主区短，不该被拉到与列表等高 */
   align-items: start;
 }
@@ -1063,26 +1195,38 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--sunken);
+  scrollbar-width: thin;
 }
 .ma-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .ma-head :is(h2, h3) { margin: 0; font-size: 12.5px; font-weight: 600; }
-.ma-note { margin: 4px 0 10px; font-size: 11px; line-height: 1.5; color: var(--muted); }
-.market-aside :is(h3, h4) {
-  margin: 12px 0 7px;
-  font-size: 11px;
-  font-weight: 600;
+.ma-note { margin: 5px 0 2px; font-size: 11px; line-height: 1.55; color: var(--muted); }
+.market-aside h4 {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  margin: 14px 0 7px;
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: .04em;
   color: var(--muted);
 }
+.market-aside h4 .h4-count {
+  font-family: var(--code);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
 
-.market-chips { display: flex; flex-direction: column; gap: 5px; }
-.market-chips.chips-row { flex-direction: row; flex-wrap: wrap; }
+.market-chips { display: flex; flex-direction: column; gap: 4px; }
+.market-chips.chips-row { flex-direction: row; flex-wrap: wrap; gap: 5px; }
 
 .market-chip {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
-  padding: 4px 8px;
+  padding: 5px 8px;
   font: inherit;
   font-size: 11.5px;
   color: var(--muted);
@@ -1101,10 +1245,72 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 }
 .market-chip .chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .market-chip .ratio { font-family: var(--code); font-size: 10px; color: var(--muted); }
-.market-chip .chip-count { margin-left: auto; font-family: var(--code); font-size: 10px; color: var(--muted); }
-.market-chips.chips-row .market-chip .chip-count { margin-left: 2px; }
+.market-chip .chip-count {
+  margin-left: auto;
+  padding-left: 6px;
+  font-family: var(--code);
+  font-size: 10px;
+  color: var(--muted);
+}
+.market-chip[aria-pressed="true"] .chip-count { color: var(--fg); }
 
-.market-main { min-width: 0; }
+/* 供应商 chip：16px 品牌图标 + 名称 + 数量 */
+.market-chip .vendor-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  object-fit: contain;
+  border-radius: 3px;
+}
+.market-chip .vendor-letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--card-hover);
+}
+
+/* 分段控件：类型筛选（全部 / 对话 / 生图 / 视频） */
+.market-seg {
+  display: inline-flex;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--sunken);
+}
+.market-seg button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.market-seg button + button { border-left: 1px solid var(--line); }
+.market-seg button:hover { color: var(--fg); background: var(--card); }
+.market-seg button[aria-pressed="true"] { color: var(--fg); background: var(--accent-soft); }
+.market-seg .seg-count { font-family: var(--code); font-size: 10px; color: var(--muted); }
+.market-seg button[aria-pressed="true"] .seg-count { color: var(--accent); }
+
+.market-main {
+  min-width: 0;
+  /* 卡片列宽由主区宽度决定：窄到放不下两列就自动变一列，不用媒体查询猜窗口宽度。
+     container-type 必须放在祖先上——容器查询查的是「容纳这个元素的容器」。 */
+  container-type: inline-size;
+}
 .market-top {
   display: flex;
   align-items: center;
@@ -1114,7 +1320,27 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 }
 .market-top .field { margin: 0; }
 .market-top .field.grow { flex: 1 1 240px; min-width: 0; }
-.market-top .market-chips { flex: none; }
+
+/* 选中分组时的横幅：分组名 + 倍率 + 站点说明，横跨模型区顶部 */
+.group-banner {
+  margin: 0 0 12px;
+  padding: 10px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+.gb-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.gb-name { font-size: 13px; font-weight: 650; }
+.gb-ratio { font-family: var(--code); font-size: 11px; color: var(--muted); }
+.gb-count { font-family: var(--code); font-size: 11px; color: var(--muted); }
+.gb-note { margin: 6px 0 0; font-size: 12px; line-height: 1.55; color: var(--muted); }
+.gb-actions { margin-left: auto; }
 
 .market-count {
   display: flex;
@@ -1138,6 +1364,10 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 .model-grid > .empty,
 .model-grid > .loading { grid-column: 1 / -1; margin: 0; }
 
+@container (max-width: 560px) {
+  .model-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
 .mc {
   display: flex;
   flex-direction: column;
@@ -1145,13 +1375,35 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   padding: 12px;
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: 12px;
   transition: border-color .12s ease, background .12s ease;
 }
 .mc:hover { border-color: var(--line-strong); background: var(--card-hover); }
+/* 类型只影响左侧描边色：生图/视频在网格里一眼能分开，但不再额外加彩色标签 */
+.mc-image { border-left: 2px solid color-mix(in srgb, #8b4f9e 65%, transparent); }
+.mc-video { border-left: 2px solid color-mix(in srgb, #d68c3c 65%, transparent); }
+.mc-audio { border-left: 2px solid color-mix(in srgb, #3f6fb0 65%, transparent); }
+.mc-embedding { border-left: 2px solid color-mix(in srgb, #2f8f68 65%, transparent); }
 
-.mc-head { display: flex; align-items: flex-start; gap: 8px; }
+.mc-head { display: flex; align-items: center; gap: 9px; }
 .mc-head > .grow { flex: 1; min-width: 0; }
+.mc-vicon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 8px;
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  overflow: hidden;
+}
+.mc-vicon img { width: 18px; height: 18px; object-fit: contain; display: block; }
+
 .mc-name {
   display: block;
   max-width: 100%;
@@ -1186,7 +1438,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 }
 
 .mc-desc {
-  margin: 7px 0 0;
+  margin: 8px 0 0;
   font-size: 11.5px;
   line-height: 1.55;
   color: var(--muted);
@@ -1212,7 +1464,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 .mc-prices.one { grid-template-columns: minmax(0, 1fr); }
 .mc-prices > div {
@@ -1243,7 +1495,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   align-items: flex-start;
   gap: 6px;
   min-width: 0;
-  margin-top: 4px;
+  margin-top: 3px;
   font-size: 10.5px;
 }
 .mc-line .k { flex: none; width: 26px; line-height: 18px; color: var(--muted); }
@@ -1260,7 +1512,15 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 }
 
 /* 把页脚按到卡底：这一行是同排卡片底部对齐的关键 */
-.mc-foot { margin-top: auto; padding-top: 9px; display: flex; justify-content: flex-end; }
+.mc-foot {
+  margin-top: auto;
+  padding-top: 9px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+}
+.mc-ctx { font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 /* 文字按钮：卡片里的「详情」、侧栏的「重置」 */
 .link {

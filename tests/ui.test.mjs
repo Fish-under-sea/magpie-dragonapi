@@ -327,6 +327,14 @@ test('没设 PAT 时给引导式空态，不甩红色错误横幅', async () => 
   assert.match(js, /去设置访问令牌/, '应给一条通往 PAT 页的路')
 })
 
+test('PAT 保存后区分「已验证 / 未验证 / 缺 scope」，不当成功一笔带过', async () => {
+  const js = await (await fetch(base + '/ui/app.js')).text()
+  assert.match(js, /已设置 · 已验证/, 'PAT 页应显示验证状态')
+  assert.match(js, /已设置 · 未验证/, 'PAT 页应能显示未验证')
+  assert.match(js, /data\.warning/, '保存后要展示服务端的 warning（缺 scope / 未验证）')
+  assert.match(js, /payload\.hint/, '保存失败时应把服务端的可操作提示带出来')
+})
+
 test('四个标签页各有页面级标题（h2），卡片标题用 h3', async () => {
   const html = await (await fetch(base + '/')).text()
 
@@ -349,4 +357,48 @@ test('账户卡不重复显示打码钥匙', async () => {
   // 服务端 label 本身就是「分组 · 打码钥匙」，再单列一次就是重复
   assert.match(js, /showMask/, '缺少去重判断')
   assert.match(js, /!String\(a\.label \|\| ''\)\.includes\(mask\)/, '应按 label 是否已含打码来判断')
+})
+
+// ── 重绘后的广场：厂商筛选 + 分组横幅 + 供应商图标 ──────────────────
+test('模型广场有厂商筛选与分组横幅，供应商图标都能取到', async () => {
+  const html = await (await fetch(base + '/')).text()
+  assert.match(html, /id="vendor-chips"/, '缺少厂商筛选栏')
+  assert.match(html, /id="group-banner"/, '缺少选中分组的横幅')
+  assert.match(html, /id="kind-chips"/, '缺少类型分段控件')
+
+  const js = await (await fetch(base + '/ui/app.js')).text()
+  assert.match(js, /function vendorBadge\(/, '缺少厂商标记渲染')
+  assert.match(js, /function renderGroupBanner\(/, '缺少分组横幅渲染')
+
+  // 图标是运行时按厂商名引用的，列不进 HTML 的 src，所以要单独核对文件真的在。
+  const files = [...new Set([...js.matchAll(/'([A-Za-z0-9._-]+\.svg)'/g)].map((m) => m[1]))]
+  assert.ok(files.length >= 10, `厂商图标映射太少，实际 ${files.length}`)
+  for (const f of files) {
+    const r = await fetch(base + '/vendor-icons/' + f)
+    assert.equal(r.status, 200, `供应商图标 ${f} 取不到（页面会显示碎图）`)
+  }
+})
+
+// ── 详情抽屉：给结论，不给机器串 ────────────────────────────────────
+test('详情抽屉不再倒站点原文，而是中文结论', async () => {
+  const js = await (await fetch(base + '/ui/app.js')).text()
+  const fn = js.match(/function modelDetailNodes\([\s\S]*?\n\}/)
+  assert.ok(fn, '找不到 modelDetailNodes')
+  assert.equal(/mode: \$?\{?billing\.mode/.test(fn[0]), false, '不该再把 mode: … 显示给用户')
+  for (const want of ['计费方式', '每一档的实际单价', '按用量计费']) {
+    assert.ok(fn[0].includes(want), `详情缺少「${want}」这一段`)
+  }
+  // 每档单价必须来自服务端折好的 prices，而不是根本不存在的 tiers[].input
+  assert.match(fn[0], /t\.prices\.input/, '分档表应读 tiers[].prices')
+  assert.equal(/t\.input\s*!=/.test(fn[0]), false, '不该再读 tiers[].input（服务端从来没给过）')
+  // 原始表达式必须收进 <details>，默认折叠
+  assert.match(fn[0], /h\('details', \{ class: 'raw' \}/, '原始表达式应放在折叠块里')
+})
+
+test('详情页的中文值不再被套等宽字体', async () => {
+  const css = (await (await fetch(base + '/ui/style.css')).text()).replace(/\/\*[\s\S]*?\*\//g, '')
+  const dd = css.match(/\.kv-grid dd\s*\{[^}]*\}/)
+  assert.ok(dd, '找不到 .kv-grid dd')
+  assert.equal(/font-family/.test(dd[0]), false, '.kv-grid dd 不该统一等宽：中文会掉进等宽字体的 CJK 回退字形')
+  assert.match(css, /\.kv-grid dd\.mono\s*\{[^}]*font-family:\s*var\(--code\)/, '需要等宽的值应显式加 .mono')
 })

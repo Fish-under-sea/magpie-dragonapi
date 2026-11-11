@@ -123,12 +123,18 @@ test('API 不写死主机名，换端口/换代理前缀也不坏', async () => 
   assert.deepEqual(hardcoded, [], `不该写死本地地址：${hardcoded.join(', ')}`)
 })
 
-test('四个标签页的入口文案都在', async () => {
+test('三个标签页：密钥已并入账户页，不再单开标签', async () => {
+  const html = await (await fetch(base + '/')).text()
+  const tabs = [...html.matchAll(/data-tab="([^"]+)"/g)].map((m) => m[1])
+  assert.deepEqual(tabs, ['catalog', 'wallet', 'pat'], `标签应只剩三个，实际 ${tabs.join(', ')}`)
+  assert.equal(/id="panel-keys"/.test(html), false, '密钥面板应已并入账户页')
+  // 密钥的能力还在：建钥匙表单挂在账户页里
+  assert.match(html, /id="key-form"/, '账户页里应保留建钥匙表单')
+  assert.match(html, /id="keys-body"/, '账户页里应保留已有钥匙列表')
+
+  // 旧书签 ?tab=keys 仍要能用，映射到账户页
   const js = await (await fetch(base + '/ui/app.js')).text()
-  assert.match(js, /模型广场/)
-  assert.match(js, /余额/)
-  assert.match(js, /密钥/)
-  assert.match(js, /访问令牌/)
+  assert.match(js, /wanted === 'keys' \? 'wallet'/, '旧 tab=keys 应映射到 wallet')
 })
 
 test('模型广场没有「启用/停用」开关', async () => {
@@ -174,9 +180,9 @@ test('每个「加载中」占位符都有对应的加载函数被 tab 调到（
       `${fn} 没有被 ensureTab 调到，它负责的卡片会一直停在「加载中」`,
     )
   }
-  // 直接检查：密钥页必须同时拉 keys 与 bind
-  assert.match(body, /name === 'keys'[\s\S]{0,200}loadKeys/, 'keys 页要调 loadKeys')
-  assert.match(body, /name === 'keys'[\s\S]{0,200}loadBind/, 'keys 页要调 loadBind，否则绑定说明永远加载中')
+  // 直接检查：账户页必须同时拉 keys 与 bind（密钥已并入账户页）
+  assert.match(body, /name === 'wallet'[\s\S]{0,260}loadKeys/, '账户页要调 loadKeys')
+  assert.match(body, /name === 'wallet'[\s\S]{0,260}loadBind/, '账户页要调 loadBind，否则绑定说明永远加载中')
 })
 
 test('renderBind 的加载中分支只能在没有数据时出现', async () => {

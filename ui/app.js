@@ -501,8 +501,8 @@ function activateTab(name, { focus = false, force = false } = {}) {
   }
   if (focus) tab.focus();
 
-  // 离开密钥页就丢掉「只显示一次」的完整钥匙，避免它一直留在屏幕上
-  if (name !== 'keys' && lastSecret) {
+  // 离开账户页就丢掉「只显示一次」的完整钥匙，避免它一直留在屏幕上
+  if (name !== 'wallet' && lastSecret) {
     lastSecret = null;
     renderSecret();
   }
@@ -512,11 +512,15 @@ function activateTab(name, { focus = false, force = false } = {}) {
 
 function ensureTab(name, force = false) {
   if (name === 'catalog') return loadCatalog(force);
-  if (name === 'wallet') return loadWallet(force);
-  // 密钥页有两块独立内容：钥匙列表（要 PAT）与绑定说明（不需要）。
-  // 绑定说明必须一起拉，否则「怎么绑进 magpie」会永远停在加载中——
-  // 它只有 loadBind 里才会被填，而 loadBind 之前只在刷新按钮里被调到。
-  if (name === 'keys') return Promise.all([loadKeys(force), loadBind(force)]);
+  // 账户页现在同时承载余额、用量、推荐计划与密钥，四块一起拉。
+  // 「怎么绑进 magpie」只有 loadBind 里才会被填，漏了它会永远停在加载中。
+  if (name === 'wallet') {
+    return Promise.all([
+      loadWallet(force),
+      loadKeys(force),
+      loadBind(force),
+    ]);
+  }
   if (name === 'pat') return loadPat(force);
   return Promise.resolve();
 }
@@ -2204,7 +2208,7 @@ async function onSavePat(ev) {
     cache.keys = null;
     cache.health = null;
     cache.stateError = '';
-    if (activeTab === 'keys') loadKeys(true);
+    if (activeTab === 'wallet') loadKeys(true);
     return data;
   } catch (err) {
     // 服务端在 400 里带的 hint 是可操作的下一步（去勾哪个 scope），必须带出来。
@@ -2237,7 +2241,7 @@ async function onClearPat(btn) {
     clearBanner('pat-form');
     banner('ok', 'PAT 已清除，页面不再持有任何凭据。', { key: 'pat-ok', timeout: 6000 });
     renderPat();
-    if (activeTab === 'keys') loadKeys(true);
+    if (activeTab === 'wallet') loadKeys(true);
   } catch (err) {
     banner('error', `清除 PAT 失败：${describeError(err)}`, { key: 'pat-form' });
   } finally {
@@ -2757,8 +2761,10 @@ async function boot() {
 
   const params = new URLSearchParams(location.search);
   const wanted = params.get('tab');
-  const valid = ['catalog', 'wallet', 'keys', 'pat'];
-  const start = valid.includes(wanted) ? wanted : 'catalog';
+  // 密钥已并入账户页；旧的 ?tab=keys 链接仍要能打开（映射到 wallet），
+  // 不能因为标签被取消就让人书签失效。
+  const valid = ['catalog', 'wallet', 'pat'];
+  const start = wanted === 'keys' ? 'wallet' : (valid.includes(wanted) ? wanted : 'catalog');
 
   activateTab(start, { focus: false });
 

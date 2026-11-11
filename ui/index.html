@@ -45,8 +45,6 @@
             aria-controls="panel-catalog" aria-selected="true" tabindex="0">模型广场</button>
     <button class="tab" role="tab" type="button" id="tab-wallet" data-tab="wallet"
             aria-controls="panel-wallet" aria-selected="false" tabindex="0">余额与用量</button>
-    <button class="tab" role="tab" type="button" id="tab-keys" data-tab="keys"
-            aria-controls="panel-keys" aria-selected="false" tabindex="0">密钥</button>
     <button class="tab" role="tab" type="button" id="tab-pat" data-tab="pat"
             aria-controls="panel-pat" aria-selected="false" tabindex="0">访问令牌</button>
   </nav>
@@ -139,21 +137,6 @@
         <div class="aff-row" id="aff-body"><p class="loading">正在读取推荐计划</p></div>
       </div>
 
-      <div class="card">
-        <header class="card-head">
-          <h3>用量流水</h3>
-          <div class="card-tools">
-            <label class="sr-only" for="flow-account">按账号查看</label>
-            <select id="flow-account"></select>
-            <span class="card-sub" id="flow-count"></span>
-          </div>
-        </header>
-        <div id="flow-body"><p class="loading">正在读取…</p></div>
-      </div>
-    </section>
-
-    <!-- 3. 密钥 -->
-    <section class="panel" id="panel-keys" role="tabpanel" aria-labelledby="tab-keys" data-panel="keys" hidden>
       <div class="grid-2 keys-grid">
         <div class="card">
           <header class="card-head"><h3>新建钥匙</h3></header>
@@ -199,6 +182,18 @@
           <span class="card-sub" id="keys-count"></span>
         </header>
         <div id="keys-body"><p class="loading">正在读取…</p></div>
+      </div>
+
+      <div class="card">
+        <header class="card-head">
+          <h3>用量流水</h3>
+          <div class="card-tools">
+            <label class="sr-only" for="flow-account">按账号查看</label>
+            <select id="flow-account"></select>
+            <span class="card-sub" id="flow-count"></span>
+          </div>
+        </header>
+        <div id="flow-body"><p class="loading">正在读取…</p></div>
       </div>
     </section>
 

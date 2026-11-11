@@ -11,9 +11,9 @@
  * 会被直接拒，服务端也用 Access-Control-Allow-Origin: * 兜住，不需要 cookie。
  */
 
-// 聚合规则单独成模块（纯函数、可单测）：站点把同一个模型在十几个分组里各卖
-// 一份，目录是「分组 × 模型」的行表，而人要看的是「一个模型一张卡」。
-import { aggregateRows, focusGroupOf } from './model-agg.js';
+// 聚合与默认排序单独成模块（纯函数、可单测）：站点把同一个模型在十几个分组里
+// 各卖一份，目录是「分组 × 模型」的行表，而人要看的是「一个模型一张卡」。
+import { aggregateRows, compareDefault, focusGroupOf } from './model-agg.js';
 
 'use strict';
 
@@ -711,26 +711,6 @@ function priceCellsOf(pricing, unit) {
   ];
 }
 
-/** versionRank 取模型名里的版本号（gpt-6.1-sol → [6,1]，deepseek-v4 → [4]）。 */
-function versionRank(name) {
-  const m = String(name || '').match(/\d+(?:[.-]\d+)*/);
-  return m ? m[0].split(/[.-]/).map(Number) : null;
-}
-
-/** byLatestVersion 新版本在前；没有版本号的排到最后，同版本按名称。 */
-function byLatestVersion(a, b) {
-  const x = versionRank(a.name);
-  const y = versionRank(b.name);
-  if (x && y) {
-    const n = Math.max(x.length, y.length);
-    for (let i = 0; i < n; i++) {
-      const d = (y[i] || 0) - (x[i] || 0);
-      if (d) return d;
-    }
-  } else if (x) return -1;
-  else if (y) return 1;
-  return String(a.name).localeCompare(String(b.name), 'zh');
-}
 
 /** billingLabel 计费方式的一句话标签（卡片与列表行共用同一套判据）。 */
 function billingLabel(pricing, isAuto, priceKind) {
@@ -869,13 +849,15 @@ function renderCatalog() {
     return;
   }
 
-  // 排序：默认保留站点顺序（宿主列表与页面一致），另外给价格与名称两种。
-  // 排序：默认「最新版本」——按模型名里的版本号从新到旧。
+  // 排序。默认那档叫「默认排序」，不是「最新版本」：站点没有发布时间字段，
+  // 拿版本号大小冒充「最新」会让 gpt-6.1 压住 claude-fable-5-2 这类跨厂商
+  // 插队。默认排序的规则是「厂商 → 模型等级 → 版本号从新到旧」，见 model-agg.js。
   // 价格按「最便宜的那个分组」排：聚合后一张卡代表多个价，用最低价才符合直觉。
   const priceKey = (a) => {
     const n = a?.cheapest?.pricing?.inputNum;
     return Number.isFinite(n) ? n : Infinity;
   };
+  const catOfAgg = (agg) => groupCat.get(agg.cheapest?.id) || 'other';
   if (filters.sort === 'price-asc') {
     rows.sort((a, b) => priceKey(a) - priceKey(b) || String(a.name).localeCompare(String(b.name)));
   } else if (filters.sort === 'price-desc') {
@@ -883,7 +865,7 @@ function renderCatalog() {
   } else if (filters.sort === 'name') {
     rows.sort((a, b) => String(a.name).localeCompare(String(b.name), 'zh'));
   } else {
-    rows.sort(byLatestVersion);
+    rows.sort((a, b) => compareDefault(a, b, catOfAgg, CATEGORY_ORDER));
   }
 
   body.className = 'model-grid' + (filters.view === 'list' ? ' as-list' : '');

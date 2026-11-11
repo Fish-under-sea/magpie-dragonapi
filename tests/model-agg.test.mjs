@@ -4,7 +4,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { aggregateRows, focusGroupOf, spanOf } from '../ui/model-agg.js'
+import { aggregateRows, compareDefault, focusGroupOf, spanOf, tierRankOf, versionRank } from '../ui/model-agg.js'
 
 /** 造一行目录数据，字段与 lib/catalog.mjs 的输出一致。 */
 function row(group, ratio, input, output, cache, extra = {}) {
@@ -140,4 +140,65 @@ test('spanOf 忽略非数值与 null', () => {
   const s = spanOf([{ pricing: { a: 1 } }, { pricing: { a: null } }, { pricing: {} }, { pricing: { a: 3 } }], 'a')
   assert.deepEqual(s, { min: 1, max: 3, same: false, count: 2 })
   assert.equal(spanOf([], 'a'), null)
+})
+
+// ── 默认排序：厂商 → 模型等级 → 版本号 ─────────────────────────────
+
+test('版本号解析：- 与 . 等价', () => {
+  assert.deepEqual(versionRank('claude-fable-5-2'), [5, 2])
+  assert.deepEqual(versionRank('claude-opus-5.5'), [5, 5])
+  assert.deepEqual(versionRank('deepseek-v4'), [4])
+  assert.equal(versionRank('no-version-here'), null)
+})
+
+test('模型等级：旗舰 < 标准 < 轻量', () => {
+  assert.equal(tierRankOf('deepseek-v4-pro'), 2)
+  assert.equal(tierRankOf('glm-5.3-flash'), 4)
+  assert.equal(tierRankOf('claude-fable-5-2'), 0, 'fable 最高档')
+  assert.equal(tierRankOf('claude-opus-5-5'), 1, 'opus 次之')
+  assert.equal(tierRankOf('claude-sonnet-5-5'), 2, 'sonnet 第三')
+  assert.equal(tierRankOf('claude-haiku-5-5'), 4, 'haiku 最低')
+  // 整词匹配：minimax 不能被当成 mini
+  assert.equal(tierRankOf('minimax-m'), 3, 'minimax 不该命中 mini')
+  // 同时出现多个档位词时取最高的那个
+  assert.equal(tierRankOf('minimax-m-pro'), 2)
+})
+
+/** 造一个聚合对象，只带排序需要的字段。 */
+function agg(name, vendor, group = 'g1') {
+  return aggregateRows([{
+    id: `${group}/${name}`, name, group, groupRatio: 0.1, groupAuto: false,
+    kind: 'chat', vendor, context: 1000, description: '', tags: '', endpoints: ['openai'],
+    pricing: { kind: 'ratio', inputNum: 1, outputNum: 2, cacheNum: 0.1, input: '$1/M' },
+  }])[0]
+}
+
+const CATS = ['claude', 'gpt', 'gemini', 'grok', 'guomo', 'image', 'video', 'other']
+const catOfName = (a) => (/claude/.test(a.name) ? 'claude' : /gpt/.test(a.name) ? 'gpt' : 'other')
+const sortList = (list) => [...list].sort((a, b) => compareDefault(a, b, catOfName, CATS))
+
+test('默认排序：先按厂商分区，不跨厂商插队', () => {
+  // gpt-6.1 的版本号比 fable-5-2 大，但厂商分区在前，不能压过去
+  const out = sortList([agg('gpt-6.1-sol', 'OpenAI'), agg('claude-fable-5-2', 'Anthropic')])
+  assert.deepEqual(out.map((x) => x.name), ['claude-fable-5-2', 'gpt-6.1-sol'])
+})
+
+test('默认排序：同厂商内先按等级，再按版本号', () => {
+  const out = sortList([
+    agg('claude-haiku-4-5', 'Anthropic'),
+    agg('claude-opus-5-5', 'Anthropic'),
+    agg('claude-sonnet-5-5-pro', 'Anthropic'),
+  ])
+  // opus(0) → pro(1) → 标准(2) → 轻量(3)；同档内版本大的在前
+  assert.deepEqual(out.map((x) => x.name), ['claude-opus-5-5', 'claude-sonnet-5-5-pro', 'claude-haiku-4-5'])
+})
+
+test('默认排序：空厂商排在本类别末尾，不跳到最前', () => {
+  const out = sortList([agg('zzz-model', ''), agg('gpt-6-sol', 'OpenAI')])
+  assert.deepEqual(out.map((x) => x.vendor), ['OpenAI', ''])
+})
+
+test('默认排序：没有版本号的排在同组末尾', () => {
+  const out = sortList([agg('claude-preview', 'Anthropic'), agg('claude-opus-5', 'Anthropic')])
+  assert.deepEqual(out.map((x) => x.name), ['claude-opus-5', 'claude-preview'])
 })

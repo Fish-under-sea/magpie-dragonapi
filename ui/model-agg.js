@@ -49,13 +49,101 @@ function kindOfGroups(groups) {
 }
 
 /**
+ * 模型名里的版本号：`gpt-6.1-sol` → [6,1]，`deepseek-v4` → [4]。
+ * 取第一段数字串，`-` 与 `.` 都当分隔（站点两种写法混用）。
+ */
+export function versionRank(name) {
+  const m = String(name || '').match(/\d+(?:[.-]\d+)*/)
+  return m ? m[0].split(/[.-]/).map(Number) : null
+}
+
+/**
+ * 模型等级词：数值越小等级越高。想调整顺序只改这张表。
+ *
+ * Anthropic 的等级就是代号，顺序是 **fable > opus > sonnet > haiku**（f-o-s-h）。
+ * 这类代号不带版本号，必须单独列出，否则它们会全落进默认档、按名字排——
+ * 那样 haiku 会排在 opus 前面，fable 也上不去。
+ *
+ * 其它厂商用档位词表达同一件事：max/ultra（旗舰）> pro/plus（进阶）>
+ * 默认（标准）> fast/flash/lite/mini（轻量）> draft（草稿）。
+ * 等级只在**同一厂商内**比较，所以两套词放一张表不会互相干扰。
+ */
+const TIER_WORDS = {
+  fable: 0,
+  opus: 1, max: 1, ultra: 1, quality: 1, best: 1,
+  sonnet: 2, pro: 2, plus: 2, prime: 2, advanced: 2,
+  // 3 = 标准档（没有档位词时的默认，见 TIER_DEFAULT）
+  fast: 4, flash: 4, flashx: 4, lite: 4, light: 4, mini: 4, turbo: 4, highspeed: 4,
+  haiku: 4,
+  draft: 5,
+}
+const TIER_DEFAULT = 3
+
+/** 取名字里**从最高档开始**的档位词；整词匹配，避免 `minimax` 命中 `mini`。 */
+export function tierRankOf(name) {
+  const tokens = String(name || '').toLowerCase().split(/[-_.\s]+/).filter(Boolean)
+  let best = null
+  for (const t of tokens) {
+    const r = TIER_WORDS[t]
+    if (r !== undefined && (best === null || r < best)) best = r
+  }
+  return best === null ? TIER_DEFAULT : best
+}
+
+/**
+ * 默认排序：**厂商 → 模型等级 → 版本号从新到旧 → 名称**。
+ *
+ * 为什么不按「发布时间」：站点每条模型都没有发布时间字段，`pricing_version`
+ * 也是全局的。硬拿版本号大小当「最新」会让 `gpt-6.1` 压住 `claude-fable-5-2`
+ * 这类跨厂商插队，所以改成先分厂商、再看等级、最后比数字——同一厂商同一
+ * 等级的型号挨在一起，数字大的在前，顺序可预测、能解释。
+ *
+ * @param a,b  聚合后的模型
+ * @param catOf (agg) => 类别 id（claude / gpt / …）用于厂商分区先后
+ * @param catOrder 类别顺序（与侧栏一致）
+ */
+export function compareDefault(a, b, catOf, catOrder = []) {
+  const rankOf = (agg) => {
+    const c = catOf ? catOf(agg) : 'other'
+    const i = catOrder.indexOf(c)
+    return i < 0 ? catOrder.length : i
+  }
+  const ca = rankOf(a)
+  const cb = rankOf(b)
+  if (ca !== cb) return ca - cb
+
+  // 厂商：空厂商排在本类别末尾
+  const va = a.vendor || '\uffff'
+  const vb = b.vendor || '\uffff'
+  const vc = String(va).localeCompare(String(vb), 'zh')
+  if (vc) return vc
+
+  const ta = tierRankOf(a.name)
+  const tb = tierRankOf(b.name)
+  if (ta !== tb) return ta - tb
+
+  // 版本从新到旧；没有版本号的排到本组末尾
+  const x = versionRank(a.name)
+  const y = versionRank(b.name)
+  if (x && y) {
+    const n = Math.max(x.length, y.length)
+    for (let i = 0; i < n; i++) {
+      const d = (y[i] || 0) - (x[i] || 0)
+      if (d) return d
+    }
+  } else if (x) return -1
+  else if (y) return 1
+
+  return String(a.name || '').localeCompare(String(b.name || ''), 'zh')
+}
+
+/**
  * rows：目录里的行（每行一个分组×模型，字段见 lib/catalog.mjs 的 buildCatalog）。
  * 返回聚合后的模型数组，每个元素带 groups（全部分组，按倍率升序）。
  *
- * 分组一律**逐个列出**，即使两个分组的倍率与价格完全一样也不合并：
- * 「这个模型在哪些分组里卖」本身就是用户要的信息，合并成 `gpt-pro/promax`
- * 会让分组名变成拼串，读起来像别名而不是两个可选渠道。
- * 代价是分组多时换到第二行——这个双行排布是刻意的，卡片高度仍由预留高度取齐。
+ * 分组一律逐个列出，即使两个分组的倍率与价格完全一样也不合并：
+ * 分组名是用户要认的渠道，拼成 `gpt-pro/promax` 会让人以为那是一个名字。
+ * 分组多时自然换到第二行，这个双行排布是刻意的，卡片高度仍由预留高度取齐。
  */
 export function aggregateRows(rows) {
   const map = new Map()

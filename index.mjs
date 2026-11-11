@@ -113,11 +113,6 @@ function makeContext(input, options) {
   }
 }
 
-/** 让本地服务能拿到某个账号的钥匙（按 tail）。 */
-export function keyForTail(ctx, tail) {
-  return ctx.secrets.get(String(tail || '')) || ''
-}
-
 export default async function dragonapi(input, options) {
   void input
   const ctx = makeContext(input, options)

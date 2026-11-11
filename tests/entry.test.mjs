@@ -42,6 +42,15 @@ after(async () => {
   try { rmSync(dir, { recursive: true, force: true }) } catch { /* 忽略 */ }
 })
 
+// magpie 的插件宿主会把 index.mjs 的**每一个命名导出**当成一个 hook 调用。
+// 曾经这里导出了一个没人用的 `keyForTail(ctx, tail)`，宿主拿插件上下文去调它，
+// 于是每次加载都报 `TypeError: undefined is not an object (evaluating 'ctx.secrets.get')`，
+// 供应商那一行直接显示 failed。这个测试把「只导出默认工厂」钉住。
+test('index.mjs 只导出默认插件工厂，不要有其它命名导出', async () => {
+  const mod = await import('../index.mjs')
+  assert.deepEqual(Object.keys(mod).sort(), ['default'], `多余的命名导出会被宿主当 hook 调用：${Object.keys(mod).join(', ')}`)
+})
+
 test('入口返回 config / auth / provider 三块', () => {
   for (const k of ['config', 'auth', 'provider']) {
     assert.ok(k in plugin, `缺少 ${k}`)

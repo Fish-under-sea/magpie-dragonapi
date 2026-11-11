@@ -205,8 +205,7 @@ async function request(path, { method = 'GET', body } = {}) {
       cache: 'no-store',         // 服务端已经自己缓存目录，浏览器别再叠一层
       headers: body ? { 'content-type': 'application/json' } : undefined,
       body: body ? JSON.stringify(body) : undefined,
-      // 必须自己设上限：保存 PAT 要串行探三个站点端点，站点半死不活时
-      // 没有信号就会一直转圈，用户看到的是「点了没反应」。
+      // 保存 PAT 并行验证；页面仍独立设等待上限，避免本地服务挂住。
       signal: AbortSignal.timeout(45000),
     });
   } catch (err) {
@@ -255,6 +254,7 @@ const api = {
   usage: (range) => request(`/api/usage?range=${encodeURIComponent(range)}`),
   keys: () => request('/api/keys'),
   aff: () => request('/api/aff'),
+  subscriptions: () => request('/api/subscriptions'),
   transferAff: () => request('/api/aff/transfer', { method: 'POST' }),
   createKey: (body) => request('/api/keys', { method: 'POST', body }),
   deleteKey: (id) => request(`/api/keys/${encodeURIComponent(id)}`, { method: 'DELETE' }),
@@ -388,11 +388,16 @@ const cache = {
   keys: null,
   bind: null,
   aff: null,
+  subscriptions: null,
+  usageErrors: {},
   health: null,
   usage: {},   // range -> response
 };
 
-const loading = { state: false, catalog: false, keys: false, bind: false, health: false, usage: false, aff: false };
+const loading = { state: false, catalog: false, keys: false, bind: false, health: false, usage: false, aff: false, subscriptions: false };
+// PAT 切换/清除后，旧请求即使较晚返回也不能重新填回上个账户的数据。
+let dataEpoch = 0;
+const usagePending = new Map();
 
 const filters = { category: '', group: '', vendor: '', kind: '', q: '', unit: 'M', sort: 'latest', view: 'grid', range: 'day' };
 
@@ -1341,7 +1346,7 @@ function bindCatalogControls() {
 async function loadWallet(force = false) {
   await loadState(force);
   renderAccounts();
-  await Promise.all([loadUsage(force), loadAff(force)]);
+  await Promise.all([loadUsage(force), loadAff(force), loadSubscriptions(force)]);
 }
 
 /**
@@ -1355,13 +1360,17 @@ async function loadAff(force = false) {
   if (!box) return;
   if (cache.aff && !force) { renderAff(); return cache.aff }
   if (loading.aff) return cache.aff
+  const epoch = dataEpoch;
   loading.aff = true
   regionLoading(box, '正在读取推荐计划')
   try {
-    cache.aff = await api.aff()
+    const data = await api.aff()
+    if (epoch !== dataEpoch) return null;
+    cache.aff = data
     renderAff()
     return cache.aff
   } catch (err) {
+    if (epoch !== dataEpoch) return null;
     const msg = describeError(err)
     // 没设 PAT 属于正常状态，不甩红条
     if (err instanceof ApiError && err.status === 400 && /访问令牌/.test(msg)) {
@@ -1373,8 +1382,95 @@ async function loadAff(force = false) {
     renderAff()
     return cache.aff
   } finally {
-    loading.aff = false
+    if (epoch === dataEpoch) loading.aff = false
   }
+}
+
+// ── 只读订阅：原币标价和 quota 额度各用自己的口径 ────────────
+const BILLING_LABEL = { subscription_first: '优先订阅', wallet_first: '优先钱包', subscription_only: '仅用订阅', wallet_only: '仅用钱包' };
+const SUB_STATUS = { active: '有效', expired: '已到期', cancelled: '已取消', canceled: '已取消' };
+const fullDate = (ms) => Number.isFinite(ms) && ms > 0 ? new Date(ms).toLocaleString('zh-CN', { hour12: false }) : '—';
+
+async function loadSubscriptions(force = false) {
+  if (cache.subscriptions && !force) { renderSubscriptions(); return cache.subscriptions; }
+  if (loading.subscriptions) return null;
+  const epoch = dataEpoch;
+  loading.subscriptions = true;
+  regionLoading($('#subscriptions-body'), '正在读取订阅与套餐');
+  try {
+    const data = await api.subscriptions();
+    if (epoch !== dataEpoch) return null;
+    cache.subscriptions = data;
+  } catch (err) {
+    if (epoch !== dataEpoch) return null;
+    cache.subscriptions = { ok: false, needPat: err.status === 400 && /访问令牌/.test(err.message), error: describeError(err) };
+  } finally {
+    if (epoch === dataEpoch) { loading.subscriptions = false; renderSubscriptions(); }
+  }
+  return cache.subscriptions;
+}
+
+function renderSubscriptions() {
+  const box = $('#subscriptions-body');
+  const d = cache.subscriptions;
+  if (!box || !d) return;
+  if (d.needPat) {
+    box.replaceChildren(h('div', { class: 'empty' },
+      h('p', { text: '设置 PAT 后显示我的订阅和套餐列表，需要 wallet:read 权限。' }),
+      h('button', { class: 'btn ghost', type: 'button', onclick: () => activateTab('pat') }, '去设置访问令牌')));
+    return;
+  }
+  if (d.ok === false) { regionError(box, `订阅没读到：${d.error}`, () => loadSubscriptions(true)); return; }
+  const subscriptions = Array.isArray(d.subscriptions) ? d.subscriptions : [];
+  const plans = Array.isArray(d.plans) ? d.plans : [];
+  const preference = BILLING_LABEL[d.billingPreference] || '站点未返回可识别的扣费偏好';
+  box.replaceChildren(
+    h('div', { class: 'subscription-toolbar' },
+      h('p', { class: 'hint', text: `扣费偏好：${preference}（只读）` }),
+      h('button', { class: 'btn ghost', type: 'button', onclick: () => loadSubscriptions(true) }, '刷新订阅')),
+    h('h4', { class: 'subscription-heading', text: '我的订阅' }),
+    subscriptions.length ? h('div', { class: 'subscription-grid' }, subscriptions.map(subscriptionCard))
+      : h('p', { class: 'empty', text: '当前没有订阅记录。' }),
+    h('h4', { class: 'subscription-heading', text: '套餐列表' }),
+    d.plansError ? h('div', { class: 'region-error-text', text: `套餐列表没读到：${d.plansError}。已读取的订阅仍显示在上方。` })
+      : plans.length ? h('div', { class: 'subscription-grid' }, plans.map((p) => h('article', { class: 'subscription-item' },
+        h('div', { class: 'subscription-title' }, h('b', { text: p.title }), h('span', { class: 'mono', text: p.price || '标价未提供' })),
+        p.subtitle ? h('p', { class: 'hint', text: p.subtitle }) : null,
+        h('dl', { class: 'acct-facts' },
+          h('dt', { text: '周期' }), h('dd', { text: durationLabel(p) }),
+          h('dt', { text: '额度' }), h('dd', { text: p.unlimited ? '不限量' : p.total || '—' }),
+          h('dt', { text: '重置周期' }), h('dd', { text: resetLabel(p.quotaResetPeriod) })),
+        h('p', { class: 'hint', text: '仅展示 · 不提供购买与支付' }))))
+        : h('p', { class: 'empty', text: '站点没有返回可展示的套餐。' }),
+  );
+}
+
+function durationLabel(p) {
+  const unit = { day: '天', week: '周', month: '个月', year: '年', hour: '小时', custom: '秒' }[p.durationUnit];
+  return unit && Number.isFinite(p.durationValue) ? `${p.durationValue} ${unit}` : '站点未提供可识别的周期';
+}
+function resetLabel(v) { return { daily: '每日', weekly: '每周', monthly: '每月', yearly: '每年', never: '不重置', custom: '自定义' }[v] || v || '—'; }
+
+function subscriptionCard(s) {
+  const status = s.status === 'active'
+    ? s.active ? '有效' : s.startAt > Date.now() ? '尚未生效' : s.endAt > 0 && s.endAt <= Date.now() ? '已到期' : '未确认有效'
+    : SUB_STATUS[s.status] || s.status || '未知状态';
+  const ratio = Number.isFinite(s.progress) ? s.progress : null;
+  const progress = s.unlimited || ratio === null ? null : h('progress', {
+    class: 'subscription-progress', max: '100', value: String(Math.max(0, Math.min(100, ratio))),
+    title: `已用 ${s.used} / ${s.total} · ${ratio.toFixed(1)}%`,
+    'aria-label': `${s.title} 使用进度`, 'aria-valuetext': `${ratio.toFixed(1)}% · 已用 ${s.used} / ${s.total}`,
+  });
+  return h('article', { class: 'subscription-item' },
+    h('div', { class: 'subscription-title' }, h('b', { text: s.title }), h('span', { class: 'acct-chip', text: status })),
+    h('dl', { class: 'acct-facts' },
+      h('dt', { text: '到期时间' }), h('dd', { text: fullDate(s.endAt) }),
+      h('dt', { text: '下次重置' }), h('dd', { text: fullDate(s.nextResetAt) }),
+      h('dt', { text: '已用 / 总额度' }), h('dd', { text: `${s.used || '—'} / ${s.unlimited ? '不限量' : s.total || '—'}` }),
+      h('dt', { text: '剩余额度' }), h('dd', { text: s.unlimited ? '不限量' : s.remaining || '—' })),
+    progress,
+    h('p', { class: 'hint', text: s.unlimited ? '不限量 · 不计算额度百分比' : ratio === null ? '额度数据不足，无法计算进度' : `使用进度 ${ratio.toFixed(1)}%${ratio > 100 ? ' · 已超额' : ''}` }),
+  );
 }
 
 // ── 推荐计划：仿原站钱包页的横条 ────────────────────────────────
@@ -1400,7 +1496,7 @@ function renderAff() {
   const a = d.aff || {};
   // 三列：待确认（站点给才显示）/ 总收入 / 邀请。只认真实值，不拿 0 假装同步过。
   const pending = Number.isFinite(a.pending) ? moneyRaw(a.pending) : null;
-  const total = Number.isFinite(a.quota) ? moneyRaw(a.quota) : null;
+  const total = Number.isFinite(a.historyQuota) ? moneyRaw(a.historyQuota) : null;
   const invites = Number.isFinite(a.count) ? fmtInt(a.count) : null;
   const canTransfer = Number.isFinite(a.quota) && a.quota > 0;
   const armed = Date.now() < affTransferArmedUntil;
@@ -1416,6 +1512,7 @@ function renderAff() {
       })),
     pending ? rfStat('待确认', pending) : null,
     total ? rfStat('总收入', total) : null,
+    Number.isFinite(a.quota) ? rfStat('可转奖励', moneyRaw(a.quota)) : null,
     invites ? rfStat('邀请', invites) : null,
     link ? h('div', { class: 'rf-link' }, h('span', { class: 'mono', text: link })) : null,
     link
@@ -1531,22 +1628,30 @@ function renderAccounts() {
   const st = cache.state;
   if (!st) { regionLoading(box, '正在读取账户'); if (sub) sub.textContent = ''; return; }
 
-  const accounts = st.accounts || [];
-  if (sub) sub.textContent = accounts.length ? `${accounts.length} 个账号` : '';
+  const bound = Array.isArray(st.accounts) ? st.accounts : Object.values(st.accounts || {});
+  const user = st.user;
+  const accounts = [
+    ...(user ? [{ ...user, wallet: true, label: user.displayName || user.username, models: undefined }] : []),
+    ...bound,
+  ];
+  if (sub) sub.textContent = [user ? 'PAT 账户钱包' : '', bound.length ? `${bound.length} 把绑定钥匙` : ''].filter(Boolean).join(' · ');
   // 空态时让说明在卡里居中，而不是顶在上面、下面留一大片空白
   box.classList.toggle('is-empty', accounts.length === 0);
   if (!accounts.length) {
-    box.replaceChildren(h('div', { class: 'empty', text: '还没有绑定任何账号。在 magpie 里添加 DragonAPI 账号后，钥匙与余额会出现在这里。' }));
+    if (st.userError) regionError(box, `PAT 账户没读到：${st.userError}`, () => loadWallet(true));
+    else box.replaceChildren(h('div', { class: 'empty', text: '设置 PAT 后可读取账户钱包与用量，无需先绑定 sk- 钥匙。绑定钥匙的额度会单独展示。' }));
     return;
   }
 
 // 版式照站点控制台的「账户」卡：大字余额 → 已用/用户/分组一行 → 明细 →
   // 标签行 + 更新时间。**只放我们真有的字段**：站点没有「代金券总额」，
   // 也没有满血/低价/自有这类标注，就不摆占位符冒充。
-  box.replaceChildren(...accounts.map((a) => {
+  box.replaceChildren(...[
+    st.userError ? h('p', { class: 'region-error-text', text: `PAT 账户没读到：${st.userError}` }) : null,
+    ...accounts.map((a) => {
     const mask = a.masked || '';
     const showMask = mask && !String(a.label || '').includes(mask);
-    const noKeyHint = a.balance === '—'
+    const noKeyHint = !a.wallet && a.balance === '—'
       ? '插件还没拿到这把钥匙的明文：在 magpie 里发一次请求、或点右上角「刷新」即可'
       : '';
     const split = splitMoney(a.balance || '—');
@@ -1569,6 +1674,7 @@ function renderAccounts() {
     ].filter(Boolean);
 
     return h('div', { class: 'acct-card' },
+      h('p', { class: 'acct-meta', text: a.wallet ? `账户钱包 · ${a.label || a.username || 'PAT 账户'}` : `钥匙额度 · ${a.label || a.key || '绑定钥匙'}` }),
       h('div', { class: 'acct-hero' },
         h('div', { class: 'acct-money' },
           split.unit ? h('span', { class: 'acct-cur', text: split.unit }) : null,
@@ -1594,7 +1700,7 @@ function renderAccounts() {
 
       noKeyHint ? h('p', { class: 'acct-hint', text: noKeyHint }) : null,
     );
-  }));
+  })].filter(Boolean));
 }
 
 /** splitMoney 把「$12.34」拆成符号与大数字，照 neartoken 账户卡的做法。 */
@@ -1603,12 +1709,10 @@ function splitMoney(text) {
   return { unit: (m && m[1]) || '', value: (m && m[2]) || '—' };
 }
 
-/** totalBalanceText 把各账号余额相加（quota），按站点币种印出来。 */
+/** 账户钱包余额，不把绑定钥匙的限额求和冒充钱包。 */
 function totalBalanceText() {
-  const accts = (cache.state && cache.state.accounts) || [];
-  if (!accts.length) return '—';
-  const raw = accts.reduce((sum, a) => sum + (Number.isFinite(a.balanceRaw) ? a.balanceRaw : 0), 0);
-  return moneyRaw(raw);
+  // 钱包余额和钥匙限额是不同口径；即使都有也绝不能相加。
+  return cache.state?.user?.balance || '—';
 }
 
 function fig(k, v, cls = '', title = '') {
@@ -1621,32 +1725,42 @@ function fig(k, v, cls = '', title = '') {
 async function loadUsage(force = false) {
   const range = filters.range;
   if (cache.usage[range] && !force) { renderUsage(); return cache.usage[range]; }
-  if (loading.usage) return cache.usage[range] || null;
-
-  loading.usage = true;
+  if (usagePending.has(range)) return usagePending.get(range);
+  const epoch = dataEpoch;
+  delete cache.usageErrors[range];
   regionLoading($('#usage-body'), `正在读取${RANGE_LABEL[range]}用量`);
-
-  try {
-    const data = await api.usage(range);
-    cache.usage[range] = data;
-    clearBanner('usage');
-    renderUsage();
-    renderLogs();
-    return data;
-  } catch (err) {
-    const msg = describeError(err);
-    banner('error', `读取${RANGE_LABEL[range]}用量失败：${msg}`, { key: 'usage' });
-    regionError($('#usage-body'), `用量没读到：${msg}`, () => loadUsage(true));
-    return null;
-  } finally {
-    loading.usage = false;
-  }
+  const pending = (async () => {
+    try {
+      const data = await api.usage(range);
+      if (epoch !== dataEpoch) return null;
+      cache.usage[range] = data;
+      clearBanner('usage');
+      renderUsage();
+      renderLogs();
+      return data;
+    } catch (err) {
+      if (epoch !== dataEpoch) return null;
+      delete cache.usage[range];
+      cache.usageErrors[range] = describeError(err);
+      renderUsage();
+      renderLogs();
+      return null;
+    } finally {
+      if (epoch === dataEpoch) usagePending.delete(range);
+    }
+  })();
+  usagePending.set(range, pending);
+  return pending;
 }
 
 function renderUsage() {
   const box = $('#usage-body');
   if (!box) return;
   const data = cache.usage[filters.range];
+  if (cache.usageErrors[filters.range]) {
+    regionError(box, `用量没读到：${cache.usageErrors[filters.range]}`, () => loadUsage(true));
+    return;
+  }
 
   if (!data) {
     regionLoading(box, '正在读取用量');
@@ -1669,9 +1783,10 @@ function renderUsage() {
     // 三个数字一行，照 neartoken 的「数据概览」
     h('div', { class: 'stats' },
       statBlock('消耗', data.spent || '—'),
-      statBlock('当前余额', totalBalanceText()),
+      statBlock('账户钱包', totalBalanceText()),
       statBlock('Token', fmtInt(data.tokens))),
     h('p', { class: 'range-note', text: `区间 ${fmtAt(data.start)} → ${fmtAt(data.end)}` }),
+    ...(data.note ? [h('p', { class: 'hint', text: data.note })] : []),
     // 有数据才画图与明细；没有就只留一处解释。
     // 以前这里会同时出现三句「没有数据」（虚线框 + 区间 + 空表），
     // 一屏空白里堆三句废话，反而看不出该怎么让数据出现。
@@ -1814,6 +1929,12 @@ function renderLogs() {
   const tools = $('#logs-tools');
   const pager = $('#logs-pager');
   if (!box) return;
+  if (cache.usageErrors[filters.range]) {
+    regionError(box, `日志没读到：${cache.usageErrors[filters.range]}`, () => loadLogs(true));
+    chips?.replaceChildren();
+    pager?.replaceChildren();
+    return;
+  }
 
   const rows = logRows();
   if (rows === null) { regionLoading(box, '正在读取日志'); return; }
@@ -1888,6 +2009,7 @@ function renderLogs() {
   );
 
   box.replaceChildren(
+    ...((cache.usage[filters.range]?.note) ? [h('p', { class: 'hint', text: cache.usage[filters.range].note })] : []),
     slice.length
       ? table
       : h('p', { class: 'lg-empty', text: logFilter.model || logFilter.group || logFilter.kind || logFilter.tokenName ? '没有符合筛选的日志。' : '这个区间还没有日志。' }),
@@ -2068,17 +2190,20 @@ async function loadKeys(force = false) {
   if (cache.keys && !force) { renderKeys(); return cache.keys; }
   if (loading.keys) return cache.keys;
 
+  const epoch = dataEpoch;
   loading.keys = true;
   regionLoading($('#keys-body'), '正在读取钥匙列表');
 
   try {
     const data = await api.keys();
+    if (epoch !== dataEpoch) return null;
     cache.keys = data;
     cache.keysNeedPat = false;
     clearBanner('keys');
     renderKeys();
     return data;
   } catch (err) {
+    if (epoch !== dataEpoch) return null;
     const msg = describeError(err);
     // 「还没设 PAT」是刚装好时的正常状态，不是错误。这里不该甩红条，
     // 该直接告诉他下一步做什么——否则第一次打开就像插件坏了。
@@ -2098,7 +2223,7 @@ async function loadKeys(force = false) {
     renderKeyGroupOptions();
     return null;
   } finally {
-    loading.keys = false;
+    if (epoch === dataEpoch) loading.keys = false;
   }
 }
 
@@ -2637,11 +2762,20 @@ function renderHealth() {
   );
 }
 
+function normalizePatInput(value) {
+  return String(value ?? '')
+    .replace(/[\s​-‍⁠﻿'"`“”‘’]/gu, '')
+    .replace(/^(?:(?:authorization:?)|bearer)+/i, '');
+}
+function patHintOf(s) {
+  return s.length <= 4 ? '*'.repeat(s.length) : s.length <= 8 ? s.slice(0, 2) + '****' + s.slice(-2) : s.slice(0, 4) + '**********' + s.slice(-4);
+}
+
 async function onSavePat(ev) {
   ev.preventDefault();
   const input = $('#pat-input');
   const btn = $('#pat-save');
-  const pat = input.value.trim();
+  const pat = normalizePatInput(input.value);
 
   if (!pat) { banner('warn', '先粘贴一个 PAT 再保存。', { key: 'pat-form' }); input.focus(); return; }
   // 只挡「明显拿错了凭据」：sk- 是模型钥匙，不是访问令牌。
@@ -2659,7 +2793,7 @@ async function onSavePat(ev) {
 
   btn.disabled = true;
   btn.textContent = '保存中…';
-  // 立刻给反馈：保存要串行探三个站点端点，没有这句用户会以为没点上。
+  // PAT 四项只读能力并行探测，页面仍保留独立超时。
   banner('info', '已提交，正在向站点验证这份令牌…', { key: 'pat-form' });
   try {
     const data = await api.savePat(pat);
@@ -2675,14 +2809,25 @@ async function onSavePat(ev) {
         ? `PAT 已保存，已连接到账户 ${data.user.name}。`
         : 'PAT 已保存。', { key: 'pat-ok', timeout: 7000 });
     }
+    clearAccountCache();
+    await loadState(true);
     renderPat();
-    // PAT 换了，钥匙/余额/用量都可能变，别拿旧缓存骗人
-    cache.keys = null;
-    cache.health = null;
-    cache.stateError = '';
-    if (activeTab === 'wallet') loadKeys(true);
+    await ensureTab(activeTab, true);
     return data;
   } catch (err) {
+    // 请求超时不等于服务端没保存；仅核对打码值，不取回或输出完整 PAT。
+    if (err.status === 0) {
+      const state = await api.state().catch(() => null);
+      if (state?.pat?.set && state.pat.hint === patHintOf(pat)) {
+        input.value = '';
+        clearAccountCache();
+        cache.state = state;
+        renderPat();
+        banner('warn', '保存请求未及时返回，但已核对本地服务保存的令牌打码值。', { key: 'pat-form' });
+        await ensureTab(activeTab, true);
+        return state;
+      }
+    }
     // 服务端在 400 里带的 hint 是可操作的下一步（去勾哪个 scope），必须带出来。
     const extra = err && err.payload && err.payload.hint ? ` ${err.payload.hint}` : '';
     banner('error', `保存 PAT 失败：${describeError(err)}${extra}`, { key: 'pat-form' });
@@ -2708,12 +2853,12 @@ async function onClearPat(btn) {
   try {
     const data = await api.clearPat();
     if (cache.state) cache.state.pat = data.pat || { set: false };
-    cache.keys = null;
-    cache.health = null;
+    clearAccountCache();
     clearBanner('pat-form');
     banner('ok', 'PAT 已清除，页面不再持有任何凭据。', { key: 'pat-ok', timeout: 6000 });
+    await loadState(true);
     renderPat();
-    if (activeTab === 'wallet') loadKeys(true);
+    await ensureTab(activeTab, true);
   } catch (err) {
     banner('error', `清除 PAT 失败：${describeError(err)}`, { key: 'pat-form' });
   } finally {
@@ -3150,8 +3295,10 @@ async function loadState(force = false) {
   if (loading.state) return cache.state;
 
   loading.state = true;
+  const epoch = dataEpoch;
   try {
     const data = await api.state();
+    if (epoch !== dataEpoch) return null;
     cache.state = data;
     cache.stateError = '';
     clearBanner('state');
@@ -3161,6 +3308,7 @@ async function loadState(force = false) {
     if (activeTab === 'pat') renderPat();
     return data;
   } catch (err) {
+    if (epoch !== dataEpoch) return null;
     const msg = describeError(err);
     cache.stateError = msg;
     banner('error', `读取站点状态失败：${msg}`, { key: 'state' });
@@ -3169,11 +3317,39 @@ async function loadState(force = false) {
     if (activeTab === 'pat') renderPat();
     return null;
   } finally {
-    loading.state = false;
+    if (epoch === dataEpoch) loading.state = false;
   }
 }
 
+function clearAccountCache() {
+  dataEpoch++;
+  usagePending.clear();
+  cache.state = null;
+  cache.stateError = '';
+  cache.keys = null;
+  cache.keysError = '';
+  cache.keysNeedPat = false;
+  cache.aff = null;
+  cache.subscriptions = null;
+  cache.usage = {};
+  cache.usageErrors = {};
+  cache.health = null;
+  for (const name of ['state', 'keys', 'aff', 'subscriptions']) loading[name] = false;
+  lastSecret = null;
+  revealed.clear();
+  affTransferArmedUntil = 0;
+  confirmDeleteId = null;
+  for (const id of ['account-body', 'usage-body', 'aff-body', 'subscriptions-body', 'keys-body', 'logs-body']) {
+    const box = $('#' + id);
+    if (box) regionLoading(box, '正在更新账户数据');
+  }
+  $('#logs-chips')?.replaceChildren();
+  $('#logs-pager')?.replaceChildren();
+  renderSecret();
+}
+
 function clearCache() {
+  clearAccountCache();
   cache.state = null;
   cache.stateError = '';
   cache.ping = null;

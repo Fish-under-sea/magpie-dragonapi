@@ -101,7 +101,10 @@ test('OPTIONS 预检回 204 且允许 POST / DELETE', async () => {
   assert.match(r.headers.get('access-control-allow-methods') || '', /DELETE/)
 })
 
-test('/api/state 给出站点、币种、账号、分组', async () => {
+test('/api/state 给出站点、币种、账号、分组', async () => siteStub((url) => {
+  assert.equal(url.pathname, '/api/user/self')
+  return jsonRes(SELF)
+}, async () => {
   const r = await fetch(base + '/api/state')
   assert.equal(r.status, 200)
   const j = await r.json()
@@ -113,7 +116,7 @@ test('/api/state 给出站点、币种、账号、分组', async () => {
   assert.equal(j.accounts[0].group, 'gpt-plus')
   // 没有钥匙明文时余额显示 —，不能假装是 0
   assert.equal(j.accounts[0].balance, '—')
-})
+}))
 
 test('/api/catalog 给出模型行，且没有「启用」这类字段', async () => {  const r = await fetch(base + '/api/catalog')
   assert.equal(r.status, 200)
@@ -308,19 +311,20 @@ async function siteStub(handler, fn) {
 }
 
 /** startPatService 起一个把状态真的写进临时目录的服务，和插件里的行为一致。 */
-async function startPatService({ port, dir: fixedDir, setPat } = {}) {
+async function startPatService({ port, dir: fixedDir, setPat, state = {}, keyOf = () => '' } = {}) {
   const d = fixedDir || mkdtempSync(join(tmpdir(), 'dragonapi-pat-'))
   const st = loadState(d)
   st.status = STATUS
+  Object.assign(st, state)
   const calls = []
   const svc = await startService({
     port,
     dir: d,
     site: 'https://example.test',
     catalog: createCatalogSource({ site: 'https://example.test', stub: CATALOG }),
-    status: createStatusSource({ site: 'https://example.test', seed: STATUS }),
+    status: { get: async () => STATUS },
     getState: async () => ({
-      accounts: {}, pat: st.pat, patHint: st.patHint, patScopes: st.patScopes,
+      accounts: st.accounts || {}, pat: st.pat, patHint: st.patHint, patScopes: st.patScopes,
       patVerified: st.patVerified, enabledGroups: [],
     }),
     setPat: setPat || (async (patch) => {
@@ -331,7 +335,7 @@ async function startPatService({ port, dir: fixedDir, setPat } = {}) {
       st.patVerified = patch.verified
       return saveState(d, st)
     }),
-    keyOf: () => '',
+    keyOf,
   })
   return { svc, base: `http://127.0.0.1:${svc.port}`, dir: d, st, calls }
 }
@@ -342,20 +346,21 @@ const savePat = (base, pat) => fetch(base + '/api/pat', {
   body: JSON.stringify({ pat }),
 })
 
-test('PAT 三条只读端点都通：收下并记全 scope', async () => {
+test('PAT 四条只读端点都通：收下并记全 scope', async () => {
   const { svc, base: b, dir: d, calls } = await startPatService({ port: 3610 })
   try {
     await siteStub((url) => {
       if (url.pathname === '/api/user/self') return jsonRes(SELF)
       if (url.pathname === '/api/token/') return jsonRes({ success: true, data: [] })
       if (url.pathname === '/api/log/self') return jsonRes({ success: true, data: [] })
+      if (url.pathname === '/api/subscription/self') return jsonRes({ success: true, data: { subscriptions: [] } })
       return jsonRes({ success: false, message: 'no route' }, 404)
     }, async () => {
       const r = await savePat(b, PAT)
       assert.equal(r.status, 200)
       const j = await r.json()
       assert.equal(j.ok, true)
-      assert.deepEqual(j.pat.scopes.sort(), ['api_key:read', 'profile:read', 'usage:read'])
+      assert.deepEqual(j.pat.scopes.sort(), ['api_key:read', 'profile:read', 'usage:read', 'wallet:read'])
       assert.equal(j.pat.verified, true)
       assert.equal(j.pat.persisted, true)
       assert.equal(j.user.name, 'fish')
@@ -378,6 +383,7 @@ test('PAT 缺 profile:read 但能读钥匙：仍然收下，并说清哪一格�
       if (url.pathname === '/api/user/self') return jsonRes(FORBIDDEN, 403)
       if (url.pathname === '/api/token/') return jsonRes({ success: true, data: [] })
       if (url.pathname === '/api/log/self') return jsonRes({ success: true, data: [] })
+      if (url.pathname === '/api/subscription/self') return jsonRes({ success: true, data: { subscriptions: [] } })
       return jsonRes({ success: false, message: 'no route' }, 404)
     }, async () => {
       const r = await savePat(b, PAT)
@@ -396,7 +402,7 @@ test('PAT 缺 profile:read 但能读钥匙：仍然收下，并说清哪一格�
   }
 })
 
-test('PAT 三个端点全 401：拒收，且不写盘、不调 setPat', async () => {
+test('PAT 四个端点全 401：拒收，且不写盘、不调 setPat', async () => {
   const { svc, base: b, dir: d, calls } = await startPatService({ port: 3612 })
   try {
     await siteStub(() => jsonRes(AUTH_FAIL, 401), async () => {
@@ -406,7 +412,7 @@ test('PAT 三个端点全 401：拒收，且不写盘、不调 setPat', async ()
       assert.equal(j.ok, false)
       assert.match(j.error, /访问令牌/)
       assert.match(j.hint, /profile:read/)
-      assert.ok(Array.isArray(j.failures) && j.failures.length === 3)
+      assert.ok(Array.isArray(j.failures) && j.failures.length === 4)
     })
     assert.equal(calls.length, 0, '鉴权失败时不该把令牌收进状态')
     assert.equal(loadState(d).pat, '')
@@ -476,4 +482,194 @@ test('真实写盘失败也会被抓到（目录不可写）', async () => {
     await svc.close()
     try { rmSync(blocker, { recursive: true, force: true }) } catch { /* 忽略 */ }
   }
+})
+
+async function withBackend(state, handler, run, keyOf = () => '') {
+  const fixture = await startPatService({ port: 3620, state, keyOf })
+  try {
+    await siteStub(handler, () => run(fixture))
+  } finally {
+    await fixture.svc.close()
+    rmSync(fixture.dir, { recursive: true, force: true })
+  }
+}
+
+test('PAT-only /state returns whitelisted wallet user with no fabricated sk accounts', async () => {
+  await withBackend({ pat: PAT }, () => jsonRes({ data: { ...SELF.data, quota: 500000, used_quota: 250000, email: 'private', access_token: 'never-return', aff_code: 'private-aff' } }), async ({ base: b }) => {
+    const r = await fetch(b + '/api/state')
+    const j = await r.json()
+    assert.equal(r.status, 200)
+    assert.deepEqual(j.accounts, [])
+    assert.deepEqual(j.user, { id: 7, username: 'fish', displayName: 'Fish', group: 'gpt-plus', balance: '$1.00', balanceRaw: 500000, used: '$0.50', usedRaw: 250000 })
+    assert.equal(j.userError, '')
+    const serialized = JSON.stringify(j)
+    for (const secret of ['never-return', 'private-aff', PAT, '"raw"', '"email"']) assert.equal(serialized.includes(secret), false)
+  })
+})
+
+test('/state wallet failures/missing quota never masquerade as a zero wallet', async () => {
+  for (const response of [() => jsonRes(FORBIDDEN, 403), () => jsonRes({ success: false, message: 'bad self' }), () => jsonRes({ data: {} })]) {
+    await withBackend({ pat: PAT }, response, async ({ base: b }) => {
+      const j = await (await fetch(b + '/api/state')).json()
+      assert.equal(j.user, null)
+      assert.ok(j.userError)
+      assert.deepEqual(j.accounts, [])
+    })
+  }
+  await withBackend({ pat: PAT }, () => jsonRes({ data: { id: 7 } }), async ({ base: b }) => {
+    const j = await (await fetch(b + '/api/state')).json()
+    assert.equal(j.user.balance, '—')
+    assert.equal(j.user.balanceRaw, null)
+    assert.equal(j.user.usedRaw, null)
+  })
+})
+
+test('/state keeps sk account balance separate from PAT wallet, never adds them', async () => {
+  await withBackend({ pat: PAT, accounts: { abcd: { label: 'sk account' } } }, (url) => {
+    if (url.pathname === '/api/user/self') return jsonRes({ data: { ...SELF.data, quota: 500000 } })
+    assert.equal(url.pathname, '/api/usage/token/')
+    return jsonRes({ data: { total_available: 250000, total_used: 125000 } })
+  }, async ({ base: b }) => {
+    const j = await (await fetch(b + '/api/state')).json()
+    assert.equal(j.user.balance, '$1.00')
+    assert.equal(j.accounts[0].balance, '$0.50')
+    assert.equal(j.accounts.length, 1)
+  }, () => 'sk-test-only')
+})
+
+test('PAT usage and logs prefer self once, apply selected window in seconds, never stack sk logs', async () => {
+  const calls = []
+  const now = Math.floor(Date.now() / 1000)
+  await withBackend({ pat: PAT, accounts: { abcd: { label: 'sk account' } } }, (url, init) => {
+    calls.push(url)
+    assert.equal(url.pathname, '/api/log/self')
+    assert.equal(init.headers['new-api-access-token'], PAT)
+    return jsonRes({ data: { items: [
+      { created_at: now, model_name: 'test', quota: 500000, prompt_tokens: 20 },
+      { created_at: 1, model_name: 'outside', quota: 500000 },
+    ] } })
+  }, async ({ base: b }) => {
+    for (const route of ['/api/usage?range=month', '/api/logs?range=week']) {
+      const j = await (await fetch(b + route)).json()
+      assert.equal(j.ok, true)
+      assert.equal(j.source, 'pat')
+      assert.equal(j.partial, true)
+      assert.match(j.note, /100/)
+      assert.equal(j.rows.length, 1)
+      assert.equal(calls.at(-1).searchParams.get('start_timestamp'), String(j.start / 1000))
+      assert.equal(calls.at(-1).searchParams.get('end_timestamp'), String(j.end / 1000))
+      if (route.includes('/usage')) assert.equal(j.spentRaw, 500000)
+    }
+    assert.equal(calls.length, 2)
+  }, () => { throw new Error('PAT default must not read sk') })
+})
+
+test('explicit account on usage and logs uses only that sk; no PAT fallback on sk failure', async () => {
+  const seen = []
+  await withBackend({ pat: PAT, accounts: { abcd: { label: 'selected' }, efgh: {} } }, (url, init) => {
+    seen.push(url.pathname)
+    assert.equal(url.pathname, '/api/log/token')
+    assert.equal(init.headers.authorization, 'Bearer sk-selected-only')
+    assert.equal(init.headers['new-api-access-token'], undefined)
+    return jsonRes({ data: [] })
+  }, async ({ base: b }) => {
+    for (const route of ['/api/usage?account=abcd', '/api/logs?account=abcd']) {
+      const j = await (await fetch(b + route)).json()
+      assert.equal(j.ok, true)
+      assert.equal(j.source, 'key')
+    }
+    const miss = await fetch(b + '/api/logs?account=missing')
+    assert.equal(miss.status, 400)
+    assert.equal((await miss.json()).ok, false)
+    assert.equal(seen.length, 2)
+  }, (key) => { assert.equal(key, 'abcd'); return 'sk-selected-only' })
+
+  await withBackend({ pat: PAT, accounts: { abcd: {} } }, () => jsonRes(FORBIDDEN, 403), async ({ base: b }) => {
+    const r = await fetch(b + '/api/usage?account=abcd')
+    assert.equal(r.status, 500)
+    assert.equal((await r.json()).ok, false)
+  }, () => 'sk-selected-only')
+})
+
+test('usage/log auth failures and unknown payloads return errors rather than zero/empty success', async () => {
+  for (const payload of [AUTH_FAIL, { data: {} }, { success: false, message: 'log refused', data: [] }]) {
+    await withBackend({ pat: PAT }, () => jsonRes(payload), async ({ base: b }) => {
+      for (const route of ['/api/usage', '/api/logs']) {
+        const r = await fetch(b + route)
+        assert.equal(r.status, 500)
+        const j = await r.json()
+        assert.equal(j.ok, false)
+        assert.ok(j.error)
+        assert.equal('rows' in j, false)
+        assert.equal('spentRaw' in j, false)
+      }
+    })
+  }
+  await withBackend({ pat: '', accounts: { abcd: {} } }, () => { throw new Error('must not fetch') }, async ({ base: b }) => {
+    assert.equal((await (await fetch(b + '/api/usage')).json()).ok, false)
+  })
+})
+
+test('normalized PAT is probed and saved, wallet-only PAT accepted', async () => {
+  await withBackend({}, (url, init) => {
+    assert.equal(init.headers.authorization, `Bearer ${PAT}`)
+    assert.equal(init.headers['new-api-access-token'], PAT)
+    return url.pathname === '/api/subscription/self'
+      ? jsonRes({ data: { subscriptions: [] } })
+      : jsonRes(FORBIDDEN, 403)
+  }, async ({ base: b, calls }) => {
+    const r = await savePat(b, `Authorization: Bearer " ${PAT}​ "`)
+    const j = await r.json()
+    assert.equal(r.status, 200)
+    assert.equal(j.pat.verified, true)
+    assert.deepEqual(j.pat.scopes, ['wallet:read'])
+    assert.equal(calls[0].pat, PAT)
+    assert.match(j.warning, /profile:read/)
+  })
+})
+
+test('/subscriptions is read-only, returns self when plans fail and errors when self fails', async () => {
+  await withBackend({ pat: PAT }, (url, init) => {
+    assert.equal(init.method, 'GET')
+    return url.pathname === '/api/subscription/self'
+      ? jsonRes({ data: { subscriptions: [], billing_preference: 'wallet_first' } })
+      : jsonRes({ message: 'plans missing' }, 503)
+  }, async ({ base: b }) => {
+    const j = await (await fetch(b + '/api/subscriptions')).json()
+    assert.equal(j.ok, true)
+    assert.deepEqual(j.subscriptions, [])
+    assert.equal(j.billingPreference, 'wallet_first')
+    assert.match(j.plansError, /plans missing/)
+    assert.equal((await fetch(b + '/api/subscriptions', { method: 'POST' })).status, 404)
+  })
+  await withBackend({ pat: PAT }, () => jsonRes(FORBIDDEN, 403), async ({ base: b }) => {
+    const r = await fetch(b + '/api/subscriptions')
+    assert.equal(r.status, 500)
+    assert.equal((await r.json()).ok, false)
+  })
+  await withBackend({}, () => { throw new Error('must not fetch') }, async ({ base: b }) => {
+    assert.equal((await fetch(b + '/api/subscriptions')).status, 400)
+  })
+})
+
+test('/aff returns real history, omits missing columns and does not hide authorization errors', async () => {
+  await withBackend({ pat: PAT }, (url) => jsonRes({ data: url.pathname.endsWith('/aff') ? 'invite' : { id: 1, aff_count: 2, aff_quota: 1, aff_history_quota: 7 } }), async ({ base: b }) => {
+    const j = await (await fetch(b + '/api/aff')).json()
+    assert.equal(j.code, 'invite')
+    assert.deepEqual(j.aff, { count: 2, quota: 1, historyQuota: 7 })
+    assert.equal(j.link, 'https://example.test/sign-up?aff=invite')
+  })
+  await withBackend({ pat: PAT }, (url) => url.pathname.endsWith('/aff') ? jsonRes({ data: 'invite' }) : jsonRes(FORBIDDEN, 403), async ({ base: b }) => {
+    const r = await fetch(b + '/api/aff')
+    const j = await r.json()
+    assert.equal(r.status, 200)
+    assert.equal(j.code, 'invite')
+    assert.equal(j.aff, null)
+    assert.match(j.note, /403.*profile:read/)
+  })
+  await withBackend({ pat: PAT }, () => jsonRes(FORBIDDEN, 403), async ({ base: b }) => {
+    const r = await fetch(b + '/api/aff')
+    assert.equal(r.status, 500)
+    assert.equal((await r.json()).ok, false)
+  })
 })

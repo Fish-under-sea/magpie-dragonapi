@@ -309,19 +309,64 @@ test('卡片含 NearToken 那套信息位：名称/厂商/描述/计费/价格/�
   for (const cls of ['mc-name', 'mc-vendor', 'mc-desc', 'mc-billing', 'mc-prices', 'mc-ends', 'mc-foot']) {
     assert.match(fn[0], new RegExp(cls), `卡片缺少 ${cls}`)
   }
-  // 分组：一个模型可能跨多个分组，抽成 groupChipsEl
+  // 分组：一个模型跨多个分组，抽成 groupChipsEl
   const groupChips = js.match(/function groupChipsEl\([\s\S]*?\n\}/)
   assert.ok(groupChips, '找不到 groupChipsEl')
   assert.match(groupChips[0], /mc-group/, '分组 chip 缺少 mc-group')
   assert.match(groupChips[0], /ratioTag\(/, '分组 chip 应带倍率标签')
-  assert.match(fn[0], /groupChipsEl\(m\)/, '卡片应调用分组 chip 渲染')
+  assert.match(fn[0], /groupChipsEl\(agg\)/, '卡片应调用分组 chip 渲染')
   // 价格三列：输入 / 输出 / 缓存读取（价格格单独一个函数，卡片调用它）
-  assert.match(fn[0], /priceCellsOf\(/, '卡片应调用价格格渲染')
-  const prices = js.match(/function priceCellsOf\([\s\S]*?\n\}/)
-  assert.ok(prices, '找不到 priceCellsOf')
+  assert.match(fn[0], /priceCellsOfAgg\(/, '卡片应调用聚合价格格渲染')
+  const prices = js.match(/function priceCellsOfAgg\([\s\S]*?\n\}/)
+  assert.ok(prices, '找不到 priceCellsOfAgg')
   for (const label of ['输入', '输出', '缓存读取']) {
     assert.ok(prices[0].includes(label), `价格格缺少「${label}」`)
   }
+})
+
+test('分组一个都不省略：不截断、不「+N」、CSS 不省略号', async () => {
+  const js = await (await fetch(base + '/ui/app.js')).text()
+  const groupChips = js.match(/function groupChipsEl\([\s\S]*?\n\}/)
+  assert.ok(groupChips, '找不到 groupChipsEl')
+  assert.equal(/\.slice\(/.test(groupChips[0]), false, '分组列表不该 slice 截断')
+  assert.equal(/\+\$\{/.test(groupChips[0]), false, '不该出现「+N」折叠')
+  assert.equal(/mc-more/.test(groupChips[0]), false, '不该再渲染「还有几个」')
+
+  // CSS 也不能靠省略号收场：这个值以前是 ellipsis，理由是维持等高，
+  // 现在等高由网格 stretch 保证，分组必须完整可读。
+  const css = (await (await fetch(base + '/ui/style.css')).text()).replace(/\/\*[\s\S]*?\*\//g, '')
+  const groupRule = css.match(/\.mc-group\s*\{[^}]*\}/)
+  assert.ok(groupRule, '找不到 .mc-group 规则')
+  assert.match(groupRule[0], /overflow:\s*visible/, '.mc-group 不该隐藏溢出')
+  assert.equal(/text-overflow:\s*ellipsis/.test(groupRule[0]), false, '.mc-group 不该用省略号')
+  const groupsRule = css.match(/\.mc-groups\s*\{[^}]*\}/)
+  assert.ok(groupsRule, '找不到 .mc-groups 规则')
+  assert.match(groupsRule[0], /flex-wrap:\s*wrap/, '分组应允许换行排下全部分组')
+})
+
+test('跨分组价格给区间，不假装只有一个价', async () => {
+  const js = await (await fetch(base + '/ui/app.js')).text()
+  assert.match(js, /function fmtRange\(/, '缺少区间格式化')
+  assert.match(js, /with-range/, '卡片应标记区间样式')
+  // 只写一次符号与单位：$0.12–0.32/M，而不是 $0.12/M–$0.32/M
+  const fn = js.match(/function fmtRange\([\s\S]*?\n\}/)
+  assert.ok(fn, '找不到 fmtRange')
+  assert.match(fn[0], /toFixed\(digits\)/, '两端应用同一精度')
+})
+
+test('目录聚合走 aggregateRows（一张卡 = 一个模型）', async () => {
+  const js = await (await fetch(base + '/ui/app.js')).text()
+  assert.match(js, /import \{ aggregateRows, focusGroupOf \} from '\.\/model-agg\.js'/, '应导入聚合模块')
+  assert.match(js, /const rows = aggregateRows\(matched\)/, 'renderCatalog 应聚合后再渲染')
+})
+
+test('聚合模块必须能被服务取到（否则页面 import 404，整页挂掉）', async () => {
+  // ui/app.js 是 module，import './model-agg.js' 会请求根路径 /model-agg.js。
+  // 静态路由若没放行 .js，页面会白屏——这条比任何样式断言都关键。
+  const r = await fetch(base + '/model-agg.js')
+  assert.equal(r.status, 200, `/model-agg.js 应可访问，实际 ${r.status}`)
+  const text = await r.text()
+  assert.match(text, /export function aggregateRows/, '取到的应是聚合模块本体')
 })
 
 test('卡片不伪造健康度：没有延迟/吞吐/成功率这类我们拿不到的数据', async () => {

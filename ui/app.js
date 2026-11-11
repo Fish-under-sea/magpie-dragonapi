@@ -11,6 +11,10 @@
  * 会被直接拒，服务端也用 Access-Control-Allow-Origin: * 兜住，不需要 cookie。
  */
 
+// 聚合规则单独成模块（纯函数、可单测）：站点把同一个模型在十几个分组里各卖
+// 一份，目录是「分组 × 模型」的行表，而人要看的是「一个模型一张卡」。
+import { aggregateRows, focusGroupOf } from './model-agg.js';
+
 'use strict';
 
 // ── DOM 小工具 ─────────────────────────────────────────────
@@ -747,6 +751,22 @@ function fmtTokValue(num, unit) {
   return `${(cur && cur.symbol) || '$'}${v.toFixed(digits)}`;
 }
 
+/**
+ * fmtRange 跨分组的价格区间：`$0.12–0.32/M`。
+ *
+ * 只写一次符号、只写一次单位 —— `$0.12/M–$0.32/M` 又长又难看，一列里塞不下。
+ * 两端用同一个精度，避免出现 `$0.0032–0.12/M` 这种一头 4 位一头 2 位的怪东西。
+ */
+function fmtRange(span, unit) {
+  const cur = cache.state && cache.state.currency;
+  const sym = (cur && cur.symbol) || '$';
+  const scale = unit === 'K' ? 1000 : 1;
+  const lo = span.min / scale;
+  const hi = span.max / scale;
+  const digits = unit === 'K' ? (hi >= 0.01 ? 4 : 6) : (hi >= 0.01 ? 2 : 4);
+  return `${sym}${lo.toFixed(digits)}–${hi.toFixed(digits)}/${unit}`;
+}
+
 /** 端点 id → 看得懂的名字（站点给的是 openai / openai-response / anthropic 这类内部名）。 */
 const ENDPOINT_LABEL = {
   openai: 'Chat',
@@ -812,14 +832,23 @@ function renderCatalog() {
     return hay.includes(query);
   });
 
-  // 一行 = 一个「分组 × 模型」。跨分组聚合成一张卡留到下一个 PR。
-  const rows = matched;
+  // 一行 = 一个「分组 × 模型」，但一张卡 = 一个模型。
+  // 聚合在这里做（而不是服务端）：筛选与排序都基于行，展示才需要合并。
+  const rows = aggregateRows(matched);
 
   if (meta) {
-    // replaceChildren 吃 null 会把它印成字符串「null」——先过滤掉空项再加。
+    // 聚合后「当前显示」与「全站」可能相等（没筛选时）。同一个数说两遍是噪音，
+    // 这时直接给一行完整的口径；筛选过才需要把「筛出几个 / 全站几个」并置。
+    const filtered = rows.length !== counts.models;
+    const scope = `${fmtInt(counts.models)} 个模型 / ${fmtInt(counts.rows)} 行 / ${fmtInt(counts.groups)} 个分组`;
     meta.replaceChildren(...[
+
       h('b', { text: fmtInt(rows.length) }),
-      h('span', { text: ` 个模型 · 全站 ${fmtInt(counts.models)} 个 / ${fmtInt(counts.rows)} 行 / ${fmtInt(counts.groups)} 个分组` }),
+      h('span', {
+        text: filtered
+          ? ` 个模型 · 全站 ${scope}`
+          : ` 个模型 · ${fmtInt(counts.rows)} 行 / ${fmtInt(counts.groups)} 个分组`,
+      }),
       filters.category ? h('span', { text: ` · 分类 ${categoryTitle(filters.category)}` }) : null,
       filters.vendor ? h('span', { text: ` · 厂商 ${filters.vendor}` }) : null,
       h('span', { class: 'spacer' }),
@@ -838,7 +867,11 @@ function renderCatalog() {
 
   // 排序：默认保留站点顺序（宿主列表与页面一致），另外给价格与名称两种。
   // 排序：默认「最新版本」——按模型名里的版本号从新到旧。
-  const priceKey = (m) => (Number.isFinite(m.pricing?.inputNum) ? m.pricing.inputNum : Infinity);
+  // 价格按「最便宜的那个分组」排：聚合后一张卡代表多个价，用最低价才符合直觉。
+  const priceKey = (a) => {
+    const n = a?.cheapest?.pricing?.inputNum;
+    return Number.isFinite(n) ? n : Infinity;
+  };
   if (filters.sort === 'price-asc') {
     rows.sort((a, b) => priceKey(a) - priceKey(b) || String(a.name).localeCompare(String(b.name)));
   } else if (filters.sort === 'price-desc') {
@@ -864,39 +897,53 @@ function listHead() {
 }
 
 /** modelRow 列表模式的一行；点整行打开详情。 */
-function modelRow(m, groupMap) {
-  const info = groupMap.get(m.group);
-  const pricing = m.pricing || {};
-  const kind = m.kind || 'chat';
-  const priceKind = pricing.kind || 'unknown';
-  const isAuto = m.group === 'auto' || (info && info.auto === true);
-  const billing = billingLabel(pricing, isAuto, priceKind);
-  const ends = Array.isArray(m.endpoints) ? m.endpoints : [];
+/** modelRow 列表模式的一行（一个模型一行）；点整行打开详情。 */
+function modelRow(agg, groupMap) {
+  const focus = agg.cheapest || { pricing: {} };
+  const pricing = focus.pricing || {};
+  const kind = agg.kind || 'chat';
+  const priceKind = agg.priceKind || pricing.kind || 'unknown';
+  const isAuto = Boolean(focus.auto);
+  const billing = billingOfAgg(agg);
+  const ends = Array.isArray(agg.endpoints) ? agg.endpoints : [];
   const unit = filters.unit;
-  const open = () => openModelDrawer(m);
+  const open = () => openModelDrawer(agg);
 
-  const priceCell = priceKind === 'percall' || priceKind === 'unknown' || isAuto
+  // 列宽固定，区间比单值长，这里用不带单位的紧凑写法（$0.12–0.32），单位单独一行。
+  const bareRange = (span) => fmtRange(span, unit).replace(`/${unit}`, '');
+  const pair = (span, fallback) => {
+    if (span && !span.same) return [h('span', { class: 'ml-p-v', text: bareRange(span) })];
+    const n = span ? span.min : null;
+    return [h('span', { class: 'ml-p-v', text: Number.isFinite(n) ? fmtTokValue(n, unit) : (fallback || '—') })];
+  };
+
+  const priceCell = priceKind === 'percall' || priceKind === 'unknown' || priceKind === 'mixed' || isAuto
     ? h('span', { class: 'ml-cell ml-price' },
       h('span', { class: 'ml-p-line' }, h('span', { class: 'ml-p-v', text: pricing.input || '—' })))
     : h('span', { class: 'ml-cell ml-price' },
       h('span', { class: 'ml-p-line' },
-        h('span', { class: 'ml-p-k', text: '输入' }), h('span', { class: 'ml-p-v', text: fmtTokValue(pricing.inputNum, unit) }),
-        h('span', { class: 'ml-p-k', text: '输出' }), h('span', { class: 'ml-p-v', text: fmtTokValue(pricing.outputNum, unit) })),
+        h('span', { class: 'ml-p-k', text: '入' }), ...pair(agg.prices?.input, pricing.input),
+        h('span', { class: 'ml-p-k', text: '出' }), ...pair(agg.prices?.output, pricing.output)),
       h('span', { class: 'ml-p-unit', text: `${(cache.state && cache.state.currency && cache.state.currency.symbol) || '$'} / 1${unit}` }));
+
+  const cacheSpan = agg.prices?.cache;
+  const cacheText = cacheSpan && !cacheSpan.same
+    ? fmtRange(cacheSpan, unit).replace(`/${unit}`, '')
+    : (cacheSpan ? fmtTokValue(cacheSpan.min, unit) : pricing.cache);
 
   return h('div', {
     class: 'ml-row',
     role: 'button',
     tabindex: '0',
-    title: `打开 ${m.name} 的详情`,
+    title: `打开 ${agg.name} 的详情（${agg.groupCount} 个分组）`,
     onclick: open,
     onkeydown: (ev) => {
       if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(); }
     },
   },
   h('span', { class: 'ml-cell ml-model' },
-    vendorBadge(m.vendor, { size: 13 }),
-    h('span', { class: 'ml-name', text: m.name }),
+    vendorBadge(agg.vendor, { size: 13 }),
+    h('span', { class: 'ml-name', text: agg.name }),
     kind !== 'chat' ? h('span', { class: 'ml-kind', text: KIND_LABEL[kind] || kind }) : null),
 
   h('span', { class: `ml-cell ml-type ${billing.cls}`, text: billing.label }),
@@ -904,20 +951,17 @@ function modelRow(m, groupMap) {
   priceCell,
 
   h('span', { class: 'ml-cell ml-cache' },
-    h('span', {
-      class: 'ml-c-v',
-      text: Number.isFinite(pricing.cacheNum) ? fmtTokValue(pricing.cacheNum, unit) : (pricing.cache || '—'),
-    }),
-    Number.isFinite(pricing.cacheNum) ? h('span', { class: 'ml-c-unit', text: `/ 1${unit}` }) : null),
+    h('span', { class: 'ml-c-v', text: cacheText || '—' }),
+    cacheText ? h('span', { class: 'ml-c-unit', text: `/ 1${unit}` }) : null),
 
   h('span', { class: 'ml-cell ml-vendor' },
-    vendorBadge(m.vendor, { size: 13 }),
-    h('span', { text: m.vendor || '—' })),
+    vendorBadge(agg.vendor, { size: 13 }),
+    h('span', { text: agg.vendor || '—' })),
 
   h('span', { class: 'ml-cell ml-ends' },
     ends.length ? endpointEls(ends, 3) : h('span', { class: 'ml-dash' })),
 
-  h('span', { class: 'ml-cell ml-groups' }, groupChipsEl(m)));
+  h('span', { class: 'ml-cell ml-groups' }, groupChipsEl(agg)));
 }
 
 /** 顶部横幅：选中分组时给分组信息，只选了分类时给分类信息，都没选就收起。 */
@@ -1065,33 +1109,72 @@ function libraryGroupChips(list, modelsByGroup, countOf) {
  * 「全部」视图下这里列的是它所在的全部（最多两个 + +N，title 里给全量）；
  * 选了具体分组时 groups 只有一个，看起来和以前一样。
  */
-function groupChipsEl(m) {
-  const list = Array.isArray(m.groups) && m.groups.length
-    ? m.groups
-    : [{ group: m.group, groupRatio: m.groupRatio, groupAuto: m.groupAuto }];
-  const shown = list.slice(0, 2);
-  const more = list.length - shown.length;
+/**
+ * 分组标签：把这张模型卡涉及的分组**全部**列出来。
+ *
+ * 站点把同一个模型在十几个分组里各卖一份，价差能到 20 倍（0.06× 到 1.2×），
+ * 所以「有哪些分组」本身就是关键信息，不能折叠成「+3」让人再点一次。
+ * 分组少就一行排开，多就换行——排版交给 CSS 的 flex-wrap，不在 JS 里截断。
+ */
+function groupChipsEl(agg) {
+  const list = Array.isArray(agg.groups) ? agg.groups : [];
   const title = list
-    .map((g) => `${GROUP_ALIAS[g.group] || g.group}${Number(g.groupRatio) > 0 ? ' ' + fmtRatio(g.groupRatio) : ''}`)
+    .map((g) => `${g.id}${Number(g.ratio) > 0 ? ' ' + fmtRatio(g.ratio) : ''}`)
     .join('\n');
   return h('span', { class: 'mc-groups', title },
-    shown.map((g) => h('span', { class: 'mc-gb' },
-      Number(g.groupRatio) > 0 ? ratioTag(g.groupRatio) : null,
-      h('span', { class: 'mc-group', text: GROUP_ALIAS[g.group] || g.group || '—' }))),
-    more > 0 ? h('span', { class: 'mc-more', text: `+${more}` }) : null);
+    list.map((g) => h('span', { class: 'mc-gb' },
+      Number(g.ratio) > 0 ? ratioTag(g.ratio) : null,
+      h('span', { class: 'mc-group', text: GROUP_ALIAS[g.id] || g.id || '—' }))));
 }
 
-function modelCard(m, groupMap) {
-  const info = groupMap.get(m.group);
-  const isAuto = m.group === 'auto' || (info && info.auto === true);
-  const pricing = m.pricing || {};
-  const priceKind = pricing.kind || 'unknown';
-  const kind = m.kind || 'chat';
-  const endpoints = Array.isArray(m.endpoints) ? m.endpoints : [];
+/**
+ * 聚合后的计费方式：分组之间不一致时如实标「多种计费」，
+ * 不挑一个顺眼的来代表全部。
+ */
+function billingOfAgg(agg) {
+  if (agg.priceKind === 'mixed') return { cls: 'mixed', label: '多种计费' };
+  const g = agg.cheapest;
+  return billingLabel(g?.pricing || {}, Boolean(g?.auto), agg.priceKind);
+}
+
+/**
+ * 三个价格格：跨分组是区间就印区间（$0.12–$0.32/M），相同就印单值。
+ *
+ * 只印最低价会让人以为这就是这个模型的价——而它其实只属于最便宜的那个分组。
+ */
+function priceCellsOfAgg(agg, unit) {
+  const cell = (label, span, fallback) => {
+    if (span && !span.same) {
+      const text = fmtRange(span, unit);
+      return h('div', null,
+        h('span', { text: label }),
+        h('b', { class: 'with-range', title: text, text }));
+    }
+    const num = span ? span.min : null;
+    return h('div', null,
+      h('span', { text: label }),
+      h('b', { text: Number.isFinite(num) ? fmtTok(num, unit) : (fallback || '—') }));
+  };
+  const p = (agg.cheapest && agg.cheapest.pricing) || {};
+  return [
+    cell('输入', agg.prices?.input, p.input),
+    cell('输出', agg.prices?.output, p.output),
+    cell('缓存读取', agg.prices?.cache, p.cache),
+  ];
+}
+
+function modelCard(agg, groupMap) {
+  const focus = agg.cheapest || { pricing: {} };
+  const pricing = focus.pricing || {};
+  const priceKind = agg.priceKind || pricing.kind || 'unknown';
+  const isAuto = Boolean(focus.auto);
+  const kind = agg.kind || 'chat';
+  const endpoints = Array.isArray(agg.endpoints) ? agg.endpoints : [];
 
   // 计费方式的说法要跟价格表一致：按次/按秒只给一列，别硬凑出「输出价 —」。
-  const billing = billingLabel(pricing, isAuto, priceKind);
+  const billing = billingOfAgg(agg);
 
+  const flat = priceKind === 'percall' || priceKind === 'unknown' || priceKind === 'auto' || isAuto;
   let priceCells;
   if (isAuto) {
     priceCells = [h('div', { class: 'wide' }, h('span', { text: '单价' }), h('b', { class: 'muted', text: '—' }))];
@@ -1099,31 +1182,34 @@ function modelCard(m, groupMap) {
     priceCells = [h('div', { class: 'wide' }, h('span', { text: '单价' }), h('b', { class: 'unknown', text: '价格未知' }))];
   } else if (priceKind === 'percall') {
     priceCells = [h('div', { class: 'wide' }, h('span', { text: '单价' }), h('b', { text: pricing.input || '—' }))];
+  } else if (priceKind === 'mixed') {
+    priceCells = [h('div', { class: 'wide' }, h('span', { text: '单价' }), h('b', { class: 'unknown', text: '见详情' }))];
   } else {
-    priceCells = priceCellsOf(pricing, filters.unit);
+    priceCells = priceCellsOfAgg(agg, filters.unit);
   }
 
-  const desc = m.description || autoDescription(m);
+  const desc = agg.description || autoDescription(agg, pricing);
   const titleBits = [
-    m.description ? desc : desc + '（站点没有给说明，这段是按目录信息拼的）',
-    m.tags ? `标签：${m.tags}` : '',
+    agg.description ? desc : desc + '（站点没有给说明，这段是按目录信息拼的）',
+    agg.tags ? `标签：${agg.tags}` : '',
     pricing.note || '',
-    m.context ? `上下文 ${fmtInt(m.context)}` : '',
-    `模型 id：${m.id || ''}`,
+    agg.context ? `上下文 ${fmtInt(agg.context)}` : '',
+    `模型 id：${focus.row?.id || agg.id || ''}`,
+    agg.groupCount > 1 ? `共 ${agg.groupCount} 个分组：` + agg.groups.map((g) => g.id).join('、') : '',
   ].filter(Boolean).join('\n');
 
-  const open = () => openModelDrawer(m);
+  const open = () => openModelDrawer(agg);
 
   return h('article', { class: `mc mc-${kind}`, title: titleBits },
     h('div', { class: 'mc-head' },
-      h('span', { class: 'mc-vicon' }, vendorBadge(m.vendor, { size: 18 })),
+      h('span', { class: 'mc-vicon' }, vendorBadge(agg.vendor, { size: 18 })),
       h('div', { class: 'grow' },
         h('button', {
           class: 'mc-name', type: 'button',
-          title: '查看这个模型的计费表达式与分档',
+          title: '查看这个模型的计费表达式与各分组定价',
           onclick: open,
-        }, m.name || m.id || '未命名'),
-        m.vendor ? h('div', { class: 'mc-vendor', text: m.vendor }) : null),
+        }, agg.name || agg.id || '未命名'),
+        agg.vendor ? h('div', { class: 'mc-vendor', text: agg.vendor }) : null),
       // 绝大多数是对话模型，每张卡都挂一个「对话」只会变成噪音；只在生图/视频这类上标。
       kind !== 'chat' ? h('span', { class: 'mc-kind', text: KIND_LABEL[kind] || kind }) : null),
 
@@ -1131,11 +1217,13 @@ function modelCard(m, groupMap) {
 
     h('div', { class: `mc-billing ${billing.cls}`, text: billing.label }),
 
-    h('div', { class: priceKind === 'percall' || priceKind === 'unknown' || isAuto ? 'mc-prices one' : 'mc-prices' }, priceCells),
+    h('div', { class: flat ? 'mc-prices one' : 'mc-prices' }, priceCells),
 
-    h('div', { class: 'mc-line' },
+    h('div', { class: 'mc-line mc-line-groups' },
       h('span', { class: 'k', text: '分组' }),
-      groupChipsEl(m)),
+      groupChipsEl(agg),
+      // 只有多于一个分组时才提示数量，单个分组没必要重复
+      agg.groupCount > 1 ? h('span', { class: 'mc-gcount', text: `${agg.groupCount} 个` }) : null),
 
     h('div', { class: 'mc-line mc-line-ends' },
       h('span', { class: 'k', text: '端点' }),
@@ -1153,11 +1241,11 @@ function modelCard(m, groupMap) {
  * 只陈述目录里确实存在的字段（厂商 / 类型 / 端点 / 计价），不编用途与能力；
  * 卡片的 tooltip 里会注明这句是按目录拼的，不冒充站点原文。
  */
-function autoDescription(m) {
+function autoDescription(m, pricing) {
   const vendor = m.vendor || '站点';
   const kind = KIND_LABEL[m.kind] || '模型';
   const ends = (Array.isArray(m.endpoints) ? m.endpoints : []).slice(0, 2);
-  const p = m.pricing || {};
+  const p = pricing || m.pricing || {};
   const billing = p.kind === 'tiered' ? '分档计费'
     : p.kind === 'percall' ? '按次/按秒计费'
       : p.kind === 'ratio' ? '按倍率计费'
@@ -2167,37 +2255,57 @@ function flashButton(btn, original, temporary) {
 
 let drawerLastFocus = null;
 
-function openModelDrawer(model) {
+/**
+ * 打开模型详情。
+ *
+ * 入参是聚合后的模型（一个模型一张卡），不是单个分组行。价签、倍率与「当前」
+ * 标记以「聚焦分组」为准：筛选了某个分组就用它，否则用最便宜的那个——这样
+ * 从哪张卡点进来，看到的都是这张卡上那个最显眼的价。
+ */
+function openModelDrawer(agg) {
   const drawer = $('#drawer');
   if (!drawer) return;
   drawerLastFocus = document.activeElement;
 
-  const kind = model.kind || 'chat';
-  $('#drawer-title').textContent = model.name || model.id || '模型详情';
+  const focus = focusGroupOf(agg, filters.group);
+  const row = focus?.row || {};
+  const kind = agg.kind || row.kind || 'chat';
+
+  $('#drawer-title').textContent = agg.name || row.name || row.id || '模型详情';
+
+  const ratios = (agg.groups || [])
+    .map((g) => (Number(g.ratio) > 0 ? Number(g.ratio) : null))
+    .filter((r) => r !== null);
+  const ratioRange = ratios.length
+    ? (Math.min(...ratios) === Math.max(...ratios)
+      ? fmtRatio(Math.min(...ratios))
+      : `${fmtRatio(Math.min(...ratios))}–${fmtRatio(Math.max(...ratios))}`)
+    : '';
+
   $('#drawer-sub').replaceChildren(...[
-    h('span', { class: 'tag-chip', text: model.group || '未分组' }),
-    model.groupRatio != null && Number(model.groupRatio) > 0
-      ? h('span', { class: 'tag-chip' }, '倍率 ', h('span', { class: 'ratio', text: fmtRatio(model.groupRatio) }))
-      : null,
-    model.vendor ? h('span', { class: 'tag-chip' }, vendorBadge(model.vendor, { size: 12 }), ' ', model.vendor) : null,
+    (agg.groupCount || 0) > 1
+      ? h('span', { class: 'tag-chip', text: `${agg.groupCount} 个分组` })
+      : h('span', { class: 'tag-chip', text: row.group || '未分组' }),
+    ratioRange ? h('span', { class: 'tag-chip' }, '倍率 ', h('span', { class: 'ratio', text: ratioRange })) : null,
+    agg.vendor ? h('span', { class: 'tag-chip' }, vendorBadge(agg.vendor, { size: 12 }), ' ', agg.vendor) : null,
     h('span', { class: 'tag-chip', text: KIND_LABEL[kind] || kind }),
   ].filter(Boolean));
 
   const icon = $('#drawer-icon');
-  if (icon) icon.replaceChildren(vendorBadge(model.vendor, { size: 30 }));
+  if (icon) icon.replaceChildren(vendorBadge(agg.vendor, { size: 30 }));
 
   const body = $('#drawer-body');
   regionLoading(body, '正在读取计费详情');
   drawer.hidden = false;
   $('#drawer-close').focus();
 
-  loadModelDetail(model, body);
+  loadModelDetail(row, body, agg);
 }
 
-async function loadModelDetail(model, body) {
+async function loadModelDetail(row, body, agg) {
   try {
-    const data = await api.model(model.group || '', model.name || model.id || '');
-    body.replaceChildren(...modelDetailNodes(model, data));
+    const data = await api.model(row.group || '', agg.name || row.name || row.id || '');
+    body.replaceChildren(...modelDetailNodes(row, data, agg));
     clearBanner('model');
   } catch (err) {
     const msg = describeError(err);
@@ -2229,26 +2337,41 @@ const PARAM_LABEL = { service_tier: '服务档' };
  * 现在的顺序按「先结论、后证据」：
  *   价签 → 概览 → 计费怎么算（中文）→ 每档实际单价 → 按用量单价 → 原始表达式（折叠）
  */
-function modelDetailNodes(model, data) {
+function modelDetailNodes(model, data, agg = null) {
   const nodes = [];
   const pricing = model.pricing || {};
   const billing = data.billing || null;
   const priceKind = pricing.kind || 'unknown';
   const isAuto = model.group === 'auto' || model.groupAuto === true;
+  const groupCount = agg && agg.groupCount > 1 ? agg.groupCount : null;
 
   // ── 1. 价签：详情页最该先被看到的东西 ──────────────────
   nodes.push(priceTiles(pricing, billing, { isAuto, priceKind }));
 
   // ── 2. 概览 ────────────────────────────────────────────
-  nodes.push(h('dl', { class: 'kv-grid' },
-    h('dt', { text: '厂商' }), h('dd', { text: model.vendor || '—' }),
-    h('dt', { text: '类型' }), h('dd', { text: KIND_LABEL[model.kind] || model.kind || '—' }),
-    h('dt', { text: '上下文' }), h('dd', { class: 'mono', text: model.context ? fmtInt(model.context) : '—' }),
-    h('dt', { text: '端点' }), h('dd', { class: 'mono', text: (model.endpoints || []).join(' · ') || '—' }),
-    h('dt', { text: '分组' }), h('dd', { text: model.group || '—' }),
-    h('dt', { text: '分组倍率' }), h('dd', { class: 'mono', text: model.groupRatio != null && Number(model.groupRatio) > 0 ? fmtRatio(model.groupRatio) : '—' }),
-    h('dt', { text: '模型 id' }), h('dd', { class: 'mono' }, model.id || '—'),
-  ));
+  // 值为空的项直接不印：一排「—」只是噪音，不传递任何信息。
+  const kv = (k, v, mono) => (v ? [h('dt', { text: k }), h('dd', { class: mono ? 'mono' : null, text: v })] : []);
+  const ends = (model.endpoints || []).map(endLabel).join(' · ');
+  // 倍率：多分组时给区间（单值会让人以为整张卡就这一个倍率）
+  const ratios = (agg && Array.isArray(agg.groups) ? agg.groups : [])
+    .map((g) => (Number(g.ratio) > 0 ? Number(g.ratio) : null))
+    .filter((r) => r !== null);
+  const ratioText = ratios.length
+    ? (Math.min(...ratios) === Math.max(...ratios)
+      ? fmtRatio(Math.min(...ratios))
+      : `${fmtRatio(Math.min(...ratios))}–${fmtRatio(Math.max(...ratios))}`)
+    : (model.groupRatio != null && Number(model.groupRatio) > 0 ? fmtRatio(model.groupRatio) : '');
+
+  const kvParts = [
+    kv('厂商', model.vendor || (agg && agg.vendor)),
+    kv('类型', KIND_LABEL[model.kind] || model.kind || (agg && KIND_LABEL[agg.kind])),
+    kv('上下文', model.context ? fmtInt(model.context) : (agg && agg.context ? fmtInt(agg.context) : ''), true),
+    kv('端点', ends, true),
+    kv('分组', groupCount ? `${groupCount} 个（下方横向比较）` : (model.group || '')),
+    kv('分组倍率', ratioText, true),
+    kv('模型 id', model.id || (agg && agg.id), true),
+  ].flat();
+  if (kvParts.length) nodes.push(h('dl', { class: 'kv-grid' }, ...kvParts));
 
   if (model.description) nodes.push(h('p', { class: 'hint', text: model.description }));
 
@@ -2318,18 +2441,23 @@ function modelDetailNodes(model, data) {
   // ── 6. 按分组定价：同一个模型在不同分组里的价格 ──────────
   const siblings = Array.isArray(data.siblings) ? data.siblings : [];
   if (siblings.length > 1) {
+    const td = (cls, child) => h('td', { class: cls || null }, child);
     nodes.push(h('section', { class: 'dtl-section' },
       h('h3', { class: 'dtl-h3', text: '按分组定价' }),
+      // 一句引导：这张表在比什么、价差从哪来。表头只说明了列名。
+      h('p', {
+        class: 'dtl-lead',
+        text: `同一个模型在这些分组里各卖一份，价差来自分组倍率。当前用的是「${GROUP_ALIAS[model.group] || model.group}」，其余分组按倍率从低到高排。`,
+      }),
       tableEl(['分组', '倍率', { label: '输入', cls: 'num' }, { label: '输出', cls: 'num' }, { label: '缓存读取', cls: 'num' }],
-        siblings.map((s) => [
-          { node: h('span', { class: 'sib-group' + (s.current ? ' is-current' : '') },
+        siblings.map((s) => h('tr', { class: s.current ? 'is-current-row' : null },
+          td(null, h('span', { class: 'sib-group' + (s.current ? ' is-current' : '') },
             h('span', { text: GROUP_ALIAS[s.group] || s.group }),
-            s.current ? h('span', { class: 'sib-now', text: '当前' }) : null) },
-          { text: Number(s.groupRatio) > 0 ? fmtRatio(s.groupRatio) : (s.auto ? '按通道' : '—'), cls: 'num' },
-          { text: s.input || '—', cls: 'num' },
-          { text: s.output || '—', cls: 'num' },
-          { text: s.cache || '—', cls: 'num' },
-        ]),
+            s.current ? h('span', { class: 'sib-now', text: '当前' }) : null)),
+          td('num', Number(s.groupRatio) > 0 ? fmtRatio(s.groupRatio) : (s.auto ? '按通道' : '—')),
+          td('num', s.input || '—'),
+          td('num', s.output || '—'),
+          td('num', s.cache || '—'))),
         { empty: '站点没有给出这个模型的分组价格。' }),
     ));
   }

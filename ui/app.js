@@ -669,14 +669,31 @@ function iconImg(file, size = 14) {
   return img;
 }
 
-/** fmtTok 把一个「每百万 token」的数值按当前单位（M/K）印出来。 */
+/**
+ * 价格单位：/1M（每百万 token）与 /272K（每 272K token）。
+ *
+ * 272K 不是随手挑的数：站点给 GPT 类模型的分档线就是 272000
+ * （`len <= 272000 ? short_context : long_context`）。卡片上表只展示
+ * 「≤272K」那一档——也就是默认首档——所以 /272K 对分档模型和普通模型
+ * 是同一种线性折算：每 272K 价 = 每百万价 × 0.272。272K 以上那一档
+ * 只在详情抽屉的分档表里出现，不混进卡片。
+ */
+const UNIT_SCALE = { M: 1, '272K': 272000 / 1e6 };
+const UNIT_TEXT = { M: '1M', '272K': '272K' };
+const unitScale = (unit) => UNIT_SCALE[unit] || 1;
+const unitText = (unit) => UNIT_TEXT[unit] || '1M';
+/** 小数位：/1M 沿用站点的 2/4 位；/272K 数值小一档，相应多两位。 */
+function unitDigits(v, unit) {
+  if (unit === '272K') return v >= 0.01 ? 4 : 6;
+  return v >= 0.01 ? 2 : 4;
+}
+
+/** fmtTok 把一个「每百万 token」的数值按当前单位印出来。 */
 function fmtTok(num, unit) {
   if (!Number.isFinite(num)) return '—';
-  const v = unit === 'K' ? num / 1000 : num;
-  // 位数跟站点原来的写法一致：/M 时 ≥0.01 两位、更小四位；/K 再补两位。
-  const digits = unit === 'K' ? (v >= 0.01 ? 4 : 6) : (v >= 0.01 ? 2 : 4);
+  const v = num * unitScale(unit);
   const cur = cache.state && cache.state.currency;
-  return `${(cur && cur.symbol) || '$'}${v.toFixed(digits)}/${unit}`;
+  return `${(cur && cur.symbol) || '$'}${v.toFixed(unitDigits(v, unit))}/${unitText(unit)}`;
 }
 
 /** 卡片的三个价格格：有数值就按单位换算，没有就退回服务端给的字符串。 */
@@ -705,26 +722,30 @@ function billingLabel(pricing, isAuto, priceKind) {
 /** fmtTokValue 只给数值（不带单位），列表里单位单独占一行。 */
 function fmtTokValue(num, unit) {
   if (!Number.isFinite(num)) return '—';
-  const v = unit === 'K' ? num / 1000 : num;
-  const digits = unit === 'K' ? (v >= 0.01 ? 4 : 6) : (v >= 0.01 ? 2 : 4);
+  const v = num * unitScale(unit);
   const cur = cache.state && cache.state.currency;
-  return `${(cur && cur.symbol) || '$'}${v.toFixed(digits)}`;
+  return `${(cur && cur.symbol) || '$'}${v.toFixed(unitDigits(v, unit))}`;
 }
 
 /**
- * fmtRange 跨分组的价格区间：`$0.12–0.32/M`。
+ * fmtRange 跨分组的价格区间：`$0.12–0.32/1M`。
  *
- * 只写一次符号、只写一次单位 —— `$0.12/M–$0.32/M` 又长又难看，一列里塞不下。
- * 两端用同一个精度，避免出现 `$0.0032–0.12/M` 这种一头 4 位一头 2 位的怪东西。
+ * 只写一次符号、只写一次单位 —— `$0.12/1M–$0.32/1M` 又长又难看，一列里塞不下。
+ * 两端用同一个精度，避免出现 `$0.0032–0.12/1M` 这种一头 4 位一头 2 位的怪东西。
  */
 function fmtRange(span, unit) {
+  return fmtRangeBare(span, unit) + '/' + unitText(unit);
+}
+
+/** fmtRangeBare 只要 `$0.12–0.32`，单位由调用方另起一行印。 */
+function fmtRangeBare(span, unit) {
   const cur = cache.state && cache.state.currency;
   const sym = (cur && cur.symbol) || '$';
-  const scale = unit === 'K' ? 1000 : 1;
-  const lo = span.min / scale;
-  const hi = span.max / scale;
-  const digits = unit === 'K' ? (hi >= 0.01 ? 4 : 6) : (hi >= 0.01 ? 2 : 4);
-  return `${sym}${lo.toFixed(digits)}–${hi.toFixed(digits)}/${unit}`;
+  const scale = unitScale(unit);
+  const lo = span.min * scale;
+  const hi = span.max * scale;
+  const digits = unitDigits(hi, unit);
+  return `${sym}${lo.toFixed(digits)}–${hi.toFixed(digits)}`;
 }
 
 /** 端点 id → 看得懂的名字。
@@ -798,6 +819,8 @@ function renderCatalog() {
 
   // 一行 = 一个「分组 × 模型」，但一张卡 = 一个模型。
   // 聚合在这里做（而不是服务端）：筛选与排序都基于行，展示才需要合并。
+  // 价格按「每百万 token」存，/272K 视图只在展示时乘 0.272——同一条价格
+  // 只是换个单位，不影响聚合与排序的取值。
   const rows = aggregateRows(matched);
 
   if (meta) {
@@ -879,7 +902,7 @@ function modelRow(agg, groupMap) {
   const open = () => openModelDrawer(agg);
 
   // 列宽固定，区间比单值长，这里用不带单位的紧凑写法（$0.12–0.32），单位单独一行。
-  const bareRange = (span) => fmtRange(span, unit).replace(`/${unit}`, '');
+  const bareRange = (span) => fmtRangeBare(span, unit);
   const pair = (span, fallback) => {
     if (span && !span.same) return [h('span', { class: 'ml-p-v', text: bareRange(span) })];
     const n = span ? span.min : null;
@@ -893,11 +916,11 @@ function modelRow(agg, groupMap) {
       h('span', { class: 'ml-p-line' },
         h('span', { class: 'ml-p-k', text: '入' }), ...pair(agg.prices?.input, pricing.input),
         h('span', { class: 'ml-p-k', text: '出' }), ...pair(agg.prices?.output, pricing.output)),
-      h('span', { class: 'ml-p-unit', text: `${(cache.state && cache.state.currency && cache.state.currency.symbol) || '$'} / 1${unit}` }));
+      h('span', { class: 'ml-p-unit', text: `${(cache.state && cache.state.currency && cache.state.currency.symbol) || '$'} / ${unitText(unit)}` }));
 
   const cacheSpan = agg.prices?.cache;
   const cacheText = cacheSpan && !cacheSpan.same
-    ? fmtRange(cacheSpan, unit).replace(`/${unit}`, '')
+    ? fmtRangeBare(cacheSpan, unit)
     : (cacheSpan ? fmtTokValue(cacheSpan.min, unit) : pricing.cache);
 
   return h('div', {
@@ -921,7 +944,7 @@ function modelRow(agg, groupMap) {
 
   h('span', { class: 'ml-cell ml-cache' },
     h('span', { class: 'ml-c-v', text: cacheText || '—' }),
-    cacheText ? h('span', { class: 'ml-c-unit', text: `/ 1${unit}` }) : null),
+    cacheText ? h('span', { class: 'ml-c-unit', text: `/ ${unitText(unit)}` }) : null),
 
   h('span', { class: 'ml-cell ml-vendor' },
     vendorBadge(agg.vendor, { size: 13 }),
@@ -1219,8 +1242,9 @@ function autoDescription(m, pricing) {
   const p = pricing || m.pricing || {};
   const billing = p.kind === 'tiered' ? '分档计费'
     : p.kind === 'percall' ? '按次/按秒计费'
-      : p.kind === 'ratio' ? '按倍率计费'
-        : '';
+      : p.kind === 'flat' ? '按量计费'
+        : p.kind === 'ratio' ? '按倍率计费'
+          : '';
   const price = p.input && p.input !== '价格未知'
     ? (p.kind === 'percall' ? `，单价 ${p.input}` : `，输入 ${p.input}`)
     : '';
@@ -1247,10 +1271,10 @@ function bindCatalogControls() {
     search.focus();
   });
 
-  // 价格单位：/1M ↔ /1K
+  // 价格单位：/1M ↔ /272K
   for (const btn of $$('#unit-seg button')) {
     btn.addEventListener('click', () => {
-      filters.unit = btn.dataset.unit === 'K' ? 'K' : 'M';
+      filters.unit = btn.dataset.unit === '272K' ? '272K' : 'M';
       for (const other of $$('#unit-seg button')) other.setAttribute('aria-pressed', String(other === btn));
       if (cache.catalog) renderCatalog();
     });
@@ -3054,9 +3078,15 @@ function billingFacts(billing, { isAuto, priceKind, note } = {}) {
   if (billing && Array.isArray(billing.tiers) && billing.tiers.length) {
     const names = billing.tiers.map((t) => t.name).filter(Boolean);
     const hasTokenPrices = billing.tiers.some((t) => t.prices && Object.keys(t.prices).length);
-    facts.push(hasTokenPrices
-      ? `共 ${billing.tiers.length} 档：${names.join(' / ')}。下表每一档的单价已经乘上分组倍率 ${fmtRatio(billing.groupRatio)}。`
-      : `共 ${billing.tiers.length} 档：${names.join(' / ')}。这些档按用量计费，单价见下表。`);
+    if (hasTokenPrices && billing.tiers.length === 1) {
+      // 单档不是「分档」：这类模型价格是平的，能变的只有 fast / 优先级这类
+      // 整单倍率（见下面「条件乘数」一节）。
+      facts.push(`只有一个档位（${names[0] || '标准'}）：单价不随上下文或时段变化。`);
+    } else {
+      facts.push(hasTokenPrices
+        ? `共 ${billing.tiers.length} 档：${names.join(' / ')}。下表每一档的单价已经乘上分组倍率 ${fmtRatio(billing.groupRatio)}。`
+        : `共 ${billing.tiers.length} 档：${names.join(' / ')}。这些档按用量计费，单价见下表。`);
+    }
   }
 
   const usageRows = billing && Array.isArray(billing.usageRows) ? billing.usageRows : [];

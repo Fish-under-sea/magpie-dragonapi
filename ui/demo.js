@@ -184,16 +184,43 @@ export function createDemoApi() {
         name, vendor,
         kind,
         groups: groups.map((g) => ({ id: g, ratio: G[g], note: '', auto: false })),
-        pricing: { kind: 'token', input: `$${inPrice}/M`, output: `$${outPrice}/M`, cache: `$${cachePrice}/M` },
+        // 数值也一并给：没有 inputNum 这类数字，切 /1M ↔ /272K 会毫无变化，
+        // 演示模式就验不出单位换算。
+        pricing: {
+          kind: 'token',
+          input: `$${inPrice}/M`, output: `$${outPrice}/M`, cache: `$${cachePrice}/M`,
+          inputNum: Number(inPrice), outputNum: Number(outPrice), cacheNum: Number(cachePrice),
+        },
         desc, ...extra,
       })
       return {
         ok: true,
         models: [
           spec('claude-fable-5-2', 'Anthropic', 'chat', ['claude-cursor', 'claude-max企业'], '3.20', '16.00', '0.08', 'Anthropic 的对话模型，支持 Anthropic 兼容 / OpenAI 兼容端点；按倍率计费。'),
-          spec('claude-opus-5-5', 'Anthropic', 'chat', ['claude-kiro', 'claude-kiro正价', 'claude-cursor', 'claude-max企业'], '0.40', '2.00', '0.02', 'Anthropic 的对话模型，分档计费。'),
+          spec('claude-opus-5-5', 'Anthropic', 'chat', ['claude-kiro', 'claude-kiro正价', 'claude-cursor', 'claude-max企业'], '0.40', '2.00', '0.02', 'Anthropic 的对话模型，按量计费；fast 档整单 ×2。', {
+            // 真实站点：`tier("standard", …) * (param("speed") == "fast" ? 2 : 1)`。
+            // 单档 + 条件倍率，不是上下文分档。
+            pricing: {
+              kind: 'flat',
+              input: '$0.40/M', output: '$2.00/M', cache: '$0.02/M',
+              inputNum: 0.4, outputNum: 2, cacheNum: 0.02,
+              tierCount: 1,
+              note: '表达式计费（standard）；整单倍率 speed=fast ×2',
+            },
+          }),
           spec('claude-sonnet-5-5', 'Anthropic', 'chat', ['claude-kiro', 'claude-kiro正价', 'claude-max企业'], '0.20', '1.00', '0.01', 'Anthropic 的对话模型，按倍率计费。'),
-          spec('gpt-6.1-sol', 'OpenAI', 'chat', ['gpt-plus', 'gpt-pro', 'gpt-promax'], '1.75', '14.00', '0.18', '通用推理与工具调用，支持多轮工作流。'),
+          spec('gpt-6.1-sol', 'OpenAI', 'chat', ['gpt-plus', 'gpt-pro', 'gpt-promax'], '1.75', '14.00', '0.18', '通用推理与工具调用，支持多轮工作流。', {
+            // 真实站点上这个模型的表达式是 `len <= 272000 ? short_context : long_context`。
+            // 卡片上表给的是 ≤272K 那一档（与 /1M 同源），/272K 只是把单价折成
+            // 每 272K token；272K 以上那档只在详情抽屉的分档表里出现。
+            pricing: {
+              kind: 'tiered',
+              input: '$1.75/M', output: '$14.00/M', cache: '$0.18/M',
+              inputNum: 1.75, outputNum: 14, cacheNum: 0.18,
+              tierCount: 2,
+              note: '2 档（short_context / long_context），上表是「short_context」档（≤272K）；整单倍率 service_tier=priority/fast/ultrafast ×2',
+            },
+          }),
           spec('gemini-3-pro-preview', 'Google', 'chat', ['gemini'], '2.00', '12.00', '0.20', '多模态理解与复杂推理。'),
           spec('deepseek-v3.2', 'DeepSeek', 'chat', ['国模'], '0.28', '0.42', '0.03', '通用对话、代码与中文写作。'),
           spec('gpt-image-2.6', 'OpenAI', 'image', ['image'], '0.04', '0', '0', '根据提示生成或编辑图像。', { pricing: { kind: 'perimage', input: '$0.20/张', output: '$0.20/张' } }),

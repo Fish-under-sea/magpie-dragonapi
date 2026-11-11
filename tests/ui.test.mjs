@@ -420,10 +420,11 @@ test('跨分组价格给区间，不假装只有一个价', async () => {
   const js = await (await fetch(base + '/ui/app.js')).text()
   assert.match(js, /function fmtRange\(/, '缺少区间格式化')
   assert.match(js, /with-range/, '卡片应标记区间样式')
-  // 只写一次符号与单位：$0.12–0.32/M，而不是 $0.12/M–$0.32/M
-  const fn = js.match(/function fmtRange\([\s\S]*?\n\}/)
-  assert.ok(fn, '找不到 fmtRange')
+  // 只写一次符号与单位：$0.12–0.32/1M，而不是 $0.12/1M–$0.32/1M
+  const fn = js.match(/function fmtRangeBare\([\s\S]*?\n\}/)
+  assert.ok(fn, '找不到 fmtRangeBare（区间数值本体）')
   assert.match(fn[0], /toFixed\(digits\)/, '两端应用同一精度')
+  assert.match(js, /function fmtRange\(span, unit\) \{\s*return fmtRangeBare\(span, unit\) \+ '\/' \+ unitText\(unit\)/, 'fmtRange 只负责补一次单位')
 })
 
 test('目录聚合走 aggregateRows（一张卡 = 一个模型）', async () => {
@@ -459,16 +460,27 @@ test('没设 PAT 时给引导式空态，不甩红色错误横幅', async () => 
   assert.match(js, /去设置访问令牌/, '应给一条通往 PAT 页的路')
 })
 
-test('广场工具条：价格单位 /1M-/1K、排序、双列-列表都是真功能', async () => {
+test('广场工具条：价格单位 /1M-/272K、排序、双列-列表都是真功能', async () => {
   const html = await (await fetch(base + '/')).text()
   for (const id of ['unit-seg', 'sort-trigger', 'sort-pop', 'view-seg', 'catalog-search']) {
     assert.ok(html.includes('id="' + id + '"'), `工具条缺少 #${id}`)
   }
+  // 单位是 /1M 与 /272K：272K 是站点 GPT 分档线，/1K 太小、看不出档位差
+  assert.match(html, /data-unit="272K"/, '应提供 /272K 单位')
+  assert.ok(html.includes('>/272K<'), '按钮文案应为 /272K')
+  assert.equal(html.includes('data-unit="K"'), false, '/1K 应已换成 /272K')
   const js = await (await fetch(base + '/ui/app.js')).text()
   assert.match(js, /function fmtTok\(/, '缺少按单位换算的格式化函数')
+  assert.match(js, /UNIT_SCALE/, '单位换算应集中在一张表里')
   assert.match(js, /filters\.unit/, '单位应参与渲染')
+  assert.match(js, /aggregateRows\(matched\)/, '聚合与单位无关：价格按每百万存，展示时才折算')
   assert.match(js, /as-list/, '缺少列表视图')
   assert.match(js, /filters\.sort/, '排序应参与渲染')
+
+  // 胶囊高度必须与「默认排序」一致：外框 30px、按钮吃满内高（上一版多出 2px）
+  const css = await (await fetch(base + '/ui/style.css')).text()
+  assert.match(css, /\.market-seg\s*\{[^}]*height:\s*30px/, '.market-seg 应与下拉同高 30px')
+  assert.match(css, /\.market-seg button\s*\{[^}]*height:\s*100%/, '分段按钮应吃满胶囊内高')
 
   // 排序：默认那档叫「默认排序」——站点没有发布时间字段，叫「最新版本」是骗人。
   // 四项齐全，且是自绘弹层（原生 select 弹白底）。

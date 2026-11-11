@@ -1,8 +1,8 @@
 # DragonAPI in Magpie —— 项目约定与经验
 
 ## 命名：包名 / 供应商标识 / 插件头部 三者分清，不要混用
-- **npm 包名**：`package.json.name` = `@fish-under-sea/magpie-dragonapi`，是对外发布名，不随展示改名。
-- **magpie 供应商/插件卡标识**：`magpie.name` 用**包名** `@fish-under-sea/magpie-dragonapi`，不要换成产品名。
+- **npm 包名 + 插件管理器卡片**：`package.json.name` = `@fish-under-sea/magpie-dragonapi`；`magpie.name` 也用包名，插件列表里要能认出这是哪个包。
+- **供应商列表显示名**：`index.mjs` 的 `config` 里 `p.name = 'DragonAPI'`。图二「来自插件」的供应商卡显示产品名，不是包名。
 - **插件内部头部与侧边栏页面名**：`magpie.page.title` / `magpie.page.titles.*` 和 `ui/index.html` 的 `<h1>` = `DragonAPI`。
 - 改其中一处时先确认改的是哪一层，不要「顺手」把另一层一起改掉。
 

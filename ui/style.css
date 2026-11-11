@@ -3441,3 +3441,21 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
 .logs-head-box .logs-toolbar,
 .logs-head-box .logs-filters-adv,
 .logs-head-box .logs-chips-bar { margin: 0; }
+
+/* 访问令牌：顶部两卡完整显示，不在卡片内部滚 */
+#panel-pat { overflow-y: auto; }
+#panel-pat > .grid-2 { flex: 0 0 auto; }
+#panel-pat > .grid-2 > .card { overflow: visible; }
+#panel-pat > .card { flex: 0 0 auto; }
+
+/* 通知改成浮空 toast，固定在右上角，不占布局、不被页面滚动藏起来 */
+.banners {
+  position: fixed; top: 72px; right: 16px; z-index: 300;
+  width: min(420px, calc(100vw - 32px)); max-height: 50vh; overflow: auto;
+  display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+}
+.banners:not(:empty) { margin-top: 0; }
+.banners .banner {
+  pointer-events: auto; background: var(--card);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
+}

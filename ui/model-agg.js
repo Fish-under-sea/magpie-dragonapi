@@ -90,39 +90,8 @@ export function tierRankOf(name) {
   return best === null ? TIER_DEFAULT : best
 }
 
-/**
- * 默认排序：**厂商 → 模型等级 → 版本号从新到旧 → 名称**。
- *
- * 为什么不按「发布时间」：站点每条模型都没有发布时间字段，`pricing_version`
- * 也是全局的。硬拿版本号大小当「最新」会让 `gpt-6.1` 压住 `claude-fable-5-2`
- * 这类跨厂商插队，所以改成先分厂商、再看等级、最后比数字——同一厂商同一
- * 等级的型号挨在一起，数字大的在前，顺序可预测、能解释。
- *
- * @param a,b  聚合后的模型
- * @param catOf (agg) => 类别 id（claude / gpt / …）用于厂商分区先后
- * @param catOrder 类别顺序（与侧栏一致）
- */
-export function compareDefault(a, b, catOf, catOrder = []) {
-  const rankOf = (agg) => {
-    const c = catOf ? catOf(agg) : 'other'
-    const i = catOrder.indexOf(c)
-    return i < 0 ? catOrder.length : i
-  }
-  const ca = rankOf(a)
-  const cb = rankOf(b)
-  if (ca !== cb) return ca - cb
-
-  // 厂商：空厂商排在本类别末尾
-  const va = a.vendor || '\uffff'
-  const vb = b.vendor || '\uffff'
-  const vc = String(va).localeCompare(String(vb), 'zh')
-  if (vc) return vc
-
-  const ta = tierRankOf(a.name)
-  const tb = tierRankOf(b.name)
-  if (ta !== tb) return ta - tb
-
-  // 版本从新到旧；没有版本号的排到本组末尾
+/** 版本从新到旧；没有版本号的排到本组末尾；同版本按名称。 */
+export function byVersionDesc(a, b) {
   const x = versionRank(a.name)
   const y = versionRank(b.name)
   if (x && y) {
@@ -133,10 +102,81 @@ export function compareDefault(a, b, catOf, catOrder = []) {
     }
   } else if (x) return -1
   else if (y) return 1
-
   return String(a.name || '').localeCompare(String(b.name || ''), 'zh')
 }
 
+/**
+ * 默认排序：**厂商 → 等级分道 → 轮转取版本**。
+ *
+ * 不能只按「等级 → 版本」排成一片：那样 Claude 区会连着出现 fable-5-2、
+ * fable-5-1、fable-5 三张同等级卡，再轮到 opus 一大片。用户要的是
+ * 「每个等级轮流往下取一个版本」：
+ *
+ *   f5.2 → o5.5 → s5.5 → h5.5 → f5.1 → o5.5 → s5 → …
+ *
+ * 所以不是比较器，而是「分道 + 轮转」：
+ *   1. 按类别（侧栏顺序）与厂商分桶，桶之间按类别顺序拼接；
+ *   2. 桶内按等级分道（fable / opus / sonnet / haiku …，即 TIER_WORDS 的档位）；
+ *   3. 每道内部按版本从新到旧；
+ *   4. 各道按等级从高到低轮流取一个，取完为止。
+ *
+ * 只有一道时（例如 GPT 区几乎全在默认档），结果就是普通的版本降序。
+ */
+export function orderDefault(aggs, { catOf, catOrder = [] } = {}) {
+  const list = Array.isArray(aggs) ? aggs : []
+  const catRank = (a) => {
+    const c = catOf ? catOf(a) : 'other'
+    const i = catOrder.indexOf(c)
+    return i < 0 ? catOrder.length : i
+  }
+
+  // 1. 分桶：类别 + 厂商。空厂商排在本类别末尾。
+  const buckets = new Map()
+  for (const a of list) {
+    const rank = catRank(a)
+    const vendor = a.vendor || '\uffff'
+    const key = `${rank}\u0000${vendor}`
+    let b = buckets.get(key)
+    if (!b) {
+      b = { rank, vendor, items: [] }
+      buckets.set(key, b)
+    }
+    b.items.push(a)
+  }
+
+  const out = []
+  const orderedBuckets = [...buckets.values()]
+    .sort((x, y) => x.rank - y.rank || String(x.vendor).localeCompare(String(y.vendor), 'zh'))
+
+  for (const bucket of orderedBuckets) {
+    // 2. 分道：等级 → 该等级的模型（道内按版本降序）
+    const lanes = new Map()
+    for (const a of bucket.items) {
+      const t = tierRankOf(a.name)
+      const lane = lanes.get(t) || []
+      lane.push(a)
+      lanes.set(t, lane)
+    }
+    const laneOrder = [...lanes.keys()].sort((x, y) => x - y)
+    for (const t of laneOrder) lanes.get(t).sort(byVersionDesc)
+
+    // 3. 轮转：每轮各道取一个，直到取完
+    const cursor = new Map(laneOrder.map((t) => [t, 0]))
+    let remaining = bucket.items.length
+    while (remaining > 0) {
+      for (const t of laneOrder) {
+        const lane = lanes.get(t)
+        const i = cursor.get(t)
+        if (i >= lane.length) continue
+        out.push(lane[i])
+        cursor.set(t, i + 1)
+        remaining -= 1
+      }
+    }
+  }
+
+  return out
+}
 /**
  * rows：目录里的行（每行一个分组×模型，字段见 lib/catalog.mjs 的 buildCatalog）。
  * 返回聚合后的模型数组，每个元素带 groups（全部分组，按倍率升序）。

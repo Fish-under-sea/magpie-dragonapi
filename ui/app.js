@@ -13,7 +13,7 @@
 
 // 聚合与默认排序单独成模块（纯函数、可单测）：站点把同一个模型在十几个分组里
 // 各卖一份，目录是「分组 × 模型」的行表，而人要看的是「一个模型一张卡」。
-import { aggregateRows, compareDefault, focusGroupOf } from './model-agg.js';
+import { aggregateRows, focusGroupOf, orderDefault } from './model-agg.js';
 
 'use strict';
 
@@ -865,7 +865,10 @@ function renderCatalog() {
   } else if (filters.sort === 'name') {
     rows.sort((a, b) => String(a.name).localeCompare(String(b.name), 'zh'));
   } else {
-    rows.sort((a, b) => compareDefault(a, b, catOfAgg, CATEGORY_ORDER));
+    // 默认排序不是比较器能表达的：它要「分等级道、轮流取版本」，
+    // 所以是重排整个数组（见 model-agg.js 的 orderDefault）。
+    const ordered = orderDefault(rows, { catOf: catOfAgg, catOrder: CATEGORY_ORDER });
+    rows.splice(0, rows.length, ...ordered);
   }
 
   body.className = 'model-grid' + (filters.view === 'list' ? ' as-list' : '');

@@ -406,7 +406,7 @@ test('跨分组价格给区间，不假装只有一个价', async () => {
 
 test('目录聚合走 aggregateRows（一张卡 = 一个模型）', async () => {
   const js = await (await fetch(base + '/ui/app.js')).text()
-  assert.match(js, /import \{ aggregateRows, compareDefault, focusGroupOf \} from '\.\/model-agg\.js'/, '应导入聚合模块')
+  assert.match(js, /import \{ aggregateRows, focusGroupOf, orderDefault \} from '\.\/model-agg\.js'/, '应导入聚合模块')
   assert.match(js, /const rows = aggregateRows\(matched\)/, 'renderCatalog 应聚合后再渲染')
 })
 
@@ -455,8 +455,8 @@ test('广场工具条：价格单位 /1M-/1K、排序、双列-列表都是真�
     assert.ok(html.includes(want), `排序菜单缺少「${want}」`)
   }
   assert.equal(html.includes('最新版本'), false, '不该再出现「最新版本」这个说法')
-  // 默认排序的规则在 model-agg.js：厂商 → 等级 → 版本号
-  assert.match(js, /compareDefault/, '默认排序应走 compareDefault')
+  // 默认排序的规则在 model-agg.js：厂商 → 等级分道 → 轮转取版本
+  assert.match(js, /orderDefault/, '默认排序应走 orderDefault')
   assert.equal(/function byLatestVersion\(/.test(js), false, '旧的按版本号排序应已移除')
   assert.equal(html.includes('id="sort-select"'), false, '排序不该再用原生 select，弹层跟不了深色主题')
   assert.equal(js.includes('kind-chips'), false, '类型分段控件应已移除（分类在侧栏）')

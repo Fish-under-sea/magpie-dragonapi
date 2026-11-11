@@ -4,7 +4,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { aggregateRows, compareDefault, focusGroupOf, spanOf, tierRankOf, versionRank } from '../ui/model-agg.js'
+import { aggregateRows, byVersionDesc, focusGroupOf, orderDefault, spanOf, tierRankOf, versionRank } from '../ui/model-agg.js'
 
 /** 造一行目录数据，字段与 lib/catalog.mjs 的输出一致。 */
 function row(group, ratio, input, output, cache, extra = {}) {
@@ -175,7 +175,7 @@ function agg(name, vendor, group = 'g1') {
 
 const CATS = ['claude', 'gpt', 'gemini', 'grok', 'guomo', 'image', 'video', 'other']
 const catOfName = (a) => (/claude/.test(a.name) ? 'claude' : /gpt/.test(a.name) ? 'gpt' : 'other')
-const sortList = (list) => [...list].sort((a, b) => compareDefault(a, b, catOfName, CATS))
+const sortList = (list) => orderDefault(list, { catOf: catOfName, catOrder: CATS })
 
 test('默认排序：先按厂商分区，不跨厂商插队', () => {
   // gpt-6.1 的版本号比 fable-5-2 大，但厂商分区在前，不能压过去
@@ -201,4 +201,47 @@ test('默认排序：空厂商排在本类别末尾，不跳到最前', () => {
 test('默认排序：没有版本号的排在同组末尾', () => {
   const out = sortList([agg('claude-preview', 'Anthropic'), agg('claude-opus-5', 'Anthropic')])
   assert.deepEqual(out.map((x) => x.name), ['claude-opus-5', 'claude-preview'])
+})
+
+test('默认排序：等级分道轮转，不把同一等级排成一片', () => {
+  const list = [
+    agg('claude-fable-5', 'Anthropic'),
+    agg('claude-fable-5-2', 'Anthropic'),
+    agg('claude-opus-5-5', 'Anthropic'),
+    agg('claude-opus-5', 'Anthropic'),
+    agg('claude-sonnet-5-5', 'Anthropic'),
+    agg('claude-sonnet-5', 'Anthropic'),
+    agg('claude-haiku-5-5', 'Anthropic'),
+    agg('claude-haiku-5', 'Anthropic'),
+  ]
+  const names = sortList(list).map((x) => x.name)
+  // f5.2 → o5.5 → s5.5 → h5.5 → f5 → o5 → s5 → h5
+  assert.deepEqual(names, [
+    'claude-fable-5-2', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5',
+    'claude-fable-5', 'claude-opus-5', 'claude-sonnet-5', 'claude-haiku-5',
+  ])
+})
+
+test('默认排序：只要还有别的等级可排，就不出现同等级相邻', () => {
+  const list = []
+  for (const g of ['fable', 'opus', 'sonnet', 'haiku']) {
+    for (const v of ['5-3', '5-2', '5-1', '5']) list.push(agg(`claude-${g}-${v}`, 'Anthropic'))
+  }
+  const out = sortList(list)
+  const gradeOf = (n) => n.split('-')[1]
+  for (let i = 1; i < out.length - 4; i++) {
+    assert.notEqual(gradeOf(out[i].name), gradeOf(out[i - 1].name),
+      `第 ${i + 1} 个与上一个同等级（还有别的等级没排完）：${out[i - 1].name} → ${out[i].name}`)
+  }
+})
+
+test('默认排序：单一等级时退化为版本降序', () => {
+  const out = sortList([agg('gpt-6-sol', 'OpenAI'), agg('gpt-5.6', 'OpenAI'), agg('gpt-6.1-sol', 'OpenAI')])
+  assert.deepEqual(out.map((x) => x.name), ['gpt-6.1-sol', 'gpt-6-sol', 'gpt-5.6'])
+})
+
+test('byVersionDesc：缺版本号的排末尾，- 与 . 等价', () => {
+  const out = [agg('claude-x-preview', 'Anthropic'), agg('claude-x-5.5', 'Anthropic'), agg('claude-x-5-6', 'Anthropic')]
+    .sort(byVersionDesc)
+  assert.deepEqual(out.map((x) => x.name), ['claude-x-5-6', 'claude-x-5.5', 'claude-x-preview'])
 })

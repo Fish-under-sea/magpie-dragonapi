@@ -1566,9 +1566,11 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  /* 卡片高度由内容决定：拉伸的话，同排卡片会被最高的那张撑高，
-     中间就空出一段——这正是「详情没挪上去」的来源。 */
-  align-items: start;
+  /* 同排卡片必须等高。上一版这里写的是 start，理由是不让最高的那张把同排
+     撑高、卡内空出一段——但那样每排高度都不一样，整屏看过去参差。
+     现在两头都顾：拉伸取齐，卡内各块（头/说明/价格/分组）预留固定高度，
+     余量只会落到页脚上方的一点点空隙，靠 .mc-foot 的 margin-top:auto 收走。 */
+  align-items: stretch;
 }
 /* 空态与加载态要占满整行，否则会缩成半宽的一格 */
 .model-grid > .empty,
@@ -1679,7 +1681,13 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 .mc-audio { border-left: 2px solid color-mix(in srgb, #3f6fb0 65%, transparent); }
 .mc-embedding { border-left: 2px solid color-mix(in srgb, #2f8f68 65%, transparent); }
 
-.mc-head { display: flex; align-items: center; gap: 9px; }
+.mc-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  /* 有厂商行与没有厂商行，高度差一整行（26 / 36）。预留到位，卡片才对齐。 */
+  min-height: 36px;
+}
 .mc-head > .grow { flex: 1; min-width: 0; }
 .mc-vicon {
   display: inline-flex;
@@ -1759,6 +1767,8 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 6px;
+  /* 区间写法比单值字号小一点（10.5px），高度会差 2px；定住高度免得整卡抖动 */
+  min-height: 35px;
 }
 .mc-prices.one { grid-template-columns: minmax(0, 1fr); }
 .mc-prices > div {
@@ -1824,7 +1834,10 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 
 /* 页脚只剩「详情」：紧跟内容，不再吸到卡底，避免中间留一片空白 */
 .mc-foot {
-  margin-top: 7px;
+  /* auto 把「详情」按到卡底：拉伸后多出来的高度集中到这里，
+     所有卡的详情在同一基线上 */
+  margin-top: auto;
+  padding-top: 7px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -1889,6 +1902,13 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   align-items: center;
 }
 .mc-gb { flex: 0 0 auto; }
+/* 分组个数是这张卡唯一的变量（1 个到 4 个）。预留两行位置，
+   1 个分组和 4 个分组的卡片才不会一高一低；超过两行才让卡片真的变高。 */
+.mc-line-groups {
+  min-height: 40px;
+  align-items: flex-start;
+}
+
 /* 分组数量：只在多于一个分组时出现，靠右贴齐，不抢分组名的位置 */
 .mc-gcount {
   flex: none;

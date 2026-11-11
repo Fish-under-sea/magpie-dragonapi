@@ -255,13 +255,14 @@ test('/api/ping 的版本来自 package.json，不是硬编码', async () => {
 })
 
 // ── 模型广场卡片网格 ────────────────────────────────────────────────
-// 用户报过「卡片不等高」。等高不是靠调数值，而是三处结构同时到位：
-//   网格 align-items: stretch（别写 start）、卡片 flex 纵向、内容高度一致。
-// 少任何一处，同一排卡片就会参差，所以这里逐条钉住。
-test('卡片高度跟着内容走：网格不拉伸，详紧紧跟内容', async () => {
-  // 曾经要求「等高」，于是用 stretch 把矮卡撑到和最高的一样高，结果矮卡中间
-  // 空出一段、看起来像「详情没挪上去」。现在改成按内容定高 + 内容本身对齐
-  // （描述锁两行、组名单行省略、端点最多两个），高度自然一致。
+// 用户报过两次「卡片不等高」，两次的要求其实是同一个：整屏看过去要齐。
+// 中间有一版改成 align-items:start（按内容定高），理由是 stretch 会让矮卡
+// 中间空一段；但那样每一排高度都不同，整屏参差——比中间空一段更难看。
+//
+// 现在的方案是两头都要：网格 stretch 取齐，同时把卡内各块高度归一
+// （头 / 说明 / 价格 / 分组 各预留固定高度），余量只剩页脚上方一点点，
+// 由 .mc-foot 的 margin-top:auto 收走。这样每排等高、卡内也不空。
+test('卡片等高：网格 stretch + 卡内各块预留高度 + 页脚吸底', async () => {
   const css = (await (await fetch(base + '/ui/style.css')).text()).replace(/\/\*[\s\S]*?\*\//g, '')
 
   const grid2 = css.match(/\.grid-2\s*\{[^}]*\}/)
@@ -270,20 +271,31 @@ test('卡片高度跟着内容走：网格不拉伸，详紧紧跟内容', async
 
   const modelGrid = css.match(/(?:^|\n)\.model-grid\s*\{[^}]*\}/m)
   assert.ok(modelGrid, '找不到 .model-grid')
-  assert.match(modelGrid[0], /align-items:\s*start/, '.model-grid 必须按内容定高，不要 stretch')
+  assert.match(modelGrid[0], /align-items:\s*stretch/, '.model-grid 必须 stretch（同排等高）')
 
   const foot = css.match(/(?:^|\n)\.mc-foot\s*\{[^}]*\}/m)
   assert.ok(foot, '找不到 .mc-foot')
-  // 页脚只放「详情」，紧跟内容右对齐——不再吸到卡底（那会在中间留一片空白）
   assert.match(foot[0], /justify-content:\s*flex-end/, '详情应右对齐')
-  assert.equal(/margin-top:\s*auto/.test(foot[0]), false, '详情不要吸到卡底，避免空白')
+  assert.match(foot[0], /margin-top:\s*auto/, '页脚必须 margin-top:auto，把余量收在卡底')
 
   const mc = css.match(/(?:^|\n)\.mc\s*\{[^}]*\}/m)
   assert.ok(mc, '找不到 .mc')
   assert.match(mc[0], /display:\s*flex/, '.mc 必须是 flex 容器')
   assert.match(mc[0], /flex-direction:\s*column/, '.mc 必须纵向排布')
 
-  // 组名单行省略：换行会把别的卡撑出空白
+  // 卡内四个高度会变的地方都必须预留高度，否则 stretch 仍会在卡内留空段
+  for (const [sel, why] of [
+    ['\\.mc-head', '有/无厂商行差一整行'],
+    ['\\.mc-desc', '描述一行与两行'],
+    ['\\.mc-prices', '区间写法与单值字号不同'],
+    ['\\.mc-line-groups', '分组 1 个与 4 个差一行'],
+  ]) {
+    const rule = css.match(new RegExp(`(?:^|\\n)${sel}\\s*\\{[^}]*\\}`, 'm'))
+    assert.ok(rule, `找不到 ${sel} 规则`)
+    assert.match(rule[0], /min-height:\s*(?:\d|calc\()/, `${sel} 必须预留高度（${why}）`)
+  }
+
+  // 组名本身仍不折行（折在「国模_原厂」中间读不出来），换行发生在 .mc-groups 层
   const group = css.match(/\.mc-group\s*\{[^}]*\}/)
   assert.ok(group, '找不到 .mc-group')
   assert.match(group[0], /white-space:\s*nowrap/, '组名要单行省略')

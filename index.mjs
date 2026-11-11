@@ -181,7 +181,7 @@ export default async function dragonapi(input, options) {
         cfg.provider ??= {}
         cfg.provider[PROVIDER_ID] ??= {}
         const p = cfg.provider[PROVIDER_ID]
-        p.name = 'DragonAPI'
+        p.name = '@fish-under-sea/magpie-dragonapi'
         if (!p.npm) p.npm = '@ai-sdk/openai-compatible'
         if (!p.api) p.api = ctx.site + '/v1'
         // 不要声明 models：空对象会被理解成「这个供应商声明的模型是 0 个」。
@@ -192,16 +192,16 @@ export default async function dragonapi(input, options) {
     auth: {
       provider: PROVIDER_ID,
       get icon() {
-        // 站点图标：包内 svg 编成 data URI。宿主只收 https 与 data:image，
-        // 联网抓会在断网时变成灰书页。
+        // 站点图标（Ciallo 立绘）：包内 png 编成 data URI。宿主只收 https 与
+        // data:image，联网抓会在断网时变成灰书页。
         try {
-          const svg = readFileSync(join(ctx.dir, 'page', 'icon.svg'))
-          return 'data:image/svg+xml;base64,' + svg.toString('base64')
+          const png = readFileSync(join(ctx.dir, 'page', 'icon.png'))
+          return 'data:image/png;base64,' + png.toString('base64')
         } catch {
           try {
             const here = new URL('.', import.meta.url).pathname
-            const svg = readFileSync(join(here, 'page', 'icon.svg'))
-            return 'data:image/svg+xml;base64,' + svg.toString('base64')
+            const png = readFileSync(join(here, 'page', 'icon.png'))
+            return 'data:image/png;base64,' + png.toString('base64')
           } catch { return '' }
         }
       },

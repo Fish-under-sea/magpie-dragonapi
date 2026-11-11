@@ -125,8 +125,42 @@ export function tierRankOf(name, vendor = '') {
   return best === null ? TIER_DEFAULT : best
 }
 
-/** 版本从新到旧；没有版本号的排到本组末尾；同版本按名称。 */
-export function byVersionDesc(a, b) {
+/**
+ * 国模的品牌顺序：kimi → ds → qwen → glm → hy → minimax → mimo。
+ *
+ * 目录里的 vendor 字段不统一（Moonshot / DeepSeek / 智谱 / 阿里云 / 阿里巴巴，
+ * 还有空的），而混元 hy、小米 mimo 常常连 vendor 都是空的，所以品牌只能
+ * 从「名字 + vendor」一起判。没列到的品牌排在后面，按名字排。
+ */
+const BRAND_ORDER = ['kimi', 'ds', 'qwen', 'glm', 'hy', 'minimax', 'mimo']
+const BRAND_TESTS = [
+  ['kimi', /\bkimi\b|moonshot|月之暗面/i],
+  ['ds', /deepseek/i],
+  ['qwen', /\bqwen\b|通义|千问|阿里/i],
+  ['glm', /\bglm\b|智谱|zhipu/i],
+  ['hy', /\bhy\d|\bhy\b|混元|hunyuan/i],
+  ['minimax', /minimax|海螺/i],
+  ['mimo', /\bmimo\b|小米|xiaomi/i],
+]
+
+/** 品牌 id：先按名字判，再看 vendor；都判不出来就用 vendor 原名。 */
+export function brandOf(name, vendor = '') {
+  const hay = `${name || ''} ${vendor || ''}`
+  for (const [id, re] of BRAND_TESTS) if (re.test(hay)) return id
+  return String(vendor || '')
+}
+
+/** 等级优先于代数的类别（代号即等级的那几家）；其余类别代数优先。 */
+const GRADE_FIRST_CATS = new Set(['claude', 'gpt', 'gemini'])
+
+/** 品牌排序权重：列表内的按位置，列表外的排后面。 */
+function brandRank(brand) {
+  const i = BRAND_ORDER.indexOf(brand)
+  return i < 0 ? BRAND_ORDER.length : i
+}
+
+/** 只比版本号：返回负数表示 a 更新；版本相同返回 0（交给调用方继续比档位/名称）。 */
+export function cmpVersionDesc(a, b) {
   const x = versionRank(a.name)
   const y = versionRank(b.name)
   if (x && y) {
@@ -135,9 +169,16 @@ export function byVersionDesc(a, b) {
       const d = (y[i] || 0) - (x[i] || 0)
       if (d) return d
     }
-  } else if (x) return -1
-  else if (y) return 1
-  return String(a.name || '').localeCompare(String(b.name || ''), 'zh')
+    return 0
+  }
+  if (x) return -1
+  if (y) return 1
+  return 0
+}
+
+/** 版本从新到旧；没有版本号的排到本组末尾；同版本按名称。 */
+export function byVersionDesc(a, b) {
+  return cmpVersionDesc(a, b) || String(a.name || '').localeCompare(String(b.name || ''), 'zh')
 }
 
 /**
@@ -165,15 +206,17 @@ export function orderDefault(aggs, { catOf, catOrder = [] } = {}) {
     return i < 0 ? catOrder.length : i
   }
 
-  // 1. 分桶：类别 + 厂商。空厂商排在本类别末尾。
+  // 1. 分桶：类别 + 品牌。同一品牌可能散在多个 vendor 名下（阿里云 / 阿里巴巴
+  //    都卖 qwen），所以用品牌而不是 vendor 做桶键；空品牌排在本类别末尾。
   const buckets = new Map()
   for (const a of list) {
     const rank = catRank(a)
-    const vendor = a.vendor || '\uffff'
-    const key = `${rank}\u0000${vendor}`
+    const cat = catOf ? catOf(a) : 'other'
+    const brand = brandOf(a.name, a.vendor)
+    const key = `${rank}\u0000${brand}`
     let b = buckets.get(key)
     if (!b) {
-      b = { rank, vendor, items: [] }
+      b = { rank, cat, brand, items: [] }
       buckets.set(key, b)
     }
     b.items.push(a)
@@ -181,10 +224,27 @@ export function orderDefault(aggs, { catOf, catOrder = [] } = {}) {
 
   const out = []
   const orderedBuckets = [...buckets.values()]
-    .sort((x, y) => x.rank - y.rank || String(x.vendor).localeCompare(String(y.vendor), 'zh'))
+    .sort((x, y) => x.rank - y.rank
+      || brandRank(x.brand) - brandRank(y.brand)
+      || String(x.brand || '\uffff').localeCompare(String(y.brand || '\uffff'), 'zh'))
 
   for (const bucket of orderedBuckets) {
-    // 2. 分道：等级 → 该等级的模型（道内按版本降序）
+    // 两种排序语义，按类别分开：
+    //   A. 代号即等级（Claude 的 f/o/s/h、GPT 的 astra/sol/terra、Gemini 的
+    //      carbon/argon）：等级优先于代数，分道轮转；
+    //   B. 档位词只是同代变体（pro / flash / lite …，国模与图片视频都属于这种）：
+    //      代数优先——2.6-flash 必须排在 2.5-pro 前面，同代内再比档位。
+    if (!GRADE_FIRST_CATS.has(bucket.cat)) {
+      // 顺序：版本 → 档位 → 名称。不能直接用 byVersionDesc，它在版本相同时
+      // 就用名字比了，会把「档位」这一层挡掉（glm-5-3-flash 会压住 glm-5.3）。
+      bucket.items.sort((a, b) => cmpVersionDesc(a, b)
+        || tierRankOf(a.name, a.vendor) - tierRankOf(b.name, a.vendor)
+        || String(a.name || '').localeCompare(String(b.name || ''), 'zh'))
+      out.push(...bucket.items)
+      continue
+    }
+
+    // A. 分道：等级 → 该等级的模型（道内按版本降序）
     const lanes = new Map()
     for (const a of bucket.items) {
       const t = tierRankOf(a.name, a.vendor)
@@ -195,7 +255,7 @@ export function orderDefault(aggs, { catOf, catOrder = [] } = {}) {
     const laneOrder = [...lanes.keys()].sort((x, y) => x - y)
     for (const t of laneOrder) lanes.get(t).sort(byVersionDesc)
 
-    // 3. 轮转：每轮各道取一个，直到取完
+    // 轮转：每轮各道取一个，直到取完
     const cursor = new Map(laneOrder.map((t) => [t, 0]))
     let remaining = bucket.items.length
     while (remaining > 0) {

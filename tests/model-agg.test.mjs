@@ -4,7 +4,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { aggregateRows, byVersionDesc, focusGroupOf, orderDefault, spanOf, tierRankOf, versionRank } from '../ui/model-agg.js'
+import { aggregateRows, brandOf, byVersionDesc, focusGroupOf, orderDefault, spanOf, tierRankOf, versionRank } from '../ui/model-agg.js'
 
 /** 造一行目录数据，字段与 lib/catalog.mjs 的输出一致。 */
 function row(group, ratio, input, output, cache, extra = {}) {
@@ -329,4 +329,56 @@ test('只有一处拼写的模型，aliases 为空且不影响展示', () => {
   const out = aggregateRows([rowOf('claude-sonnet-5-5', 'claude-kiro', 0.1)])
   assert.equal(out.length, 1)
   assert.equal(out[0].aliases, undefined)
+})
+
+// ── 国模的品牌顺序：kimi → ds → qwen → glm → hy → minimax → mimo ──────
+
+test('brandOf：从名字或 vendor 认出品牌', () => {
+  assert.equal(brandOf('kimi-k3', 'Moonshot'), 'kimi')
+  assert.equal(brandOf('deepseek-v4-pro', 'DeepSeek'), 'ds')
+  assert.equal(brandOf('qwen3.8-max', '阿里云'), 'qwen')
+  assert.equal(brandOf('glm-5.3', '智谱'), 'glm')
+  assert.equal(brandOf('hy3', ''), 'hy', '混元的名字就是 hy3，vendor 是空的')
+  assert.equal(brandOf('minimax-m3', 'MiniMax'), 'minimax')
+  assert.equal(brandOf('mimo-v2.5', ''), 'mimo')
+})
+
+test('国模区按品牌顺序排，不按名字或版本', () => {
+  const list = [
+    agg('mimo-v2.5', ''), agg('minimax-m3', 'MiniMax'), agg('hy3', ''),
+    agg('glm-5.3', '智谱'), agg('qwen3.8-max', '阿里云'), agg('deepseek-v4-pro', 'DeepSeek'),
+    agg('kimi-k3', 'Moonshot'),
+  ]
+  const names = sortList(list).map((x) => x.name)
+  assert.deepEqual(names, [
+    'kimi-k3', 'deepseek-v4-pro', 'qwen3.8-max', 'glm-5.3', 'hy3', 'minimax-m3', 'mimo-v2.5',
+  ])
+})
+
+test('国模这类「档位只是变体」的类别：代数优先于档位', () => {
+  // mimo-v2.6-flash 必须排在 mimo-v2.5-pro 前面：2.6 > 2.5，flash 只是同代变体
+  const out = sortList([
+    agg('mimo-v2.5-pro', ''),
+    agg('mimo-v2.5', ''),
+    agg('mimo-v2.6-flash', ''),
+  ])
+  assert.deepEqual(out.map((x) => x.name), ['mimo-v2.6-flash', 'mimo-v2.5-pro', 'mimo-v2.5'])
+})
+
+test('同代内才比档位：v4-pro 在 v4-flash 之前', () => {
+  const out = sortList([
+    agg('deepseek-v4-flash', 'DeepSeek'),
+    agg('deepseek-v4-pro', 'DeepSeek'),
+  ])
+  assert.deepEqual(out.map((x) => x.name), ['deepseek-v4-pro', 'deepseek-v4-flash'])
+})
+
+test('版本相同时档位先于名称，不被名字排序挡掉', () => {
+  // glm-5-3-flash-260828 与 glm-5.3 版本都是 5.3；按名字会 flash 在前，
+  // 但档位（默认档 3 < flash 档 4）应当先发挥作用
+  const out = sortList([
+    agg('glm-5-3-flash-260828', '智谱'),
+    agg('glm-5.3', '智谱'),
+  ])
+  assert.deepEqual(out.map((x) => x.name), ['glm-5.3', 'glm-5-3-flash-260828'])
 })

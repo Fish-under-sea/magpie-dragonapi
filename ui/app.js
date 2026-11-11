@@ -662,7 +662,7 @@ const CATEGORY_TESTS = [
   ['gpt', /gpt|openai|codex|davinci|o[134]\b/i],
   ['gemini', /gemini|google|bard/i],
   ['grok', /grok|xai/i],
-  ['guomo', /国模|deepseek|qwen|通义|千问|glm|智谱|moonshot|kimi|月之暗面|豆包|doubao|hunyuan|混元|文心|ernie|百度|baidu|讯飞|spark|minimax|海螺|阶跃|ling|jimeng|即梦|小米|mimo|零一|yi-/i],
+  ['guomo', /国模|deepseek|qwen|通义|千问|glm|智谱|moonshot|kimi|月之暗面|豆包|doubao|hunyuan|混元|\bhy\d|文心|ernie|百度|baidu|讯飞|spark|minimax|海螺|阶跃|ling|jimeng|即梦|小米|mimo|零一|yi-/i],
 ];
 /** 分组显示名：站点的「视频」按你说的改名成 video。 */
 const GROUP_ALIAS = { 视频: 'video' };

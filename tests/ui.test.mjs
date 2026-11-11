@@ -512,26 +512,23 @@ test('PAT 保存后区分「已验证 / 未验证 / 缺 scope」，不当成功�
   assert.match(js, /payload\.hint/, '保存失败时应把服务端的可操作提示带出来')
 })
 
-test('页面标题：广场直接进工具条，其余三页保留 h2 页头，卡片标题用 h3', async () => {
+test('页面不再自贴标题：标签页已说明位置，面板直接进内容，卡片用 h3', async () => {
   const html = await (await fetch(base + '/')).text()
 
-  // 模型广场去掉了页头：整页第一块就是横跨全宽的工具条（侧栏在它下面）
+  // 四页都不再有页头/副标题：标签栏已经标出当前在哪一页，再印一遍是重复。
+  assert.equal(/class="page-head"/.test(html), false, '不该再有页面级页头')
+  assert.equal(/class="page-sub"/.test(html), false, '不该再有页面副标题')
+  assert.equal(/<h2>/.test(html.replace(/<h2 id="drawer-title">[\s\S]*?<\/h2>/g, '')), false,
+    '面板里不该再有 h2（抽屉标题除外）')
+
+  // 模型广场整页第一块就是横跨全宽的工具条（侧栏在它下面）
   const catalogPanel = html.match(/data-panel="catalog"[\s\S]*?<\/section>/)
   assert.ok(catalogPanel, '找不到模型广场面板')
-  assert.equal(/class="page-head"/.test(catalogPanel[0]), false, '模型广场不设页头')
   assert.match(catalogPanel[0], /class="market-top"/, '缺少工具条')
   assert.ok(
     catalogPanel[0].indexOf('class="market-top"') < catalogPanel[0].indexOf('class="market-body"'),
     '工具条要在布局最前面，侧栏在它下面',
   )
-
-  // 其余三个面板仍是 page-head + h2 + page-sub
-  const heads = [...html.matchAll(/class="page-head"[\s\S]{0,220}?<h2>([^<]+)<\/h2>[\s\S]{0,120}?class="page-sub"/g)]
-  assert.equal(heads.length, 3, `应有 3 个页面级标题，实际 ${heads.length}`)
-  const titles = heads.map((m) => m[1])
-  for (const want of ['余额与用量', '密钥', '访问令牌']) {
-    assert.ok(titles.includes(want), `缺少页面标题「${want}」：${titles.join(', ')}`)
-  }
   // 面板本身仍有可访问名称：由 tab 的 aria-labelledby 提供
   assert.match(html, /aria-labelledby="tab-catalog"/, '广场面板要靠 tab 标出可访问名称')
 

@@ -1121,16 +1121,17 @@ function libraryGroupChips(list, modelsByGroup, countOf) {
  * 分组少就一行排开，多就换行——排版交给 CSS 的 flex-wrap，不在 JS 里截断。
  */
 function groupChipsEl(agg) {
-  // 展示用 chips：同倍率同价的分组已经并成一项（gpt-pro/promax）。
-  // agg.groups 仍是原始分组，详情页的按分组定价表要用它。
-  const list = Array.isArray(agg.chips) && agg.chips.length ? agg.chips : (agg.groups || []);
-  const title = (Array.isArray(agg.groups) ? agg.groups : [])
+  // 每个分组各占一个 chip，即使两个分组的倍率与价格完全一致也不并成
+  // `gpt-pro/promax`——分组名是用户要认的渠道，拼串会让人以为那是一个名字。
+  // 分组多的模型自然排到第二行，这个双行排布是刻意的。
+  const list = Array.isArray(agg.groups) ? agg.groups : [];
+  const title = list
     .map((g) => `${g.id}${Number(g.ratio) > 0 ? ' ' + fmtRatio(g.ratio) : ''}`)
     .join('\n');
   return h('span', { class: 'mc-groups', title },
     list.map((g) => h('span', { class: 'mc-gb' },
       Number(g.ratio) > 0 ? ratioTag(g.ratio) : null,
-      h('span', { class: 'mc-group', text: GROUP_ALIAS[g.label] || GROUP_ALIAS[g.id] || g.label || g.id || '—' }))));
+      h('span', { class: 'mc-group', text: GROUP_ALIAS[g.id] || g.id || '—' }))));
 }
 
 /**

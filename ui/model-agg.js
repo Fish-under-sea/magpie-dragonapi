@@ -49,49 +49,13 @@ function kindOfGroups(groups) {
 }
 
 /**
- * 把「倍率与三档价格都相同」的分组合并成一个展示项。
- *
- * 站点常把同一档价格挂在不同分组名下（gpt-pro 与 gpt-promax 都是 0.16×、
- * 单价一样）。分开列只是把同一个价说两遍，还多占一行——合并成
- * `gpt-pro/promax` 后大多数模型的分组一行就放得下，卡片因此更矮更齐。
- *
- * 只在倍率、计价方式、三档数值全部一致时合并；差一点都保持分开，
- * 因为那意味着价不一样，合并会误导。
- */
-export function mergeGroups(groups) {
-  const out = []
-  const keyOf = (g) => {
-    const p = g.pricing || {}
-    return [g.ratio ?? '', g.auto ? 'auto' : '', p.kind || '',
-      p.inputNum ?? '', p.outputNum ?? '', p.cacheNum ?? ''].join('|')
-  }
-  for (const g of groups) {
-    const k = keyOf(g)
-    const last = out[out.length - 1]
-    if (last && last._key === k) {
-      last.ids.push(g.id)
-      last.label = last.ids.join('/')
-      last.groups.push(g)
-      continue
-    }
-    out.push({
-      _key: k,
-      ids: [g.id],
-      label: g.id,
-      ratio: g.ratio,
-      auto: g.auto,
-      pricing: g.pricing,
-      groups: [g],
-    })
-  }
-  for (const item of out) delete item._key
-  return out
-}
-
-/**
  * rows：目录里的行（每行一个分组×模型，字段见 lib/catalog.mjs 的 buildCatalog）。
- * 返回聚合后的模型数组，每个元素带 groups（全部分组，按倍率升序）
- * 与 chips（按「倍率+价格」归并后的展示项）。
+ * 返回聚合后的模型数组，每个元素带 groups（全部分组，按倍率升序）。
+ *
+ * 分组一律**逐个列出**，即使两个分组的倍率与价格完全一样也不合并：
+ * 「这个模型在哪些分组里卖」本身就是用户要的信息，合并成 `gpt-pro/promax`
+ * 会让分组名变成拼串，读起来像别名而不是两个可选渠道。
+ * 代价是分组多时换到第二行——这个双行排布是刻意的，卡片高度仍由预留高度取齐。
  */
 export function aggregateRows(rows) {
   const map = new Map()
@@ -139,7 +103,6 @@ export function aggregateRows(rows) {
   for (const a of out) {
     a.groups.sort(byRatioThenName)
     a.cheapest = a.groups[0] || null
-    a.chips = mergeGroups(a.groups)
     a.priceKind = kindOfGroups(a.groups)
     a.prices = {
       input: spanOf(a.groups, 'inputNum'),

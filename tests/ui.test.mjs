@@ -329,15 +329,16 @@ test('详情与端点同一行，省掉一整行页脚', async () => {
   assert.equal(/mc-foot/.test(fn[0]), false, '卡片里不该再渲染独立页脚')
 })
 
-test('同倍率同价的分组合并成一个 chip（gpt-pro/promax）', async () => {
+test('分组逐个列出，不并成 gpt-pro/promax 这种拼串', async () => {
   const js = await (await fetch(base + '/ui/app.js')).text()
   const chips = js.match(/function groupChipsEl\([\s\S]*?\n\}/)
   assert.ok(chips, '找不到 groupChipsEl')
-  assert.match(chips[0], /agg\.chips/, '分组 chip 应使用归并后的 chips')
-  // 数量标记随归并失去意义（不再有隐藏项），不该再渲染
-  assert.equal(/mc-gcount/.test(js), false, '不该再渲染分组数量标记')
+  // 分组名是用户要认的渠道；拼串会让人以为那是一个名字。
+  // 分组多的模型自然排到第二行，这个双行排布是刻意的。
+  assert.equal(/agg\.chips/.test(chips[0]), false, '不该再走归并后的 chips')
+  assert.match(chips[0], /agg\.groups/, '应逐个渲染 agg.groups')
+  assert.equal(/join\('\/'\)/.test(chips[0]), false, '不该把多个分组名拼成一个')
 })
-
 test('模型广场是筛选栏 + 卡片网格，不再是表格', async () => {
   const html = await (await fetch(base + '/')).text()
   assert.match(html, /class="market-body"/, '缺少 market-body 布局')

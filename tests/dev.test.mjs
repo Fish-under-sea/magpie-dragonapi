@@ -52,6 +52,15 @@ test('dev.mjs 不吃端口冲突：端口可指定', () => {
   assert.match(dev, /--service-port/, '应支持 --service-port')
 })
 
+test('dev.mjs 支持代理插件服务且保留 PAT 验证与持久化结果', () => {
+  assert.match(dev, /--upstream/)
+  assert.match(dev, /UPSTREAM \? null : await startService/)
+  assert.match(dev, /patVerified: state\.patVerified === true/)
+  assert.match(dev, /state\.patVerified = verified === true/)
+  assert.match(dev, /return saveState\(DIR, state\)/)
+  assert.match(dev, /inner\?\.close\(\)/)
+})
+
 test('dev.mjs 不进 npm 包', () => {
   const pkg = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf8'))
   const files = pkg.files || []

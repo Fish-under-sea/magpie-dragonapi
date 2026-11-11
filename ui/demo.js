@@ -125,6 +125,8 @@ export function createDemoApi() {
         siteName: 'DragonAPI',
         pat: { set: true, hint: 'nap_d****demo', scopes: ['profile:read', 'api_key:read', 'api_key:write'], verified: true },
         currency: { symbol: '$', per: 500000, rate: 1, display: true },
+        user: { id: 1, username: 'demo', displayName: '演示账户', group: 'default', balance: '$18.50', balanceRaw: 9250000, used: '$68.19', usedRaw: 34095000 },
+        userError: '',
         accounts: {
           'sk-demo': {
             key: 'sk-demo', label: 'gpt-promax · sk-d****demo', group: 'gpt-promax',
@@ -141,10 +143,21 @@ export function createDemoApi() {
       const [start, end] = rangeOf(range);
       return summarizeRows(rows, null, start, end);
     }
+    if (path === '/api/subscriptions') {
+      return {
+        ok: true, billingPreference: 'subscription_first', plansError: '', at: now,
+        subscriptions: [
+          { id: 461, planId: 3, title: '演示 · Plus 月度套餐', status: 'active', active: true, endAt: now + 20 * DAY, nextResetAt: now + 3 * DAY, used: '$28.18', total: '$30.00', remaining: '$1.82', progress: 93.93, unlimited: false },
+          { id: 462, planId: 4, title: '演示 · 不限量套餐', status: 'cancelled', active: false, endAt: now - DAY, nextResetAt: null, used: '$42.00', total: '不限量', remaining: '不限量', progress: null, unlimited: true },
+          { id: 463, planId: 3, title: '演示 · 已超额套餐', status: 'expired', active: false, endAt: now - 2 * DAY, nextResetAt: null, used: '$33.00', total: '$30.00', remaining: '-$3.00', progress: 110, unlimited: false },
+        ],
+        plans: [{ id: 3, title: '演示 · Plus 月度套餐', subtitle: '套餐额度与钱包余额分别展示', price: '30 USD', priceAmount: 30, priceCurrency: 'USD', durationUnit: 'month', durationValue: 1, total: '$30.00', unlimited: false, quotaResetPeriod: 'weekly' }],
+      };
+    }
     if (path === '/api/aff') {
       return {
         ok: true,
-        aff: { count: 2, quota: 12500, pending: 12500 },
+        aff: { count: 2, quota: 12500, historyQuota: 37500, pending: 12500 },
         code: '0mY4',
         link: 'https://newapi.dragon3api.com/sign-up?aff=0mY4',
         note: '',

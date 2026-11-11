@@ -163,6 +163,14 @@
         </div>
       </div>
 
+      <div class="card subscriptions-card">
+        <header class="card-head">
+          <h3>订阅套餐</h3>
+          <span class="card-sub">只读 · 不支持购买或修改扣费偏好</span>
+        </header>
+        <div id="subscriptions-body" aria-live="polite"><p class="loading">正在读取订阅…</p></div>
+      </div>
+
       <!-- 推荐计划：放在 API 密钥上面（原站钱包页同位）——
            待确认 / 总收入 / 邀请三列 + 链接胶囊 + 复制 + 转移到余额 -->
       <div class="card aff-card">
@@ -288,7 +296,7 @@
                 <tr><td class="mono">api_key:write</td><td>新建 / 删除钥匙</td></tr>
                 <tr><td class="mono">api_key:reveal</td><td>查看完整钥匙（<code>reveal</code>）</td></tr>
                 <tr><td class="mono">usage:read</td><td>看用量与流水</td></tr>
-                <tr><td class="mono">wallet:read</td><td>看余额与邀请</td></tr>
+                <tr><td class="mono">wallet:read</td><td>读取订阅、套餐列表与邀请</td></tr>
               </tbody>
             </table>
           </div>

@@ -43,6 +43,9 @@ const valueOf = (name, fallback) => {
 const PORT = valueOf('--port', 3671)
 const SERVICE_PORT = valueOf('--service-port', PORT + 1)
 const SANDBOX = flag('--sandbox')
+const upstreamIndex = argv.indexOf('--upstream')
+const UPSTREAM = upstreamIndex >= 0 ? String(argv[upstreamIndex + 1] || '').replace(/\/+$/, '') : ''
+if (upstreamIndex >= 0 && !/^https?:\/\//.test(UPSTREAM)) throw new Error('--upstream 需要 HTTP 服务地址')
 const SITE = process.env.DRAGONAPI_SITE || 'https://newapi.dragon3api.com'
 const DIR = process.env.DRAGONAPI_DIR || join(here, '.dev-state')
 
@@ -81,7 +84,7 @@ async function main() {
     seed: state.status || null,
     onRead: (v) => { state.status = v; saveState(DIR, state) },
   })
-  const inner = await startService({
+  const inner = UPSTREAM ? null : await startService({
     port: SERVICE_PORT,
     dir: DIR,
     site: SITE,
@@ -92,14 +95,16 @@ async function main() {
       pat: state.pat || '',
       patHint: state.patHint || '',
       patScopes: state.patScopes || [],
+      patVerified: state.patVerified === true,
       enabledGroups: state.enabledGroups || [],
     }),
-    setPat: async ({ pat, hint, scopes, user }) => {
+    setPat: async ({ pat, hint, scopes, user, verified }) => {
+      state.patVerified = verified === true
       state.pat = pat
       state.patHint = hint
       state.patScopes = scopes
-      if (user) state.user = { id: user.id, name: user.username }
-      saveState(DIR, state)
+      state.user = user ? { id: user.id, name: user.username } : null
+      return saveState(DIR, state)
     },
     // 开发预览没有 magpie 的钥匙：余额会显示 —，这是预期
     keyOf: () => '',
@@ -145,7 +150,7 @@ async function main() {
 
     // API 一律反代给内部服务：界面代码走的就是 prod 那条路
     if (path.startsWith('/api/')) {
-      const target = `http://127.0.0.1:${inner.port}${path}${url.search}`
+      const target = `${UPSTREAM || `http://127.0.0.1:${inner.port}`}${path}${url.search}`
       const chunks = []
       for await (const c of req) chunks.push(c)
       const body = chunks.length ? Buffer.concat(chunks) : undefined
@@ -220,15 +225,15 @@ async function main() {
     console.log('  ' + base + '__sandbox?theme=dark    —— 沙箱 iframe（改请求/存储/导航时看这个）')
   }
   console.log('')
-  console.log('  改 ui/ 里任何文件都会自动刷新。内部服务（/api/*）在 127.0.0.1:' + inner.port)
-  console.log('  状态目录：' + DIR)
+  console.log('  改 ui/ 里任何文件都会自动刷新。API 来源：' + (UPSTREAM || `http://127.0.0.1:${inner.port}`))
+  console.log('  状态：' + (UPSTREAM ? '使用上游插件服务的状态，本预览不写独立状态' : DIR))
   console.log('  Ctrl+C 结束')
   console.log('')
 
   const shutdown = async () => {
     for (const c of clients) { try { c.end() } catch { /* 已断 */ } }
     await new Promise((r) => server.close(r))
-    await inner.close()
+    await inner?.close()
     process.exit(0)
   }
   process.on('SIGINT', shutdown)

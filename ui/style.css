@@ -2747,6 +2747,29 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
   overflow: hidden;
 }
 
+/* 账户内容增多后统一面板滚动：不把订阅或密钥挤成不可达的小窗口。 */
+#panel-wallet { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+#panel-wallet > .card, #panel-wallet .acct-layout { flex: none; }
+#panel-wallet .acct-layout { height: auto; max-height: none; }
+#panel-wallet .acct-layout > .card { overflow: visible; }
+#panel-wallet .keys-page { flex: none; min-height: 240px; overflow: visible; }
+#panel-wallet #keys-body { flex: none; overflow-y: visible; }
+.subscription-toolbar, .subscription-title { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.subscription-heading { margin: 16px 0 10px; font-size: 12px; }
+.subscription-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.subscription-item { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--sunken); }
+.subscription-item .acct-facts { margin-top: 12px; }
+.subscription-item dd, .subscription-title b { overflow-wrap: anywhere; }
+.subscription-progress { display: block; width: 100%; height: 8px; margin-top: 14px; accent-color: var(--accent); }
+.subscription-progress::-webkit-progress-bar { background: var(--line); border-radius: 4px; }
+.subscription-progress::-webkit-progress-value { background: var(--accent); border-radius: 0 4px 4px 0; }
+.subscription-progress::-moz-progress-bar { background: var(--accent); border-radius: 0 4px 4px 0; }
+.pat-state { margin: 4px 0 10px; gap: 4px; padding: 7px 10px; }
+.pat-state > p { margin: 4px 0; }
+.banner[data-tone="ok"] { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
+@media (max-width: 720px) { .subscription-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (forced-colors: active) { .subscription-progress { forced-color-adjust: auto; } }
+
 @media (max-width: 900px) {
   /* 窄屏一列时不再强分高度，改为整块可滚——否则每张卡都只剩几十像素 */
   .panel { overflow: visible; }

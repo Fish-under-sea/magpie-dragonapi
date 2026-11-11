@@ -779,7 +779,9 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 /* ── 余额 / 用量：账户概览 + 数据概览（照 neartoken 的账户卡与看板） ── */
 
 /* 余额页两张卡各自按内容定高：账户卡内容少时不要被拉出一截空白 */
-.wallet-grid { align-items: start; }
+/* 两张概览卡必须等高：左边只有一句空态时也要拉到与右边同高，\n   否则一眼看过去像没加载完。等高后卡片内部用 flex 把内容铺开。 */
+.wallet-grid { align-items: stretch; }
+.wallet-grid > .card { display: flex; flex-direction: column; }
 
 /* 账户概览：整页唯一的大数字 */
 .acct-overview {
@@ -1953,3 +1955,71 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 
 /* 分组定价里「当前」那一行：整行提亮，比只亮一个徽标更容易扫到 */
 .data-table tbody tr.is-current-row td { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+/* ── 推荐计划：一行横条（图标 / 说明 / 邀请数 / 链接 / 同步时间） ──────
+ *
+ * 放成整条而不是再塞一张等宽小卡：它只有「邀请几个、链接是什么」两件事，
+ * 做成方卡会占掉半屏，还把上面两张概览卡的高度节奏打乱。
+ */
+.aff-card { padding: 0; }
+.aff-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+}
+.aff-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border: 1px solid var(--accent-line);
+}
+/* 小圆点连线：一个纯 CSS 的「分享」图形，省一张图 */
+.aff-icon::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow:
+    0 -6px 0 -3px var(--accent),
+    0 6px 0 -3px var(--accent),
+    5px 0 0 -3px var(--accent);
+  border: 1.5px solid var(--accent);
+}
+.aff-main { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.aff-title { margin: 0; font-size: 12.5px; font-weight: 650; }
+.aff-note { margin: 0; font-size: 11px; line-height: 1.5; color: var(--muted); }
+.aff-stats { display: flex; align-items: baseline; gap: 6px; flex: none; }
+.aff-k { font-size: 10.5px; color: var(--muted); }
+.aff-v {
+  font-family: var(--code);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  margin-right: 6px;
+}
+.aff-link { display: flex; align-items: center; gap: 6px; flex: 1 1 320px; min-width: 0; }
+.aff-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 30px;
+  padding: 0 9px;
+  font-family: var(--code);
+  font-size: 11px;
+  color: var(--fg);
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.aff-copy { flex: none; }
+.aff-sync { flex: none; font-family: var(--code); font-size: 10.5px; color: var(--muted); }
+
+@media (max-width: 720px) {
+  .aff-stats { order: 3; }
+  .aff-link { flex-basis: 100%; }
+  .aff-sync { display: none; }
+}

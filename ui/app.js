@@ -260,6 +260,7 @@ const api = {
   usage: (range) => request(`/api/usage?range=${encodeURIComponent(range)}`),
   logs: (account) => request(`/api/logs?limit=200&account=${encodeURIComponent(account)}`),
   keys: () => request('/api/keys'),
+  aff: () => request('/api/aff'),
   createKey: (body) => request('/api/keys', { method: 'POST', body }),
   deleteKey: (id) => request(`/api/keys/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   revealKey: (id) => request(`/api/keys/${encodeURIComponent(id)}/reveal`, { method: 'POST' }),
@@ -391,12 +392,13 @@ const cache = {
   catalog: null,
   keys: null,
   bind: null,
+  aff: null,
   health: null,
   usage: {},   // range -> response
   logs: {},    // account key -> rows[]
 };
 
-const loading = { state: false, catalog: false, keys: false, bind: false, health: false, usage: false, logs: false };
+const loading = { state: false, catalog: false, keys: false, bind: false, health: false, usage: false, logs: false, aff: false };
 
 const filters = { category: '', group: '', vendor: '', kind: '', q: '', unit: 'M', sort: 'latest', view: 'grid', range: 'day', account: '' };
 
@@ -1337,8 +1339,84 @@ function bindCatalogControls() {
 async function loadWallet(force = false) {
   await loadState(force);
   renderAccounts();
-  await Promise.all([loadUsage(force), loadFlow(force)]);
+  await Promise.all([loadUsage(force), loadFlow(force), loadAff(force)]);
 }
+
+/**
+ * 推荐计划：邀请码、已邀请人数、累计奖励。
+ *
+ * 站点没开这个端点时不假装「0 人邀请」，而是如实说没有——两者对用户
+ * 意味着完全不同的东西（一个是没开功能，一个是真没人注册）。
+ */
+async function loadAff(force = false) {
+  const box = $('#aff-body');
+  if (!box) return;
+  if (cache.aff && !force) { renderAff(); return cache.aff }
+  if (loading.aff) return cache.aff
+  loading.aff = true
+  regionLoading(box, '正在读取推荐计划')
+  try {
+    cache.aff = await api.aff()
+    renderAff()
+    return cache.aff
+  } catch (err) {
+    const msg = describeError(err)
+    // 没设 PAT 属于正常状态，不甩红条
+    if (err instanceof ApiError && err.status === 400 && /访问令牌/.test(msg)) {
+      cache.aff = { ok: true, aff: null, link: '', note: '设置访问令牌（PAT）后显示邀请与奖励' }
+      renderAff()
+      return cache.aff
+    }
+    cache.aff = { ok: false, error: msg }
+    renderAff()
+    return cache.aff
+  } finally {
+    loading.aff = false
+  }
+}
+
+function renderAff() {
+  const box = $('#aff-body');
+  if (!box) return;
+  const d = cache.aff || {};
+
+  if (d.ok === false) {
+    box.replaceChildren(h('p', { class: 'aff-note muted', text: `推荐计划没读到：${d.error || '未知原因'}` }));
+    return;
+  }
+
+  const link = d.link || '';
+  const count = d.aff && Number.isFinite(d.aff.count) ? fmtInt(d.aff.count) : null;
+  const quota = d.aff && Number.isFinite(d.aff.quota) ? moneyRaw(d.aff.quota) : null;
+
+  const copyBtn = h('button', {
+    class: 'btn ghost aff-copy', type: 'button',
+    title: '复制推荐链接',
+    onclick: (ev) => copyText(link, ev.currentTarget),
+  }, '复制');
+
+  // replaceChildren 收 null 会把它印成字符串「null」——必须先过滤再加。
+  // 没有数据来源时（没设 PAT / 站点没开端点）也不摆一排「—」：
+  // 那只会让人以为「有 0 个邀请」，把说明写清楚就够了。
+  const stats = (count == null && !quota) ? null : h('div', { class: 'aff-stats' },
+    count == null ? null : h('span', { class: 'aff-k', text: '邀请' }),
+    count == null ? null : h('b', { class: 'aff-v', text: count }),
+    quota ? h('span', { class: 'aff-k', text: '奖励' }) : null,
+    quota ? h('b', { class: 'aff-v', text: quota }) : null);
+
+  box.replaceChildren(...[
+    h('span', { class: 'aff-icon', 'aria-hidden': 'true' }),
+    h('div', { class: 'aff-main' },
+      h('h3', { class: 'aff-title', text: '推荐计划' }),
+      h('p', { class: 'aff-note' }, d.note || '通过你的推荐链接注册的用户，会给你的账号带来奖励；累计奖励可随时转入余额。')),
+    stats,
+    link ? h('div', { class: 'aff-link' },
+      h('input', { class: 'aff-input', readonly: 'readonly', value: link, 'aria-label': '推荐链接', onclick: (ev) => ev.currentTarget.select() }),
+      copyBtn) : null,
+    d.at ? h('span', { class: 'aff-sync', text: `· 同步 ${fmtAt(d.at)}` }) : null,
+  ].filter(Boolean));
+}
+
 
 function renderAccounts() {
   const box = $('#account-body');

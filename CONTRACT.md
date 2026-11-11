@@ -26,7 +26,13 @@
   "ok": true,
   "site": "https://newapi.dragon3api.com",
   "siteName": "DragonAPI",
-  "pat": { "set": true, "hint": "nap_…a1b2", "scopes": ["profile:read", "api_key:read"] },
+  "pat": {
+    "set": true,
+    "hint": "nap_…a1b2",
+    "scopes": ["profile:read", "api_key:read"],
+    "verified": true,
+    "stateFile": "C:\\…\\magpie\\data\\dragonapi-state.json"
+  },
   "currency": { "symbol": "$", "per": 500000, "rate": 1, "display": true, "code": "USD" },
   "accounts": [
     {
@@ -56,10 +62,35 @@
 ```json
 // 请求
 { "pat": "nap_xxx" }
-// 响应
-{ "ok": true, "pat": { "set": true, "hint": "nap_…a1b2", "scopes": ["profile:read"] }, "user": { "name": "fish", "id": 12 } }
+// 成功响应（令牌至少有一个端点验通）
+{
+  "ok": true,
+  "pat": {
+    "set": true,
+    "hint": "nap_…a1b2",
+    "scopes": ["profile:read", "api_key:read", "usage:read"],
+    "verified": true,
+    "missing": [],
+    "persisted": true
+  },
+  "user": { "name": "fish", "id": 12 },
+  "warning": ""
+}
 ```
-校验方式：`GET /api/user/self` + `GET /api/token/?p=0&size=1`。失败返回 400 与原因。
+
+校验方式：依次探 **三个只读端点**（`/api/user/self` → `profile:read`、
+`/api/token/` → `api_key:read`、`/api/log/self` → `usage:read`），**不写任何东西**。
+
+判定规则（这是「访问令牌保存失败」那次事故的根因，改之前先读）：
+
+| 情况 | 行为 |
+| --- | --- |
+| 三个端点全 401/403 | **拒收**，HTTP 400，`error` 带站点原话，`hint` 说清怎么改权限 |
+| 至少一个通了，但缺别的 scope | **收下**，`warning` 指名缺哪一格，`scopes` 只列能用的 |
+| 一个都没通，但都不是鉴权错误（超时 / 非 JSON 验证页） | **收下**，`verified: false`，`warning` 说「没能连上站点验证」 |
+| 令牌能用但状态文件写不进去 | HTTP 500，`error` 带**状态文件路径与原因**，`pat.persisted: false` |
+
+不允许出现「返回 ok 但没落盘」——那会变成用户重启后令牌凭空消失。
 
 ### `DELETE /api/pat`
 ```json
@@ -104,10 +135,40 @@
 `pricing.kind` ∈ `ratio | tiered | percall | unknown`，解析不出来时 `kind: "unknown"` 且 `note` 说明原因（**不允许编造价格**）。
 
 ### `GET /api/model?group=gpt-plus&model=gpt-6-sol`
-单模型详情，额外返回：
+单模型详情。`billing` 里的字段**已经折成可以直接显示的量**，页面不该再自己解析表达式：
+
 ```json
-{ "ok": true, "billing": { "mode": "tiered_expr", "expr": "…", "tiers": [ { "name": "short_context", "input": 2, "output": 10 } ], "usages": [ { "field": "seconds", "unit": "second", "price": 0.45 } ], "schema": { … }, "examples": [ … ] } }
+{
+  "ok": true,
+  "billing": {
+    "mode": "tiered_expr",
+    "modeLabel": "表达式分档计费",
+    "expr": "tier(\"short_context\", p*2 + c*10) * (param(\"service_tier\") == \"priority\" ? 2 : 1)",
+    "groupRatio": 1,
+    "currency": { "symbol": "$", "code": "USD" },
+    "tiers": [
+      {
+        "name": "short_context",
+        "body": "p*2 + c*10",
+        "coeffs": { "input": 2, "output": 10 },
+        "prices": { "input": "$2.00/M", "output": "$10.00/M" }
+      }
+    ],
+    "multipliers": [{ "param": "service_tier", "value": "priority", "factor": 2 }],
+    "usages": { "seconds": { "min": 0.16, "max": 0.16 } },
+    "usageRows": [{ "field": "seconds", "label": "时长", "unit": "秒", "price": "$0.1600/秒", "min": 0.16, "max": 0.16 }],
+    "schema": { },
+    "examples": []
+  }
+}
 ```
+
+| 字段 | 用途 |
+| --- | --- |
+| `tiers[].prices` | 每档实际单价（系数 × 分组倍率）。**不要读 `tiers[].input`——那个字段不存在** |
+| `multipliers` | 整单倍率规则，如 `service_tier=priority` 时 ×2 |
+| `usageRows` | 视频/按秒模型的字段 / 单位 / 单价，单位已尽量翻成中文 |
+| `schema` / `examples` | 站点原文，只作为证据收在折叠块里 |
 
 ## 3. 余额与用量
 
@@ -200,8 +261,9 @@
 ## 7. UI 必须做到的事
 
 1. **模型广场是只读的**：显示分组、倍率、模型、价格、端点类型；没有启用/停用开关，没有「已选」状态。
-2. 分组筛选、搜索、按 kind 过滤；价格未知的模型明确标「价格未知」，不猜。
-3. 余额卡 + 用量卡（按天/周/月）+ 用量流水表。
-4. 密钥页：列出现有钥匙（打码）、按分组建新钥匙、建完显示一次完整钥匙并提供复制、删除钥匙、查看完整钥匙（需 reveal 权限）。
-5. PAT 页：填入/清除访问令牌，说明需要哪些 scope。
-6. 所有网络失败都要有可读提示，不能白屏；不能使用 localStorage。
+2. 分组筛选、**厂商筛选**、搜索、按 kind 过滤；价格未知的模型明确标「价格未知」，不猜。
+3. **详情抽屉给结论，不倒原文**：价格 / 概览 / 计费方式（中文）/ 每档实际单价 / 按用量单价；原始表达式与 schema 折叠在「原始计费表达式」里，空数组不渲染。中文值不用等宽字体。
+4. 余额卡 + 用量卡（按天/周/月）+ 用量流水表。
+5. 密钥页：列出现有钥匙（打码）、按分组建新钥匙、建完显示一次完整钥匙并提供复制、删除钥匙、查看完整钥匙（需 reveal 权限）。
+6. PAT 页：填入/清除访问令牌，说明需要哪些 scope；保存后显示验到的 scope。缺 scope 时给「哪些功能会失败」的提示，不要一句「不可用」打死。
+7. 所有网络失败都要有可读提示，不能白屏；不能使用 localStorage。

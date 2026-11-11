@@ -273,10 +273,11 @@ test('卡片等高：网格 stretch + 卡内各块预留高度 + 页脚吸底', 
   assert.ok(modelGrid, '找不到 .model-grid')
   assert.match(modelGrid[0], /align-items:\s*stretch/, '.model-grid 必须 stretch（同排等高）')
 
-  const foot = css.match(/(?:^|\n)\.mc-foot\s*\{[^}]*\}/m)
-  assert.ok(foot, '找不到 .mc-foot')
-  assert.match(foot[0], /justify-content:\s*flex-end/, '详情应右对齐')
-  assert.match(foot[0], /margin-top:\s*auto/, '页脚必须 margin-top:auto，把余量收在卡底')
+  const foot = css.match(/(?:^|\n)\.mc-line-ends\s*\{[^}]*\}/m)
+  assert.ok(foot, '找不到 .mc-line-ends')
+  assert.match(foot[0], /margin-top:\s*auto/, '端点行必须 margin-top:auto，把余量收在卡底')
+  // 详情已经并到端点那一行，卡片不该再单占一行页脚
+  assert.equal(/\.mc-foot\s*\{/.test(css), false, '不该再有独立的 .mc-foot 行')
 
   const mc = css.match(/(?:^|\n)\.mc\s*\{[^}]*\}/m)
   assert.ok(mc, '找不到 .mc')
@@ -301,6 +302,42 @@ test('卡片等高：网格 stretch + 卡内各块预留高度 + 页脚吸底', 
   assert.match(group[0], /white-space:\s*nowrap/, '组名要单行省略')
 })
 
+test('端点用完整说法，不再只写 Chat/Response', async () => {
+  const js = await (await fetch(base + '/ui/app.js')).text()
+  const map = js.match(/const ENDPOINT_LABEL = \{[\s\S]*?\n\};/)
+  assert.ok(map, '找不到 ENDPOINT_LABEL')
+  // 一个模型常同时挂几种兼容层，只写「Chat」会让人以为只支持一种协议
+  assert.match(map[0], /'OpenAI 兼容'/, 'openai 应显示为「OpenAI 兼容」')
+  assert.match(map[0], /'OpenAI Responses'/, 'openai-response 应显示为「OpenAI Responses」')
+  assert.match(map[0], /'Anthropic 兼容'/, 'anthropic 应显示为「Anthropic 兼容」')
+  assert.match(map[0], /'Gemini 兼容'/, 'gemini 应显示为「Gemini 兼容」')
+  assert.equal(/(?:openai:\s*'Chat')/.test(map[0]), false, '不该再退回「Chat」这种半截说法')
+
+  // 自动描述里也要用同一套说法，别一边「OpenAI 兼容」一边「openai 端点」
+  const auto = js.match(/function autoDescription\([\s\S]*?\n\}/)
+  assert.ok(auto, '找不到 autoDescription')
+  assert.match(auto[0], /\.map\(endLabel\)/, '自动描述应走 endLabel 转可读名')
+})
+
+test('详情与端点同一行，省掉一整行页脚', async () => {
+  const js = await (await fetch(base + '/ui/app.js')).text()
+  const fn = js.match(/function modelCard\([\s\S]*?\n\}/)
+  assert.ok(fn, '找不到 modelCard')
+  const endsLine = fn[0].match(/mc-line-ends[\s\S]*?\)\);/)
+  assert.ok(endsLine, '找不到端点行')
+  assert.match(endsLine[0], /mc-detail/, '详情按钮应在这行里')
+  assert.equal(/mc-foot/.test(fn[0]), false, '卡片里不该再渲染独立页脚')
+})
+
+test('同倍率同价的分组合并成一个 chip（gpt-pro/promax）', async () => {
+  const js = await (await fetch(base + '/ui/app.js')).text()
+  const chips = js.match(/function groupChipsEl\([\s\S]*?\n\}/)
+  assert.ok(chips, '找不到 groupChipsEl')
+  assert.match(chips[0], /agg\.chips/, '分组 chip 应使用归并后的 chips')
+  // 数量标记随归并失去意义（不再有隐藏项），不该再渲染
+  assert.equal(/mc-gcount/.test(js), false, '不该再渲染分组数量标记')
+})
+
 test('模型广场是筛选栏 + 卡片网格，不再是表格', async () => {
   const html = await (await fetch(base + '/')).text()
   assert.match(html, /class="market-body"/, '缺少 market-body 布局')
@@ -318,7 +355,7 @@ test('卡片含 NearToken 那套信息位：名称/厂商/描述/计费/价格/�
   const js = await (await fetch(base + '/ui/app.js')).text()
   const fn = js.match(/function modelCard\([\s\S]*?\n\}/)
   assert.ok(fn, '找不到 modelCard')
-  for (const cls of ['mc-name', 'mc-vendor', 'mc-desc', 'mc-billing', 'mc-prices', 'mc-ends', 'mc-foot']) {
+  for (const cls of ['mc-name', 'mc-vendor', 'mc-desc', 'mc-billing', 'mc-prices', 'mc-ends', 'mc-detail']) {
     assert.match(fn[0], new RegExp(cls), `卡片缺少 ${cls}`)
   }
   // 分组：一个模型跨多个分组，抽成 groupChipsEl

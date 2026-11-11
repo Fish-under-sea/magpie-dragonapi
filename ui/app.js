@@ -767,17 +767,21 @@ function fmtRange(span, unit) {
   return `${sym}${lo.toFixed(digits)}–${hi.toFixed(digits)}/${unit}`;
 }
 
-/** 端点 id → 看得懂的名字（站点给的是 openai / openai-response / anthropic 这类内部名）。 */
+/** 端点 id → 看得懂的名字。
+ *
+ * 站点给的是内部名（openai / openai-response / anthropic）。只写「Chat」
+ * 会让人以为只支持一种协议，其实一个模型常常同时挂在几种兼容层上，
+ * 所以按 NearToken 的说法写全：OpenAI 兼容 / OpenAI Responses / Anthropic 兼容… */
 const ENDPOINT_LABEL = {
-  openai: 'Chat',
-  'openai-response': 'Response',
-  anthropic: 'Anthropic',
-  gemini: 'Gemini',
-  'image-generation': '图片',
+  openai: 'OpenAI 兼容',
+  'openai-response': 'OpenAI Responses',
+  anthropic: 'Anthropic 兼容',
+  gemini: 'Gemini 兼容',
+  'image-generation': '生图',
   '视频任务': '视频',
-  'jina-rerank': 'Rerank',
-  rerank: 'Rerank',
-  embedding: '嵌入',
+  'jina-rerank': '重排',
+  rerank: '重排',
+  embedding: '向量',
   audio: '语音',
   tts: '语音合成',
   asr: '语音识别',
@@ -1117,14 +1121,16 @@ function libraryGroupChips(list, modelsByGroup, countOf) {
  * 分组少就一行排开，多就换行——排版交给 CSS 的 flex-wrap，不在 JS 里截断。
  */
 function groupChipsEl(agg) {
-  const list = Array.isArray(agg.groups) ? agg.groups : [];
-  const title = list
+  // 展示用 chips：同倍率同价的分组已经并成一项（gpt-pro/promax）。
+  // agg.groups 仍是原始分组，详情页的按分组定价表要用它。
+  const list = Array.isArray(agg.chips) && agg.chips.length ? agg.chips : (agg.groups || []);
+  const title = (Array.isArray(agg.groups) ? agg.groups : [])
     .map((g) => `${g.id}${Number(g.ratio) > 0 ? ' ' + fmtRatio(g.ratio) : ''}`)
     .join('\n');
   return h('span', { class: 'mc-groups', title },
     list.map((g) => h('span', { class: 'mc-gb' },
       Number(g.ratio) > 0 ? ratioTag(g.ratio) : null,
-      h('span', { class: 'mc-group', text: GROUP_ALIAS[g.id] || g.id || '—' }))));
+      h('span', { class: 'mc-group', text: GROUP_ALIAS[g.label] || GROUP_ALIAS[g.id] || g.label || g.id || '—' }))));
 }
 
 /**
@@ -1221,18 +1227,17 @@ function modelCard(agg, groupMap) {
 
     h('div', { class: 'mc-line mc-line-groups' },
       h('span', { class: 'k', text: '分组' }),
-      groupChipsEl(agg),
-      // 只有多于一个分组时才提示数量，单个分组没必要重复
-      agg.groupCount > 1 ? h('span', { class: 'mc-gcount', text: `${agg.groupCount} 个` }) : null),
+      groupChipsEl(agg)),
 
+    // 端点与「详情」同一行：卡片最后一行本来就只剩这两个短元素，
+    // 各占一行纯属浪费高度。详情靠右，仍然在视觉上收尾这张卡。
     h('div', { class: 'mc-line mc-line-ends' },
       h('span', { class: 'k', text: '端点' }),
       endpoints.length
         ? h('span', { class: 'mc-ends' }, ...endpointEls(endpoints, 4))
-        : h('span', { class: 'muted', text: '—' })),
-
-    h('div', { class: 'mc-foot' },
-      h('button', { class: 'link mc-detail', type: 'button', onclick: open }, '详情', h('span', { class: 'mc-detail-arrow', text: '›' }))));
+        : h('span', { class: 'muted', text: '—' }),
+      h('button', { class: 'link mc-detail', type: 'button', onclick: open },
+        '详情', h('span', { class: 'mc-detail-arrow', text: '›' }))));
 }
 
 /**
@@ -1244,7 +1249,7 @@ function modelCard(agg, groupMap) {
 function autoDescription(m, pricing) {
   const vendor = m.vendor || '站点';
   const kind = KIND_LABEL[m.kind] || '模型';
-  const ends = (Array.isArray(m.endpoints) ? m.endpoints : []).slice(0, 2);
+  const ends = (Array.isArray(m.endpoints) ? m.endpoints : []).slice(0, 2).map(endLabel);
   const p = pricing || m.pricing || {};
   const billing = p.kind === 'tiered' ? '分档计费'
     : p.kind === 'percall' ? '按次/按秒计费'

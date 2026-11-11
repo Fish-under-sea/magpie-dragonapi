@@ -1833,25 +1833,27 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 }
 
 /* 页脚只剩「详情」：紧跟内容，不再吸到卡底，避免中间留一片空白 */
-.mc-foot {
-  /* auto 把「详情」按到卡底：拉伸后多出来的高度集中到这里，
-     所有卡的详情在同一基线上 */
+/* 端点行兼收「详情」：卡片最后一行只剩这两个短元素，合成一行省 26px。
+   同时它吸到卡底（margin-top:auto）——stretch 多出来的高度集中在这里上方。 */
+.mc-line-ends {
   margin-top: auto;
   padding-top: 7px;
-  display: flex;
   align-items: center;
-  justify-content: flex-end;
 }
-/* 用 .mc-foot 前缀提高优先级：.link 在本文件后面定义，不加会被它压回蓝色 */
-.mc-foot .mc-detail {
+.mc-line-ends .k { line-height: 1.4; }
+/* 用 .mc-line-ends 前缀提高优先级：.link 在本文件后面定义，不加会被它压回蓝色 */
+.mc-line-ends .mc-detail {
   display: inline-flex;
   align-items: center;
   gap: 3px;
+  flex: none;
+  margin-left: auto;
+  padding-left: 8px;
   font-size: 12px;
   font-weight: 650;
   color: var(--fg);
 }
-.mc-foot .mc-detail:hover { color: var(--accent); text-decoration: none; }
+.mc-line-ends .mc-detail:hover { color: var(--accent); text-decoration: none; }
 .mc-detail-arrow { color: var(--muted); font-size: 14px; line-height: 1; }
 
 /* 文字按钮：卡片里的「详情」、侧栏的「重置」 */

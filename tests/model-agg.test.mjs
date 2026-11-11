@@ -120,6 +120,47 @@ test('不同模型不会被并到一起', () => {
   assert.deepEqual(out.map((x) => x.name).sort(), ['gpt-6-astra', 'gpt-6.1-sol'])
 })
 
+test('同倍率同价的分组合并成一个展示项（gpt-pro/promax）', () => {
+  const out = aggregateRows([
+    row('gpt-特惠', 0.06, 0.12, 0.6, 0.006),
+    row('gpt-plus', 0.1, 0.2, 1.0, 0.01),
+    row('gpt-pro', 0.16, 0.32, 1.6, 0.02),
+    row('gpt-promax', 0.16, 0.32, 1.6, 0.02),
+  ])
+  // groups 仍是 4 个原始分组（详情页的按分组定价表要用）
+  assert.equal(out[0].groups.length, 4)
+  // chips 归并成 3 项，让分组一行放得下
+  assert.equal(out[0].chips.length, 3)
+  assert.deepEqual(out[0].chips.map((c) => c.label), ['gpt-特惠', 'gpt-plus', 'gpt-pro/gpt-promax'])
+  assert.deepEqual(out[0].chips[2].ids, ['gpt-pro', 'gpt-promax'])
+})
+
+test('倍率相同但价格不同时不合并——那意味着价不一样', () => {
+  const out = aggregateRows([
+    row('a', 0.16, 0.32, 1.6, 0.02),
+    row('b', 0.16, 0.5, 2.5, 0.05),
+  ])
+  assert.equal(out[0].chips.length, 2, '价格不同必须分开列')
+})
+
+test('倍率不同不合并', () => {
+  const out = aggregateRows([
+    row('a', 0.1, 0.32, 1.6, 0.02),
+    row('b', 0.16, 0.32, 1.6, 0.02),
+  ])
+  assert.equal(out[0].chips.length, 2)
+})
+
+test('三个以上同价分组也能一并合并', () => {
+  const out = aggregateRows([
+    row('a', 0.16, 0.32, 1.6, 0.02),
+    row('b', 0.16, 0.32, 1.6, 0.02),
+    row('c', 0.16, 0.32, 1.6, 0.02),
+  ])
+  assert.equal(out[0].chips.length, 1)
+  assert.equal(out[0].chips[0].label, 'a/b/c')
+})
+
 test('空输入返回空数组，不抛', () => {
   assert.deepEqual(aggregateRows([]), [])
   assert.deepEqual(aggregateRows(null), [])

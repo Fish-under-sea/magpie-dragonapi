@@ -382,3 +382,29 @@ test('版本相同时档位先于名称，不被名字排序挡掉', () => {
   ])
   assert.deepEqual(out.map((x) => x.name), ['glm-5.3', 'glm-5-3-flash-260828'])
 })
+
+// ── 视频的品牌顺序：seed(ance) → h3 → wan → veo → omni → grok → muse ──
+
+test('brandOf：名字优先于 vendor（wan 不能被阿里云判成 qwen）', () => {
+  assert.equal(brandOf('wan3.0-video', '阿里云'), 'wan')
+  assert.equal(brandOf('seedance-2.5', '字节跳动'), 'seed')
+  assert.equal(brandOf('veo-3.1', 'Google'), 'veo')
+  assert.equal(brandOf('omni-flash-video', 'Google'), 'omni')
+  assert.equal(brandOf('grok-imagine-video-1.5', 'xAI'), 'grok')
+  assert.equal(brandOf('muse-video', ''), 'muse')
+  // 名字看不出来时才退回 vendor
+  assert.equal(brandOf('some-unnamed', 'DeepSeek'), 'ds')
+})
+
+test('视频区按品牌顺序排', () => {
+  const list = [
+    agg('muse-video', ''), agg('grok-imagine-video-1.5', 'xAI'), agg('omni-flash-video', 'Google'),
+    agg('veo-3.1', 'Google'), agg('wan3.0-video', '阿里云'), agg('seedance-2.5', '字节跳动'),
+  ].map((a) => ({ ...a, cat: 'video' }))
+  const catOf = () => 'video'
+  const names = orderDefault(list, { catOf, catOrder: ['video'] }).map((x) => x.name)
+  assert.deepEqual(names, [
+    'seedance-2.5', 'wan3.0-video', 'veo-3.1', 'omni-flash-video',
+    'grok-imagine-video-1.5', 'muse-video',
+  ])
+})

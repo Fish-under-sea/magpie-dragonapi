@@ -139,24 +139,63 @@ const BRAND_TESTS = [
   ['qwen', /\bqwen\b|通义|千问|阿里/i],
   ['glm', /\bglm\b|智谱|zhipu/i],
   ['hy', /\bhy\d|\bhy\b|混元|hunyuan/i],
-  ['minimax', /minimax|海螺/i],
+  ['minimax', /minimax|海螺|hailuo/i],
   ['mimo', /\bmimo\b|小米|xiaomi/i],
+  // 图片 / 视频这两类各自有厂商顺序（见 CATEGORY_BRAND_ORDER），
+  // 先把它们的品牌认出来，排序时按类别查表。
+  ['seed', /seedance/i],
+  ['h3', /\bh3\b|hailuo-?3/i],
+  ['wan', /wan\d|wan-video|万相/i],
+  ['veo', /\bveo\b/i],
+  ['omni', /\bomni\b/i],
+  ['muse', /\bmuse\b/i],
+  ['grok', /grok/i],
+  ['gpt-image', /gpt-image/i],
+  ['gemini-image', /gemini.*image|nano-?banana|^banana/i],
 ]
 
-/** 品牌 id：先按名字判，再看 vendor；都判不出来就用 vendor 原名。 */
+/**
+ * 类别专用的品牌顺序。站点的模型页按「厂商」分区，而每个类别里的厂商
+ * 谁先谁后是业务判断，只能一类一类定：
+ *   - 国模：见 BRAND_ORDER（kimi → ds → qwen → glm → hy → minimax → mimo）
+ *   - 视频：seed(ance) → h3 → wan → veo → omni → grok → muse
+ */
+const CATEGORY_BRAND_ORDER = {
+  video: ['seed', 'h3', 'wan', 'veo', 'omni', 'grok', 'muse'],
+}
+
+/**
+ * 品牌 id：**先按名字判，再看 vendor**。
+ *
+ * 顺序不能反：`wan3.0-video` 的 vendor 是「阿里云」，而阿里云在 qwen 的规则里，
+ * 先看 vendor 会把它判成 qwen，于是视频区里的 wan 找错了位置（排到最后）。
+ * 名字里写了什么厂商就是什么厂商，vendor 只在名字看不出来时兜底。
+ */
 export function brandOf(name, vendor = '') {
-  const hay = `${name || ''} ${vendor || ''}`
-  for (const [id, re] of BRAND_TESTS) if (re.test(hay)) return id
-  return String(vendor || '')
+  const n = String(name || '')
+  for (const [id, re] of BRAND_TESTS) if (re.test(n)) return id
+  const v = String(vendor || '')
+  if (v) {
+    for (const [id, re] of BRAND_TESTS) if (re.test(v)) return id
+  }
+  return v
 }
 
 /** 等级优先于代数的类别（代号即等级的那几家）；其余类别代数优先。 */
 const GRADE_FIRST_CATS = new Set(['claude', 'gpt', 'gemini'])
 
-/** 品牌排序权重：列表内的按位置，列表外的排后面。 */
-function brandRank(brand) {
-  const i = BRAND_ORDER.indexOf(brand)
-  return i < 0 ? BRAND_ORDER.length : i
+/**
+ * 品牌排序权重：类别专用表优先（视频/图片），其次国模品牌表，
+ * 都没列到的排最后（按品牌名兜底）。
+ */
+function brandRank(brand, cat) {
+  const local = CATEGORY_BRAND_ORDER[cat]
+  if (Array.isArray(local)) {
+    const i = local.indexOf(brand)
+    if (i >= 0) return i
+  }
+  const j = BRAND_ORDER.indexOf(brand)
+  return j < 0 ? 1000 : 100 + j
 }
 
 /** 只比版本号：返回负数表示 a 更新；版本相同返回 0（交给调用方继续比档位/名称）。 */
@@ -225,7 +264,7 @@ export function orderDefault(aggs, { catOf, catOrder = [] } = {}) {
   const out = []
   const orderedBuckets = [...buckets.values()]
     .sort((x, y) => x.rank - y.rank
-      || brandRank(x.brand) - brandRank(y.brand)
+      || brandRank(x.brand, x.cat) - brandRank(y.brand, y.cat)
       || String(x.brand || '\uffff').localeCompare(String(y.brand || '\uffff'), 'zh'))
 
   for (const bucket of orderedBuckets) {

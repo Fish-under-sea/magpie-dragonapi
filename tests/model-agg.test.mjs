@@ -236,12 +236,97 @@ test('默认排序：只要还有别的等级可排，就不出现同等级相�
 })
 
 test('默认排序：单一等级时退化为版本降序', () => {
-  const out = sortList([agg('gpt-6-sol', 'OpenAI'), agg('gpt-5.6', 'OpenAI'), agg('gpt-6.1-sol', 'OpenAI')])
-  assert.deepEqual(out.map((x) => x.name), ['gpt-6.1-sol', 'gpt-6-sol', 'gpt-5.6'])
+  // 用不带厂商代号的模型：全部落在默认等级，只有一道
+  const out = sortList([agg('acme-6-sol', 'Acme'), agg('acme-5.6', 'Acme'), agg('acme-6.1-sol', 'Acme')])
+  assert.deepEqual(out.map((x) => x.name), ['acme-6.1-sol', 'acme-6-sol', 'acme-5.6'])
 })
 
 test('byVersionDesc：缺版本号的排末尾，- 与 . 等价', () => {
   const out = [agg('claude-x-preview', 'Anthropic'), agg('claude-x-5.5', 'Anthropic'), agg('claude-x-5-6', 'Anthropic')]
     .sort(byVersionDesc)
   assert.deepEqual(out.map((x) => x.name), ['claude-x-5-6', 'claude-x-5.5', 'claude-x-preview'])
+})
+
+test('Gemini 的代号等级：c > a > a-h > a-m > a-l > flash', () => {
+  assert.equal(tierRankOf('gemini-4-carbon', 'Google'), 0)
+  assert.equal(tierRankOf('gemini-4-argon', 'Google'), 1)
+  assert.equal(tierRankOf('gemini-4-argon-high', 'Google'), 2)
+  assert.equal(tierRankOf('gemini-4-argon-medium', 'Google'), 3)
+  assert.equal(tierRankOf('gemini-4-argon-low', 'Google'), 4)
+  assert.equal(tierRankOf('gemini-3.8-flash', 'Google'), 5)
+  // 只有 Google 用这套代号；别家同名不受影响
+  assert.equal(tierRankOf('some-carbon-model', 'OpenAI'), 3)
+})
+
+test('Gemini 4 全系列按 c→a→a-h→a-m→a-l 排，不跨道', () => {
+  const list = [
+    agg('gemini-4-argon-low', 'Google'),
+    agg('gemini-4-argon', 'Google'),
+    agg('gemini-4-argon-medium', 'Google'),
+    agg('gemini-4-carbon', 'Google'),
+    agg('gemini-4-argon-high', 'Google'),
+  ]
+  const names = sortList(list).map((x) => x.name)
+  assert.deepEqual(names, [
+    'gemini-4-carbon',
+    'gemini-4-argon',
+    'gemini-4-argon-high',
+    'gemini-4-argon-medium',
+    'gemini-4-argon-low',
+  ])
+})
+
+test('GPT 的代号等级：astra(a) > sol > terra，等级优先于代数', () => {
+  assert.equal(tierRankOf('gpt-6-astra', 'OpenAI'), 0)
+  assert.equal(tierRankOf('gpt-6.1-sol', 'OpenAI'), 1)
+  assert.equal(tierRankOf('gpt-6-sol', 'OpenAI'), 1)
+  assert.equal(tierRankOf('gpt-5.6-terra', 'OpenAI'), 2)
+  // 6a 必须排在 6.1sol 前面：代数只在同一等级道内比较
+  const out = sortList([
+    agg('gpt-6.1-sol', 'OpenAI'),
+    agg('gpt-6-astra', 'OpenAI'),
+    agg('gpt-6-sol', 'OpenAI'),
+  ])
+  assert.equal(out[0].name, 'gpt-6-astra')
+  assert.ok(
+    out.findIndex((x) => x.name === 'gpt-6-astra') < out.findIndex((x) => x.name === 'gpt-6.1-sol'),
+    'gpt-6-astra 应在 gpt-6.1-sol 之前',
+  )
+})
+
+// ── 同一模型的不同拼写（- 与 .）去重 ───────────────────────────────
+
+/** 造一行指定名字的目录数据。 */
+function rowOf(name, group, ratio) {
+  return {
+    id: `${group}/${name}`, name, group, groupRatio: ratio, groupAuto: false,
+    kind: 'chat', vendor: 'Anthropic', context: 200000, description: '', tags: '',
+    endpoints: ['anthropic', 'openai'],
+    pricing: { kind: 'ratio', inputNum: 1.4, outputNum: 7, cacheNum: 0.07, input: '$1.40/M' },
+  }
+}
+
+test('同一模型两种拼写：证据一致就合并，主名保留分组多的那个', () => {
+  const out = aggregateRows([
+    rowOf('claude-opus-5-5', 'claude-kiro', 0.1),
+    rowOf('claude-opus-5-5', 'claude-cursor', 0.4),
+    rowOf('claude-opus-5.5', 'claude-kiro', 0.1),
+  ])
+  assert.equal(out.length, 1, '两种拼写应合成一张卡')
+  assert.equal(out[0].name, 'claude-opus-5-5', '主名用分组更全的那种拼写')
+  assert.deepEqual(out[0].aliases, ['claude-opus-5-5', 'claude-opus-5.5'], '另一个拼写记进 aliases')
+  assert.equal(out[0].groups.length, 2, '同名分组不能因为合并被算两遍')
+})
+
+test('拼写相同但价格不同：不合并，各自保留', () => {
+  const a = rowOf('claude-opus-5-5', 'claude-kiro', 0.1)
+  const b = { ...rowOf('claude-opus-5.5', 'claude-kiro', 0.1), pricing: { ...rowOf('x', 'g', 1).pricing, inputNum: 9.9 } }
+  const out = aggregateRows([a, b])
+  assert.equal(out.length, 2, '价格对不上就不能当作同一个模型')
+})
+
+test('只有一处拼写的模型，aliases 为空且不影响展示', () => {
+  const out = aggregateRows([rowOf('claude-sonnet-5-5', 'claude-kiro', 0.1)])
+  assert.equal(out.length, 1)
+  assert.equal(out[0].aliases, undefined)
 })

@@ -79,8 +79,43 @@ const TIER_WORDS = {
 }
 const TIER_DEFAULT = 3
 
+/**
+ * 厂商自有的代号等级：**按顺序匹配，先命中先用**，所以越具体的写越前。
+ *
+ * 一些厂商不用档位词，而是用一串代号表示等级。这种顺序只能由人定，
+ * 写在这里比塞进通用词表清楚——通用词表跨厂商共用，加进去会误伤别家。
+ *
+ * Google：`gemini-4-carbon`(c) > `gemini-4-argon`(a) > `argon-high`(a-h)
+ * > `argon-medium`(a-m) > `argon-low`(a-l) > `flash`。
+ */
+const VENDOR_GRADES = {
+  Google: [
+    [/carbon/i, 0],
+    [/argon-h(?:igh)?\b/i, 2],
+    [/argon-m(?:edium)?\b/i, 3],
+    [/argon-l(?:ow)?\b/i, 4],
+    [/\bargon\b/i, 1],
+    [/flash/i, 5],
+  ],
+  OpenAI: [
+    // GPT 的代号等级：astra(a) > sol > terra。等级优先于代数，所以
+    // gpt-6-astra 排在 gpt-6.1-sol 前面——代数只在同一道内比较。
+    [/\bastra\b/i, 0],
+    [/\bsol\b/i, 1],
+    [/\bterra\b/i, 2],
+    // codex 是另一条产品线（代码审查），不该和对话型号插花排，
+    // 单独排在这些等级之后。
+    [/\bcodex\b/i, 4],
+  ],
+}
+
 /** 取名字里**从最高档开始**的档位词；整词匹配，避免 `minimax` 命中 `mini`。 */
-export function tierRankOf(name) {
+export function tierRankOf(name, vendor = '') {
+  const vendorRules = VENDOR_GRADES[vendor]
+  if (Array.isArray(vendorRules)) {
+    for (const [re, rank] of vendorRules) if (re.test(String(name || ''))) return rank
+  }
+
   const tokens = String(name || '').toLowerCase().split(/[-_.\s]+/).filter(Boolean)
   let best = null
   for (const t of tokens) {
@@ -152,7 +187,7 @@ export function orderDefault(aggs, { catOf, catOrder = [] } = {}) {
     // 2. 分道：等级 → 该等级的模型（道内按版本降序）
     const lanes = new Map()
     for (const a of bucket.items) {
-      const t = tierRankOf(a.name)
+      const t = tierRankOf(a.name, a.vendor)
       const lane = lanes.get(t) || []
       lane.push(a)
       lanes.set(t, lane)
@@ -241,6 +276,65 @@ export function aggregateRows(rows) {
   }
 
   // 输出顺序保持输入首见顺序，调用方的排序菜单仍掌握最终顺序。
+  return mergeAliases(out)
+}
+
+/** 版本号里的 `-` 与 `.` 视为同一种写法：claude-opus-5-5 ≡ claude-opus-5.5。 */
+function canonicalName(name) {
+  return String(name || '').replace(/(\d)-(?=\d)/g, '$1.')
+}
+
+/** 两个分组项是不是同一个「槽位」：同分组、同倍率、同计价、三档数值一致。 */
+function sameSlot(a, b) {
+  const pa = a.pricing || {}
+  const pb = b.pricing || {}
+  return a.id === b.id
+    && (a.ratio ?? null) === (b.ratio ?? null)
+    && (pa.kind || '') === (pb.kind || '')
+    && (pa.inputNum ?? null) === (pb.inputNum ?? null)
+    && (pa.outputNum ?? null) === (pb.outputNum ?? null)
+    && (pa.cacheNum ?? null) === (pb.cacheNum ?? null)
+}
+
+/**
+ * 合并同一模型的不同拼写（`claude-opus-5-5` 与 `claude-opus-5.5`）。
+ *
+ * 站点把同一个模型按两种写法挂在目录里，不合并就会多出一张看起来重复的卡。
+ * 但「名字长得像」不能当作等价证据，所以加一道硬门槛：**较短的变体**的每个
+ * 分组，都必须在**较长的变体**里找到同分组、同倍率、同计价、三档数值完全一样
+ * 的一项；全部对上才合并，否则保持两张。合并时只保留主名，另一边记进 aliases，
+ * 详情页会写出来，不会悄悄消失。
+ */
+function mergeAliases(aggs) {
+  const buckets = new Map()
+  for (const a of aggs) {
+    const k = canonicalName(a.name)
+    const list = buckets.get(k) || []
+    list.push(a)
+    buckets.set(k, list)
+  }
+
+  const out = []
+  for (const list of buckets.values()) {
+    if (list.length === 1) { out.push(list[0]); continue }
+    // 分组更全的那个当主名（用户看到的名字）
+    list.sort((x, y) => y.groupCount - x.groupCount || String(x.name).localeCompare(String(y.name), 'zh'))
+    const primary = list[0]
+    primary.aliases = [primary.name]
+    for (const v of list.slice(1)) {
+      const covered = v.groups.every((gv) => primary.groups.some((gp) => sameSlot(gv, gp)))
+      if (!covered) {
+        // 证据不足：当作不同模型，各自保留
+        out.push(v)
+        continue
+      }
+      if (!primary.aliases.includes(v.name)) primary.aliases.push(v.name)
+    }
+    out.push(primary)
+  }
+  // 保持调用方拿到的顺序稳定：按首次出现重排
+  const order = new Map(aggs.map((a, i) => [a, i]))
+  out.sort((x, y) => (order.get(x) ?? 0) - (order.get(y) ?? 0))
   return out
 }
 

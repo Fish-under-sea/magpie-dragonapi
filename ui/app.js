@@ -2360,7 +2360,14 @@ function modelDetailNodes(model, data, agg = null) {
     kv('端点', ends, true),
     kv('分组', groupCount ? `${groupCount} 个（下方横向比较）` : (model.group || '')),
     kv('分组倍率', ratioText, true),
-    kv('模型 id', model.id || (agg && agg.id), true),
+    // 站点可能把同一个模型按两种拼写挂着（claude-opus-5-5 / claude-opus-5.5）。
+    // 卡片上合并成一张，但这里要把两个原名都写出来——不能让人以为名字被改过。
+    kv('模型 id', [
+      model.id || (agg && agg.id),
+      agg && Array.isArray(agg.aliases) && agg.aliases.length > 1
+        ? `& ${agg.aliases.slice(1).join(' & ')}`
+        : '',
+    ].filter(Boolean).join(' '), true),
   ].flat();
   if (kvParts.length) nodes.push(h('dl', { class: 'kv-grid' }, ...kvParts));
 

@@ -2062,21 +2062,20 @@ function logRowEl(r) {
   const effort = r.effort && !/^(none|无|default)$/i.test(String(r.effort)) ? r.effort : '';
 
   return h('div', { class: 'lg-row', role: 'row' },
-    // 1 时间 + 类型
+    // 1 时间 + 类型 + 令牌胶囊（令牌跟时间一列，恢复原来的位置）
     h('span', { class: 'lg-cell-stack', role: 'cell' },
       h('span', { class: 'lg-time-str', text: r.atText || fmtAt(r.at) }),
       h('span', { class: 'lg-meta-row' },
-        h('span', { class: `lg-tag${r.kind === '消耗' ? ' ok' : ''}`, text: r.kind || '消费' }))),
+        h('span', { class: `lg-tag${r.kind === '消耗' ? ' ok' : ''}`, text: r.kind || '消费' }),
+        h('button', {
+          class: 'lg-pill lg-copyable', type: 'button', title: '点击复制令牌名称',
+          onclick: (ev) => copyText(r.tokenName || '', ev.currentTarget),
+        },
+        h('span', { class: 'lg-key', 'aria-hidden': 'true', text: '⚿' }),
+        h('span', { text: mask(r.tokenName || '') })))),
 
-    // 2 令牌胶囊 + 分组：上游把两者叠在一列——上面是令牌，下面是分组与倍率
+    // 2 分组 + 倍率（令牌已回到时间列，这里只放分组）
     h('span', { class: 'lg-cell-stack', role: 'cell' },
-      h('button', {
-        class: 'lg-group-pill', type: 'button',
-        title: r.tokenName ? `点击复制令牌名称：${r.tokenName}` : (r.group ? `分组 ${r.group}` : ''),
-        onclick: (ev) => copyText(r.tokenName || '', ev.currentTarget),
-      },
-      h('span', { class: 'lg-key', 'aria-hidden': 'true', text: '⚿' }),
-      h('span', { class: 'lg-gb-name', text: mask(r.tokenName || r.group || '') })),
       h('span', { class: 'lg-group-meta' },
         h('span', { class: 'lg-group-name', title: r.group || '', text: r.group || '—' }),
         ratio ? h('span', { class: 'lg-group-ratio', text: ratio }) : null)),
@@ -2095,9 +2094,9 @@ function logRowEl(r) {
         r.effort && effort ? h('span', { class: 'lg-effort', text: effort }) : null,
         hasMap ? h('span', { class: 'lg-map-mark', title: '查看模型映射', 'aria-hidden': 'true' }, '⇄') : null)),
 
-    // 4 费用：钱包 / 订阅各用各的图标，金额 6 位小数（与上游一致）
+    // 4 费用：钱包 / 订阅各用各的图标，徽章照官网（中圆角、muted 底、foreground 字）
     h('span', { class: 'lg-cell-stack', role: 'cell' },
-      h('span', { class: `lg-cost-pill${bySubscription ? ' sub' : ''}`, title: paidBy },
+      h('span', { class: 'lg-cost-pill', title: paidBy },
         bySubscription ? subscriptionGlyph() : walletGlyph(),
         h('span', { text: costText ? mask(costText) : '—' }))),
 
@@ -3061,7 +3060,7 @@ async function copyText(text, btn, label = '复制') {
   try {
     if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
       await navigator.clipboard.writeText(text);
-      flashButton(btn, label, '已复制');
+      flashButton(btn, '已复制');
       return;
     }
   } catch {
@@ -3094,19 +3093,28 @@ async function copyText(text, btn, label = '复制') {
     const sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(range);
-    flashButton(btn, label, '已选中，按 Ctrl+C');
+    flashButton(btn, '已选中，按 Ctrl+C');
     banner('warn', '浏览器不允许直接写剪贴板，文本已选中，按 Ctrl+C 复制。', { key: 'copy', timeout: 6000 });
   } else {
-    flashButton(btn, label, '复制失败');
+    flashButton(btn, '复制失败');
     banner('warn', '复制失败，请手动选中钥匙文本。', { key: 'copy', timeout: 6000 });
   }
 }
 
-function flashButton(btn, original, temporary) {
+function flashButton(btn, temporary) {
   if (!btn) return;
+  // 按钮内容可能不是纯文本（令牌胶囊里有图标 + 名字）：存 innerHTML，到点原样还原。
+  // 上一版存的是传进来的 label，令牌胶囊被复制后永远变成「复制」，回不来了。
+  if (btn.dataset.flashing === '1') return;
+  btn.dataset.flashing = '1';
+  const saved = btn.innerHTML;
   btn.textContent = temporary;
   btn.disabled = true;
-  setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1600);
+  setTimeout(() => {
+    btn.innerHTML = saved;
+    btn.disabled = false;
+    delete btn.dataset.flashing;
+  }, 1600);
 }
 
 // ── 单模型详情（抽屉） ────────────────────────────────────

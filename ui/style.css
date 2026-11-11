@@ -2341,13 +2341,13 @@ input.logs-input:focus-visible, select.logs-select:focus-visible {
 }
 .lg-tag.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
 /* 令牌 / 模型 / 费用三处都用胶囊：与上游日志表一致 */
-.lg-group-pill,
-.lg-model-pill,
-.lg-cost-pill {
+.lg-pill,
+.lg-model-pill {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   min-width: 0;
+  max-width: 100%;
   min-height: 20px;
   padding: 0 8px;
   font-size: 10.5px;
@@ -2358,24 +2358,42 @@ input.logs-input:focus-visible, select.logs-select:focus-visible {
   overflow: hidden;
   white-space: nowrap;
 }
-.lg-group-pill {
-  font: inherit;
-  font-size: 10.5px;
-  text-align: left;
-  cursor: pointer;
+.lg-pill { font-family: var(--code); cursor: pointer; }
+.lg-pill:hover { border-color: var(--accent-line); }
+.lg-pill > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* 费用徽章照官网：中圆角、muted 底、foreground 字、半粗数字 */
+.lg-cost-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 22px;
+  padding: 0 8px;
+  font-family: var(--code);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+  background: var(--sunken);
+  border: 1px solid var(--line-strong, var(--line));
+  border-radius: 6px;
+  overflow: hidden;
+  white-space: nowrap;
 }
-.lg-group-pill:hover { border-color: var(--accent-line); }
+.lg-cost-pill svg { flex: none; color: var(--muted); }
 .lg-key { flex: none; font-size: 9.5px; color: var(--muted); }
-.lg-gb-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.lg-group-meta { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 10px; }
+/* 分组：官网里是「分组 + 倍率」一行文字，不做成胶囊 */
+.lg-group-meta { display: flex; align-items: baseline; gap: 6px; min-width: 0; font-size: 11px; }
 .lg-group-name {
   min-width: 0;
-  color: var(--violet, var(--accent));
+  color: var(--accent);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.lg-group-ratio { flex: none; font-family: var(--code); color: var(--muted); }
+.lg-group-ratio { flex: none; font-family: var(--code); font-size: 10px; color: var(--muted); }
 .lg-model-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .lg-model-pill { flex: 0 1 auto; font-family: var(--code); }
 .lg-model-pill .vendor-icon,
@@ -2399,13 +2417,6 @@ input.logs-input:focus-visible, select.logs-select:focus-visible {
   border: 0;
 }
 .lg-map-mark { flex: none; color: var(--muted); font-size: 10px; }
-.lg-cost-pill { font-family: var(--code); font-variant-numeric: tabular-nums; }
-.lg-cost-pill svg { flex: none; color: var(--muted); }
-.lg-cost-pill.sub {
-  color: var(--violet, var(--accent));
-  border-color: color-mix(in srgb, var(--violet, var(--accent)) 45%, transparent);
-}
-.lg-cost-pill.sub svg { color: var(--violet, var(--accent)); }
 .lg-num {
   font-family: var(--code);
   font-size: 11px;
@@ -2433,7 +2444,7 @@ input.logs-input:focus-visible, select.logs-select:focus-visible {
 }
 .lg-dur-fast::before { background: var(--ok); }
 .lg-dur-mid::before { background: var(--warn); }
-.lg-dur-slow::before { background: var(--danger, #e5484d); }
+.lg-dur-slow::before { background: var(--bad); }
 .lg-dash { color: var(--muted); font-size: 10px; }
 .lg-detail {
   font-size: 10.5px;

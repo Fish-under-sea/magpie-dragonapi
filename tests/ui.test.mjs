@@ -653,7 +653,8 @@ test('使用日志页：筛选条 + 统计条 + 明细表都在，且列与 Near
   // 费用 / 模型 / 令牌都做成胶囊；费用按钱包/订阅换图标，金额 6 位小数
   assert.match(js, /lg-cost-pill/, '费用应是胶囊')
   assert.match(js, /lg-model-pill/, '模型应是胶囊')
-  assert.match(js, /lg-group-pill/, '令牌/分组应是胶囊')
+  assert.match(js, /lg-pill/, '令牌应是胶囊')
+  assert.match(js, /lg-group-meta/, '分组列应是分组 + 倍率')
   assert.match(js, /billingSource/, '费用要区分钱包与订阅扣费')
   assert.match(js, /vendorOfModel/, '模型胶囊要带厂商标记')
   assert.match(js, /toFixed\(6\)/, '费用金额按上游给 6 位小数')

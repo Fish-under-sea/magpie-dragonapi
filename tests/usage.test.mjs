@@ -84,6 +84,13 @@ test('rowsOf：没有 quota 时费用留空，不写 0', () => {
   assert.equal(rows[0].costRaw, undefined)
 })
 
+test('rowsOf：首字读 other.frt（毫秒），-1000 表示没记录', () => {
+  const hit = rowsOf([{ created_at: 1, model_name: 'a', use_time: 8, other: { frt: 5178 } }], CUR)[0]
+  assert.equal(hit.ttft, 5.178)
+  const miss = rowsOf([{ created_at: 1, model_name: 'a', use_time: 8, other: { frt: -1000 } }], CUR)[0]
+  assert.equal(miss.ttft, undefined)
+})
+
 test('rowsOf：带出扣费来源与分组倍率（费用图标与分组副行要用）', () => {
   const sub = rowsOf([{
     created_at: 1, model_name: 'a', quota: 1000,

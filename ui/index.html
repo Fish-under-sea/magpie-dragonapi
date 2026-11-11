@@ -18,7 +18,7 @@
         <img src="icon.png" alt="" width="28" height="28" loading="eager">
       </span>
       <div class="brand-text">
-        <h1>@fish-under-sea/magpie-dragonapi</h1>
+        <h1>DragonAPI</h1>
         <a class="brand-site" id="site-link" href="https://newapi.dragon3api.com" target="_blank" rel="noopener noreferrer">newapi.dragon3api.com</a>
       </div>
     </div>
@@ -35,6 +35,8 @@
   <nav class="tabs" role="tablist" aria-label="功能分页">
     <button class="tab" role="tab" type="button" id="tab-wallet" data-tab="wallet"
             aria-controls="panel-wallet" aria-selected="true" tabindex="0">账户概览</button>
+    <button class="tab" role="tab" type="button" id="tab-dashboard" data-tab="dashboard"
+            aria-controls="panel-dashboard" aria-selected="false" tabindex="-1">数据看板</button>
     <button class="tab" role="tab" type="button" id="tab-catalog" data-tab="catalog"
             aria-controls="panel-catalog" aria-selected="false" tabindex="-1">模型广场</button>
     <button class="tab" role="tab" type="button" id="tab-logs" data-tab="logs"
@@ -108,60 +110,116 @@
     <!-- 使用日志：仿 NearToken 的「使用日志」——筛选条 + 统计条 + 明细表 -->
     <section class="panel" id="panel-logs" role="tabpanel" aria-labelledby="tab-logs" data-panel="logs" hidden>
       <div class="card logs-card">
-        <div class="logs-bar">
-          <div class="segmented" id="logs-range" role="group" aria-label="时间范围">
-            <button type="button" data-log-range="day" aria-pressed="true">日</button>
-            <button type="button" data-log-range="week" aria-pressed="false">周</button>
-            <button type="button" data-log-range="month" aria-pressed="false">月</button>
+        <div class="logs-head-box">
+          <div class="logs-toolbar">
+          <div class="logs-filters">
+            <div class="menu logs-range-menu">
+              <button class="logs-range menu-trigger" id="logs-range-btn" type="button"
+                      aria-haspopup="listbox" aria-expanded="false" aria-controls="logs-range-pop">
+                <svg class="logs-range-ico" viewBox="0 0 24 24" width="14" height="14" fill="none"
+                     stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/>
+                </svg>
+                <span id="logs-range-text">—</span>
+              </button>
+              <div class="menu-pop" id="logs-range-pop" role="listbox" aria-label="时间范围" hidden>
+                <button type="button" role="option" data-log-range="day" aria-selected="true">今天</button>
+                <button type="button" role="option" data-log-range="week" aria-selected="false">近 7 天</button>
+                <button type="button" role="option" data-log-range="month" aria-selected="false">近 30 天</button>
+              </div>
+            </div>
+            <label class="sr-only" for="logs-model">模型名称</label>
+            <input id="logs-model" class="logs-input" type="search" placeholder="模型名称" autocomplete="off">
+            <label class="sr-only" for="logs-group">分组</label>
+            <select id="logs-group" class="logs-select" data-empty-label="全部分组"></select>
+            <label class="sr-only" for="logs-kind">类型</label>
+            <select id="logs-kind" class="logs-select" data-empty-label="全部类型"></select>
           </div>
-          <label class="sr-only" for="logs-model">模型名称</label>
-          <input id="logs-model" class="logs-input" type="search" placeholder="模型名称" autocomplete="off">
-          <label class="sr-only" for="logs-group">分组</label>
-          <select id="logs-group" class="logs-select"></select>
-          <label class="sr-only" for="logs-kind">类型</label>
-          <select id="logs-kind" class="logs-select"></select>
-          <button class="btn ghost" id="logs-more" type="button" aria-expanded="false">展开</button>
+          <button class="logs-expand" id="logs-more" type="button" aria-expanded="false">
+            <span>展开</span><span class="logs-caret" aria-hidden="true">▾</span>
+          </button>
         </div>
-        <div class="logs-bar" id="logs-more-row" hidden>
+        <div class="logs-filters logs-filters-adv" id="logs-more-row" hidden>
           <label class="sr-only" for="logs-token">令牌名称</label>
           <input id="logs-token" class="logs-input" type="search" placeholder="令牌名称" autocomplete="off">
           <label class="sr-only" for="logs-request">请求 ID</label>
           <input id="logs-request" class="logs-input" type="search" placeholder="请求 ID" autocomplete="off">
+          <label class="sr-only" for="logs-uprequest">上游请求 ID</label>
+          <input id="logs-uprequest" class="logs-input" type="search" placeholder="上游请求 ID" autocomplete="off">
         </div>
         <div class="logs-chips-bar">
           <div class="logs-chips" id="logs-chips"></div>
           <div class="logs-tools" id="logs-tools"></div>
+        </div>
         </div>
         <div class="logs-body" id="logs-body"><p class="loading">正在读取日志…</p></div>
         <div class="logs-pager" id="logs-pager"></div>
       </div>
     </section>
 
-    <!-- 2. 余额与用量 -->
+    <!-- 数据看板：照站点 /dashboard/models 的统计卡片 + 消耗分布 + 调用分析 -->
+    <section class="panel" id="panel-dashboard" role="tabpanel" aria-labelledby="tab-dashboard" data-panel="dashboard" hidden>
+      <div class="dash-head">
+        <h3 class="dash-title">模型调用分析</h3>
+        <div class="dash-head-right">
+          <div class="segmented" id="dash-days" role="group" aria-label="时间范围">
+            <button type="button" data-dash-days="1" aria-pressed="true">1 天</button>
+            <button type="button" data-dash-days="7" aria-pressed="false">7 天</button>
+            <button type="button" data-dash-days="14" aria-pressed="false">14 天</button>
+            <button type="button" data-dash-days="29" aria-pressed="false">29 天</button>
+          </div>
+          <div class="market-seg" id="dash-gran" role="group" aria-label="时间粒度">
+            <button type="button" data-dash-gran="hour" aria-pressed="true" title="按小时">时</button>
+            <button type="button" data-dash-gran="day" aria-pressed="false" title="按天">日</button>
+            <button type="button" data-dash-gran="week" aria-pressed="false" title="按周">周</button>
+          </div>
+        </div>
+      </div>
+      <div class="dash-cards" id="dash-cards"></div>
+
+      <div class="card dash-card">
+        <header class="card-head">
+          <h3>消耗分布 <span class="card-sub" id="dash-usage-sub"></span></h3>
+          <div class="market-seg" id="dash-usage-kind" role="group" aria-label="图表类型">
+            <button type="button" data-usage-kind="bar" aria-pressed="false">柱状图</button>
+            <button type="button" data-usage-kind="area" aria-pressed="true">面积图</button>
+          </div>
+        </header>
+        <div class="dash-chart" id="dash-usage-chart"></div>
+        <div class="dash-legend" id="dash-usage-legend"></div>
+      </div>
+
+      <div class="card dash-card">
+        <header class="card-head">
+          <h3>模型调用分析 <span class="card-sub" id="dash-calls-sub"></span></h3>
+          <div class="market-seg" id="dash-calls-view" role="group" aria-label="调用分析视图">
+            <button type="button" data-calls-view="trend" aria-pressed="true">调用趋势</button>
+            <button type="button" data-calls-view="proportion" aria-pressed="false">调用次数分布</button>
+            <button type="button" data-calls-view="top" aria-pressed="false">调用次数排行</button>
+          </div>
+        </header>
+        <div class="dash-chart" id="dash-calls-chart"></div>
+      </div>
+    </section>
+
+    <!-- 3. 余额与订阅：宽卡，左余额右订阅；整页不滚动 -->
     <section class="panel" id="panel-wallet" role="tabpanel" aria-labelledby="tab-wallet" data-panel="wallet" hidden>
-      <div class="acct-layout">
-        <div class="card acct-main-card">
-          <header class="card-head">
-            <h3>钱包</h3>
+      <div class="card wallet-wide">
+        <div class="wallet-col wallet-balance">
+          <header class="card-head wallet-head">
+            <h3 class="wallet-title">
+              <a class="wallet-link" href="https://newapi.dragon3api.com/wallet"
+                 target="_blank" rel="noopener noreferrer" title="在 DragonAPI 站点打开钱包">钱包 <span class="wallet-arrow" aria-hidden="true">↗</span></a>
+            </h3>
             <span class="card-sub" id="account-sub"></span>
           </header>
           <div id="account-body"><p class="loading">正在读取…</p></div>
-          <!-- 订阅最多一条：和余额同一张卡，不再单开「订阅套餐」卡 -->
+        </div>
+        <div class="wallet-col wallet-plan">
+          <!-- 订阅最多一条：余额在左，订阅在右 -->
           <div id="subscriptions-body" class="wallet-sub" aria-live="polite">
             <p class="loading">正在读取订阅…</p>
           </div>
-        </div>
-
-        <div class="card">
-          <header class="card-head">
-            <h3>数据概览</h3>
-            <div class="segmented" role="group" aria-label="统计区间">
-              <button type="button" data-range="day" aria-pressed="true">日</button>
-              <button type="button" data-range="week" aria-pressed="false">周</button>
-              <button type="button" data-range="month" aria-pressed="false">月</button>
-            </div>
-          </header>
-          <div id="usage-body"><p class="loading">正在读取…</p></div>
         </div>
       </div>
 
@@ -175,14 +233,31 @@
       <div class="card keys-page">
         <div class="keys-titlebar">
           <h3>API 密钥</h3>
-          <button class="btn primary" id="key-create-open" type="button">+ 创建 API 密钥</button>
+          <div class="keys-title-actions">
+            <button class="btn ghost keys-addr" id="keys-api-addr" type="button" title="复制 API 地址">
+              API 地址 <span class="keys-caret" aria-hidden="true">▾</span>
+            </button>
+            <button class="btn primary" id="key-create-open" type="button">+ 创建 API 密钥</button>
+          </div>
         </div>
         <div class="keys-filterbar">
           <label class="sr-only" for="keys-filter-name">按名称筛选</label>
           <input id="keys-filter-name" class="keys-input" type="search" placeholder="按名称筛选…" autocomplete="off">
-          <label class="sr-only" for="keys-filter-group">按分组筛选</label>
-          <select id="keys-filter-group" class="keys-select"></select>
-          <button class="btn ghost" id="keys-filter-clear" type="button">重置</button>
+          <label class="sr-only" for="keys-filter-key">按 API 密钥筛选</label>
+          <input id="keys-filter-key" class="keys-input" type="search" placeholder="按 API 密钥筛选…" autocomplete="off">
+          <label class="sr-only" for="keys-filter-status">按状态筛选</label>
+          <select id="keys-filter-status" class="keys-select" data-empty-label="全部状态">
+            <option value="">所有状态</option>
+            <option value="1">已启用</option>
+            <option value="2">已禁用</option>
+          </select>
+          <div class="menu keys-view-menu">
+            <button class="btn ghost menu-trigger" id="keys-view-btn" type="button"
+                    aria-haspopup="listbox" aria-expanded="false" aria-controls="keys-view-pop">
+              查看 <span class="menu-caret" aria-hidden="true">▾</span>
+            </button>
+            <div class="menu-pop" id="keys-view-pop" role="listbox" aria-label="切换列" hidden></div>
+          </div>
         </div>
         <div id="keys-body"><p class="loading">正在读取…</p></div>
       </div>
@@ -217,6 +292,15 @@
             <div class="field">
               <label for="key-group">分组</label>
               <select id="key-group" name="group" required></select>
+            </div>
+            <div class="field">
+              <label for="key-expire">过期时间</label>
+              <select id="key-expire" name="expire">
+                <option value="0">永不过期</option>
+                <option value="3600">1 小时</option>
+                <option value="86400">1 天</option>
+                <option value="2592000">1 个月</option>
+              </select>
             </div>
           </section>
 

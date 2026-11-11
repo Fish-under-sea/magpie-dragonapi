@@ -1570,6 +1570,12 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 }
 .menu-pop [role="option"]:hover { background: var(--card-hover); }
 .menu-pop [role="option"][aria-selected="true"] { color: var(--accent); background: var(--accent-soft); }
+/* 「查看」列显隐：用勾选而不是整行高亮（勾选项保持普通底色） */
+#logs-view-pop [role="option"] { display: flex; align-items: center; gap: 6px; }
+#logs-view-pop [role="option"]::before { content: "✓"; width: 12px; color: transparent; }
+#logs-view-pop [role="option"][aria-selected="true"] { color: var(--fg); background: transparent; }
+#logs-view-pop [role="option"][aria-selected="true"]::before { color: var(--accent); }
+#logs-view-pop [role="option"]:hover { background: var(--card-hover); }
 
 /* ── 主题内下拉：原生 select 的候选列表由系统画成白底，这里整体换掉 ── */
 .sel { position: relative; display: inline-flex; min-width: 0; flex: none; }
@@ -2242,6 +2248,97 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
  * 每列里的两行小字用 .lg-cell-stack 纵向叠。窄屏不砍列，改横向滚动。
  */
 .logs-card { display: flex; flex-direction: column; gap: 12px; }
+/* ── 日志页工具栏：照站点 usage-logs/common 的版式 ───────────── */
+.logs-toolbar {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--card) 50%, transparent);
+}
+.logs-filters {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+.logs-filters-adv {
+  margin-bottom: 8px;
+}
+/* hidden 会被 .logs-filters 的 display:grid 压掉，显式补回 */
+.logs-filters[hidden] { display: none; }
+.logs-toolbar .logs-input,
+.logs-toolbar .logs-select { width: 100%; }
+.logs-range-menu { position: relative; min-width: 0; }
+.logs-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 12px;
+  color: var(--fg);
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.logs-range-ico { flex: none; color: var(--muted); }
+#logs-range-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.logs-range-menu .menu-pop { min-width: 100%; }
+.logs-expand {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.logs-expand:hover { color: var(--fg); }
+.logs-expand .logs-caret { font-size: 9px; transition: transform .15s; }
+.logs-expand[aria-expanded="true"] .logs-caret { transform: rotate(180deg); }
+.logs-expand[aria-expanded="true"] { color: var(--accent); }
+
+/* 统计胶囊：照站点 aK 组件（中圆角、muted 底、左侧竖条 + 标签 + 等宽数字） */
+.lg-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--sunken) 60%, transparent);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, .08);
+}
+.lg-stat-bar { width: 2px; height: 14px; border-radius: 999px; flex: none; }
+.lg-stat-bar.sky { background: color-mix(in srgb, #0ea5e9 70%, transparent); }
+.lg-stat-bar.rose { background: color-mix(in srgb, #f43f5e 65%, transparent); }
+.lg-stat-bar.slate { background: color-mix(in srgb, #94a3b8 70%, transparent); }
+.lg-stat-k { font-size: 11px; color: var(--muted); }
+.lg-stat-v {
+  font-family: var(--code);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
 .logs-bar {
   display: flex;
   align-items: center;
@@ -2311,9 +2408,9 @@ input.logs-input:focus-visible, select.logs-select:focus-visible {
 }
 .lg-row {
   display: grid;
-  grid-template-columns: minmax(104px, .9fr) minmax(128px, 1.1fr) minmax(160px, 1.5fr)
+  grid-template-columns: var(--lg-cols, minmax(104px, .9fr) minmax(128px, 1.1fr) minmax(160px, 1.5fr)
     minmax(112px, .9fr) minmax(60px, .5fr) minmax(110px, .9fr) minmax(92px, .7fr)
-    minmax(120px, 1fr);
+    minmax(120px, 1fr));
   gap: 0 12px;
   align-items: center;
   padding: 7px 12px;
@@ -2892,3 +2989,455 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
   #panel-wallet .acct-layout { flex: none; }
 }
 
+
+/* ── 数据看板：照站点 /dashboard/models ───────────────────────── */
+#panel-dashboard { overflow-y: auto; padding-right: 2px; }
+.dash-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.dash-head h3.dash-title { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: .2px; }
+.dash-head-right { display: flex; align-items: center; gap: 8px; }
+.dash-cards { flex: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.dash-stat { border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); padding: 10px 12px; min-width: 0; }
+.dash-stat-top { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.dash-stat-ico { display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center; border-radius: 6px; }
+.dash-stat-value { margin-top: 7px; font-size: 19px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: .2px; }
+.dash-stat-desc { margin-top: 2px; font-size: 10px; color: var(--muted); }
+.dash-stat.tone-info .dash-stat-ico { color: #1664FF; background: color-mix(in srgb, #1664FF 14%, transparent); }
+.dash-stat.tone-success .dash-stat-ico { color: #3CC780; background: color-mix(in srgb, #3CC780 16%, transparent); }
+.dash-stat.tone-chart-4 .dash-stat-ico { color: #FF8A00; background: color-mix(in srgb, #FF8A00 16%, transparent); }
+.dash-stat.tone-chart-3 .dash-stat-ico { color: #1AC6FF; background: color-mix(in srgb, #1AC6FF 16%, transparent); }
+.dash-stat.tone-chart-5 .dash-stat-ico { color: #7442D4; background: color-mix(in srgb, #7442D4 16%, transparent); }
+.dash-stat.tone-chart-2 .dash-stat-ico { color: #009488; background: color-mix(in srgb, #009488 16%, transparent); }
+.dash-stat.tone-warning .dash-stat-ico { color: #FFC400; background: color-mix(in srgb, #FFC400 18%, transparent); }
+.dash-card { flex: none; display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.dash-chart { position: relative; min-height: 0; }
+.dash-svg { display: block; width: 100%; height: auto; }
+.dash-grid { stroke: var(--line); stroke-width: 1; }
+.dash-axis { fill: var(--muted); font-size: 10px; font-family: var(--code); }
+.dash-hover-line { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.dash-tip { position: absolute; top: 6px; z-index: 5; min-width: 160px; max-width: 220px; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .3); pointer-events: none; }
+.dash-tip[hidden] { display: none; }
+.dash-tip-time { margin-bottom: 4px; font-size: 10.5px; color: var(--muted); }
+.dash-tip-row { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+.dash-tip-dot { flex: none; width: 8px; height: 8px; border-radius: 2px; }
+.dash-tip-k { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.dash-tip-v { margin-left: auto; font-family: var(--code); }
+.dash-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.dash-legend-item { display: inline-flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 11px; color: var(--muted); background: none; border: 0; cursor: pointer; }
+.dash-legend-item:hover { color: var(--fg); }
+.dash-legend-item.off { opacity: .38; }
+.dash-legend-dot { width: 9px; height: 9px; border-radius: 2px; }
+.dash-props { display: flex; flex-direction: column; gap: 9px; padding: 2px 0 6px; }
+.dash-prop-row { display: grid; grid-template-columns: 190px minmax(0, 1fr) 130px; gap: 10px; align-items: center; font-size: 11.5px; }
+.dash-prop-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-prop-track { height: 8px; border-radius: 999px; background: var(--sunken); overflow: hidden; }
+.dash-prop-fill { display: block; height: 100%; border-radius: 999px; }
+.dash-prop-val { text-align: right; font-family: var(--code); color: var(--muted); }
+.dash-table { width: 100%; }
+@media (max-width: 720px) {
+  .dash-prop-row { grid-template-columns: 120px minmax(0, 1fr) 100px; }
+}
+
+/* ── 钱包宽卡：左余额 / 右订阅，严格限高；密钥内部滚 ─────────── */
+#panel-wallet { overflow: hidden; }
+.wallet-wide {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 18px;
+  flex: 0 0 auto;
+  height: auto;
+  max-height: 46vh;
+  overflow: hidden;
+}
+.wallet-balance,
+.wallet-plan { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.wallet-balance { overflow: hidden; }
+.wallet-plan { overflow: hidden; }
+.wallet-balance { padding-right: 18px; border-right: 1px solid var(--line); }
+.wallet-plan .wallet-sub { margin-top: 0; padding-top: 0; border-top: 0; }
+#panel-wallet .aff-card { flex: 0 0 auto; max-height: 150px; overflow: auto; }
+#panel-wallet .keys-page { flex: 1 1 auto; min-height: 0; }
+#panel-wallet #keys-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
+@media (max-width: 900px) {
+  .wallet-wide { grid-template-columns: minmax(0, 1fr); height: auto; max-height: 46vh; }
+  .wallet-balance { border-right: 0; padding-right: 0; }
+}
+
+/* 钱包卡头的跳转按钮：靠右，不挤标题 */
+.wallet-jump { margin-left: auto; text-decoration: none; white-space: nowrap; }
+/* 推荐计划的链接与按钮：换行后从左侧排 */
+.rf-actions { flex: 1 1 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+.rf-actions .rf-link { flex: 1 1 260px; min-width: 0; }
+
+/* 钱包左栏：内容居中，底部补一句口径说明，避免大片空白 */
+.wallet-balance #account-body { justify-content: center; gap: 14px; }
+.wallet-note { margin: 16px 0 0; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 11px; line-height: 1.6; color: var(--muted); }
+/* 订阅紧凑到「刚好放下」，不触发卡内滚动 */
+.wallet-plan { overflow: hidden; }
+.wallet-plan .wallet-sub-head { font-size: 11.5px; }
+.wallet-plan .subscription-item { margin-top: 8px; padding: 10px 12px; }
+.wallet-plan .subscription-item .acct-facts { margin-top: 8px; }
+.wallet-plan .acct-facts { row-gap: 2px; font-size: 11.5px; }
+.wallet-plan .subscription-progress { margin-top: 10px; height: 6px; }
+
+/* ── 日志工具栏：胶囊 + 扁平，照官网的圆润度 ─────────────── */
+.logs-toolbar {
+  padding: 12px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--card) 55%, transparent);
+}
+.logs-filters { grid-template-columns: minmax(0, 2.4fr) minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); }
+.logs-range,
+.logs-toolbar .logs-input,
+.logs-toolbar .sel-trigger {
+  height: 40px;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: none;
+}
+.logs-range { padding: 0 16px; font-size: 12.5px; }
+.logs-toolbar .logs-input { padding: 0 14px; }
+.logs-toolbar .sel-trigger { padding: 0 14px; }
+.logs-toolbar .sel-caret { font-size: 10px; }
+.logs-expand { height: 40px; border-radius: 999px; padding: 0 14px; }
+/* 统计胶囊：更扁、更小圆角压力，去掉阴影 */
+.lg-stat {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: none;
+}
+.lg-stat-bar { width: 3px; height: 12px; }
+/* 工具按钮也做胶囊，和官网一致 */
+.logs-tools .btn { border-radius: 999px; }
+
+/* 钱包左栏的账户主体不再自己滚：内容已居中放下，滚动条只在密钥卡里 */
+#panel-wallet .wallet-balance #account-body { overflow: hidden; }
+
+/* ── API 密钥：照官网表格重做 ─────────────────────────────── */
+.keys-title-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.keys-addr { border-radius: 999px; }
+.keys-caret { font-size: 9px; color: var(--muted); }
+.keys-filterbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.keys-filterbar .keys-input { flex: 1 1 200px; }
+.keys-filterbar .keys-select { flex: 0 0 140px; }
+.keys-view { margin-left: auto; }
+.keys-table-wrap { min-height: 0; }
+.keys-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.keys-table thead th {
+  position: sticky; top: 0; z-index: 1;
+  padding: 9px 12px; text-align: left; white-space: nowrap;
+  font-size: 11px; font-weight: 600; color: var(--muted);
+  background: var(--card); border-bottom: 1px solid var(--line);
+}
+.keys-table td {
+  padding: 11px 12px; white-space: nowrap; vertical-align: middle;
+  font-size: 12px; border-bottom: 1px solid var(--line);
+}
+.keys-table tbody tr:hover { background: var(--card-hover); }
+.keys-table tr.is-selected { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.keys-check { width: 14px; height: 14px; accent-color: var(--accent); cursor: pointer; }
+.keys-check-col { width: 34px; }
+.keys-name { font-weight: 600; }
+.keys-status.on { color: var(--ok); }
+.keys-status.off { color: var(--muted); }
+.keys-key { display: inline-flex; align-items: center; gap: 6px; font-family: var(--code); font-size: 11.5px; color: var(--muted); }
+.keys-quota { font-family: var(--code); font-variant-numeric: tabular-nums; }
+.keys-group { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; }
+.keys-group .rt-green { color: var(--ok); }
+.keys-group .rt-blue { color: #1AC6FF; }
+.keys-group .rt-orange { color: #FF8A00; }
+.keys-group .rt-gold { color: #FFC400; }
+.keys-ratio { padding: 1px 7px; border: 1px solid var(--line); border-radius: 999px; font-family: var(--code); font-size: 10px; color: var(--muted); }
+.keys-muted { color: var(--muted); }
+.keys-time { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--muted); }
+.keys-time b { color: var(--fg); font-weight: 500; }
+.keys-actions { display: inline-flex; align-items: center; gap: 2px; }
+.keys-act {
+  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px; border: 1px solid transparent; background: transparent; color: var(--muted); cursor: pointer;
+}
+.keys-act:hover { background: var(--card-hover); color: var(--fg); }
+.keys-act.danger:hover { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
+
+/* ── 日志头部：直接照 NearToken in Magpie 的 .lg-* 设计（覆盖上面的胶囊尝试） ── */
+.logs-toolbar { padding: 8px; gap: 8px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.02); }
+.logs-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.logs-range-menu { flex: 1 1 340px; min-width: 240px; }
+.logs-range,
+.logs-toolbar .logs-input,
+.logs-toolbar .sel-trigger {
+  height: 34px; border-radius: 9px; border: 1px solid var(--line);
+  background: rgba(0,0,0,.22); box-shadow: none; font-size: 11.5px;
+}
+.logs-range { padding: 0 10px; }
+.logs-toolbar .logs-input { flex: 1 1 180px; min-width: 140px; padding: 0 10px; }
+.logs-toolbar .sel { flex: 0 0 auto; }
+.logs-toolbar .sel-trigger { min-width: 140px; padding: 0 12px; }
+.logs-expand { height: 34px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--muted); padding: 0 8px; }
+.logs-expand:hover { background: rgba(255,255,255,.06); color: var(--fg); }
+.logs-chips-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
+.lg-stat { height: 24px; padding: 0 9px; border: 1px solid transparent; border-radius: 999px; background: rgba(255,255,255,.04); box-shadow: none; }
+.lg-stat-k { font-size: 11px; }
+.lg-stat-v { font-size: 11px; }
+.logs-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.logs-tools .btn { height: 34px; padding: 0 8px; border-color: transparent; background: transparent; color: var(--muted); border-radius: 8px; }
+.logs-tools .btn:hover { background: rgba(255,255,255,.06); color: var(--fg); }
+.logs-tools .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; padding: 0 14px; }
+.logs-tools a.btn { text-decoration: none; display: inline-flex; align-items: center; }
+
+/* API 密钥：查看列菜单 + 更小的复制图标 */
+.keys-view-menu { margin-left: auto; }
+#keys-view-pop { min-width: 170px; }
+#keys-view-pop [role="option"] { display: flex; align-items: center; gap: 8px; }
+.keys-check-mark { flex: none; width: 14px; color: var(--accent); font-size: 12px; }
+.keys-key .btn {
+  width: 22px; height: 22px; min-height: 0; padding: 0; font-size: 12px;
+  line-height: 1; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center;
+}
+
+/* 密钥「查看」菜单：选中用勾选，不用整行高亮 */
+#keys-view-pop [role="option"][aria-selected="true"] { color: var(--fg); background: transparent; }
+#keys-view-pop [role="option"]:hover { background: var(--card-hover); }
+
+/* 日志头部：胶囊化 + 排布（最新要求）；表格不许左右滚 */
+.logs-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.logs-range-menu { flex: 1 1 420px; min-width: 260px; }
+.logs-range,
+.logs-toolbar .logs-input,
+.logs-toolbar .sel-trigger {
+  height: 40px; border-radius: 999px; border: 1px solid var(--line);
+  background: rgba(0,0,0,.22); box-shadow: none; font-size: 12px;
+}
+.logs-range { padding: 0 16px; }
+.logs-toolbar .logs-input { flex: 1 1 180px; min-width: 150px; padding: 0 14px; }
+.logs-toolbar .sel { flex: 0 0 auto; }
+.logs-toolbar .sel-trigger { min-width: 150px; padding: 0 16px; }
+.logs-expand { height: 40px; border-radius: 999px; }
+.logs-body { overflow-x: hidden; }
+.lg-table { min-width: 0; width: 100%; }
+.lg-row { grid-template-columns: var(--lg-cols); gap: 0 10px; }
+.lg-row > * { min-width: 0; }
+
+/* 半透明表头 / 弹层：加不透明底 + 背景模糊，避免滚动内容透出来 */
+.lg-head,
+.keys-table thead th {
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.sel-pop,
+.menu-pop {
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.logs-toolbar,
+.keys-filterbar,
+.keys-titlebar {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* 表头再压实一点：接近不透明 + 模糊，滚动行完全不透出 */
+.lg-head,
+.keys-table thead th {
+  background: color-mix(in srgb, var(--bg) 98%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* 日志顶部（照站点源码的 primaryFilters 结构）：一行、扁平胶囊、32px */
+.logs-toolbar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px; border: 1px solid var(--line); border-radius: 8px;
+  background: color-mix(in srgb, var(--card) 55%, transparent);
+  box-shadow: none;
+}
+.logs-filters {
+  display: flex; flex-wrap: nowrap; align-items: center; gap: 8px;
+  flex: 1 1 auto; min-width: 0;
+}
+.logs-range-menu { position: relative; flex: 2 1 320px; min-width: 200px; }
+.logs-toolbar .logs-input { flex: 1 1 160px; min-width: 120px; }
+.logs-toolbar .sel { flex: 0 0 140px; min-width: 0; }
+.logs-toolbar .sel-trigger { width: 100%; min-width: 0; }
+.logs-range,
+.logs-toolbar .logs-input,
+.logs-toolbar .sel-trigger {
+  height: 32px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--card); box-shadow: none; font-size: 11.5px; color: var(--fg);
+}
+.logs-range { padding: 0 12px; display: inline-flex; align-items: center; gap: 8px; }
+.logs-toolbar .logs-input { padding: 0 12px; }
+.logs-toolbar .sel-trigger { padding: 0 12px; }
+.logs-expand {
+  flex: none; height: 32px; padding: 0 10px; border-radius: 999px;
+  border: 1px solid transparent; background: transparent; color: var(--muted);
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.logs-expand:hover { background: rgba(255,255,255,.06); color: var(--fg); }
+
+/* 收紧日志顶部上下留白 */
+.logs-toolbar { margin-bottom: 0; }
+#logs-more-row { margin: 0; }
+.logs-chips-bar { margin: 6px 0 8px; }
+
+/* 日志统计与动作按钮统一「扁/胶囊」 */
+.lg-stat { border-color: transparent; background: rgba(255,255,255,.05); }
+.logs-tools .btn { height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid transparent; background: transparent; }
+.logs-tools .btn:hover { background: rgba(255,255,255,.06); }
+.logs-tools .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* API 密钥筛选行/标题按钮也扁胶囊化 */
+.keys-filterbar .keys-input,
+.keys-filterbar .keys-select,
+.keys-filterbar .btn,
+.keys-filterbar .sel-trigger,
+#keys-api-addr,
+#key-create-open {
+  height: 32px; border-radius: 999px; box-shadow: none;
+}
+.keys-filterbar .keys-input,
+.keys-filterbar .keys-select,
+.keys-filterbar .btn,
+.keys-filterbar .sel-trigger { background: var(--card); border: 1px solid var(--line); padding: 0 14px; }
+#keys-api-addr { background: transparent; border: 1px solid var(--line); padding: 0 14px; }
+#key-create-open { padding: 0 16px; }
+
+.logs-card { gap: 0; }
+
+
+/* 弹层：完全不透明并压住表格，避免内容透出 */
+.menu-pop, .sel-pop {
+  background: var(--bg); backdrop-filter: none; -webkit-backdrop-filter: none; z-index: 90;
+}
+#keys-view-pop { max-height: 300px; overflow: auto; }
+
+/* 扁平胶囊：去掉描边，纯色浅底 */
+.logs-range,
+.logs-toolbar .logs-input,
+.logs-toolbar .sel-trigger,
+.keys-filterbar .keys-input,
+.keys-filterbar .keys-select,
+.keys-filterbar .btn,
+.keys-filterbar .sel-trigger,
+#keys-api-addr,
+.logs-tools .btn {
+  border-color: transparent !important;
+  background: rgba(255, 255, 255, .05) !important;
+}
+.logs-tools .btn.primary,
+#key-create-open {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #fff;
+}
+
+/* 密钥复制按钮：只留图标，去掉框选 */
+.keys-key .btn {
+  width: 20px; height: 20px; min-height: 0; padding: 0;
+  border: 0 !important; background: transparent !important; box-shadow: none;
+  color: var(--muted); border-radius: 0;
+}
+.keys-key .btn:hover { color: var(--fg); background: transparent !important; }
+
+/* 密钥行操作：禁用/编辑/更多 */
+.keys-actions { display: inline-flex; align-items: center; gap: 2px; }
+.keys-act.danger { color: var(--bad); }
+.keys-more { position: relative; display: inline-flex; }
+.keys-more-btn { font-size: 16px; line-height: 1; }
+.keys-more-pop { left: auto; right: 0; min-width: 190px; }
+.keys-more-pop [role="option"],
+.keys-more-del {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; padding: 8px 10px; border: 0; border-radius: 7px;
+  background: transparent; color: var(--fg); font: inherit; font-size: 12px; text-align: left; cursor: pointer;
+}
+.keys-more-pop [role="option"]:hover, .keys-more-del:hover { background: var(--card-hover); }
+.kmi-ico { color: var(--muted); }
+.keys-more-del { color: var(--bad); }
+
+/* 密钥行「更多」菜单向上弹，避免被卡片底边裁掉 */
+.keys-more-pop { top: auto; bottom: calc(100% + 6px); }
+
+/* 展开按钮：胶囊；展开行三个输入也胶囊扁平 */
+.logs-expand { background: rgba(255,255,255,.05); color: var(--fg); border: 1px solid transparent; }
+.logs-expand[aria-expanded="true"] { background: rgba(255,255,255,.09); color: var(--accent); }
+.logs-expand .logs-caret { transition: transform .15s; }
+.logs-expand[aria-expanded="true"] .logs-caret { transform: rotate(180deg); }
+.logs-filters-adv {
+  display: flex; flex-wrap: nowrap; gap: 8px; align-items: center;
+  margin-top: 6px;
+}
+.logs-filters-adv .logs-input {
+  flex: 1 1 0; height: 32px; border-radius: 999px; border: 1px solid transparent;
+  background: rgba(255,255,255,.05); padding: 0 12px; font-size: 11.5px;
+}
+
+/* 钱包标题即入口：无框，只加箭头；金额放大填满左栏 */
+.wallet-title { margin: 0; }
+.wallet-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--fg); text-decoration: none; font-size: 13.5px; font-weight: 650; letter-spacing: .01em;
+}
+.wallet-link:hover { color: var(--accent); }
+.wallet-arrow { font-size: 12px; color: var(--muted); }
+.wallet-link:hover .wallet-arrow { color: var(--accent); }
+.wallet-balance #account-body { flex: 1 1 auto; display: flex; min-height: 0; }
+.wallet-balance .acct-card { height: 100%; justify-content: space-between; gap: 14px; }
+.wallet-balance .acct-hero { align-items: center; }
+.wallet-balance .acct-num { font-size: 46px; line-height: 1.02; }
+.wallet-balance .acct-cur { font-size: 24px; }
+.wallet-jump { display: none; }
+
+/* 每页行数下拉向上弹，避免被卡片底边裁掉 */
+.lg-pager .sel-pop { top: auto; bottom: calc(100% + 6px); }
+/* 日志表头不跟随滚动（不再 sticky） */
+.lg-head { position: static; backdrop-filter: none; -webkit-backdrop-filter: none; }
+
+/* 日志：筛选区（绿框）+ 表格区（红框）各自成块，和官网一致 */
+.logs-head-box {
+  border: 1px solid var(--line); border-radius: 12px; padding: 10px;
+  background: rgba(255, 255, 255, .02);
+}
+.logs-head-box .logs-toolbar { border: 0; background: transparent; padding: 0; margin: 0; }
+.logs-head-box .logs-filters-adv { margin-top: 8px; }
+.logs-head-box .logs-chips-bar { margin: 10px 0 0; }
+.logs-body {
+  border: 1px solid var(--line); border-radius: 12px;
+  overflow-x: hidden; overflow-y: auto;
+  margin-top: 10px;
+}
+.logs-body .lg-table { border: 0; border-radius: 0; }
+.lg-head { background: color-mix(in srgb, var(--card) 75%, transparent); }
+.lg-row { padding: 10px 12px; }
+.logs-pager { margin-top: 10px; }
+
+/* 钱包左栏：左对齐，内容从顶部排，sub-plus 贴底与右侧卡片齐 */
+.wallet-balance #account-body {
+  flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 12px;
+}
+.wallet-balance .acct-card { height: 100%; justify-content: flex-start; align-items: stretch; gap: 12px; text-align: left; }
+.wallet-balance .acct-hero { justify-content: flex-start; }
+.wallet-balance .acct-money { justify-content: flex-start; }
+.wallet-balance .acct-foot { margin-top: auto; }
+
+/* 推荐计划：同步时间下移，与左侧副标题小字同一行 */
+.rf-sync { align-self: flex-end; padding-bottom: 1px; }
+
+/* 钱包左栏留白：标题下留空隙，数字下移填掉底部空白 */
+.wallet-balance #account-body { margin-top: 10px; }
+.wallet-balance .acct-hero { margin-top: 12px; }
+
+/* 展开后三行之间留足空隙，不要挤在一起 */
+.logs-head-box .logs-filters-adv { margin-top: 14px; }
+.logs-head-box .logs-chips-bar { margin-top: 16px; }
+
+/* 展开区用 flex 纵向排列，统一 12px 间距，避免行间重叠 */
+.logs-head-box { display: flex; flex-direction: column; gap: 12px; }
+.logs-head-box .logs-toolbar,
+.logs-head-box .logs-filters-adv,
+.logs-head-box .logs-chips-bar { margin: 0; }

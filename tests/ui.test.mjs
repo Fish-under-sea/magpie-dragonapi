@@ -124,10 +124,10 @@ test('API 不写死主机名，换端口/换代理前缀也不坏', async () => 
   assert.deepEqual(hardcoded, [], `不该写死本地地址：${hardcoded.join(', ')}`)
 })
 
-test('四个标签页：账户在前，使用日志紧跟模型广场，密钥已并入账户页', async () => {
+test('五个标签页：账户在前，数据看板独立，使用日志紧跟模型广场，密钥并入账户页', async () => {
   const html = await (await fetch(base + '/')).text()
   const tabs = [...html.matchAll(/data-tab="([^"]+)"/g)].map((m) => m[1])
-  assert.deepEqual(tabs, ['wallet', 'catalog', 'logs', 'pat'], `标签顺序不符，实际 ${tabs.join(', ')}`)
+  assert.deepEqual(tabs, ['wallet', 'dashboard', 'catalog', 'logs', 'pat'], `标签顺序不符，实际 ${tabs.join(', ')}`)
   assert.match(html, /id="panel-logs"/, '应有使用日志面板')
   assert.equal(/id="flow-body"/.test(html), false, '账户页不再有用量流水卡')
   assert.equal(/id="panel-keys"/.test(html), false, '密钥面板应已并入账户页')
@@ -519,7 +519,7 @@ test('列表视图是七列表格：模型/类型/价格/缓存/供应商/端点
   assert.match(css, /\.model-grid\.as-list \.ml-head,/, '缺少表头样式')
 })
 
-test('标签栏是胶囊，余额页是账户概览 + 数据概览', async () => {
+test('标签栏是胶囊，账户概览是宽钱包 + 数据看板独立成页', async () => {
   const css = (await (await fetch(base + '/ui/style.css')).text()).replace(/\/\*[\s\S]*?\*\//g, '')
   const tabs = css.match(/(?:^|\n)\.tabs\s*\{[^}]*\}/m)
   assert.ok(tabs, '找不到 .tabs')
@@ -530,18 +530,23 @@ test('标签栏是胶囊，余额页是账户概览 + 数据概览', async () =>
 
   const html = await (await fetch(base + '/')).text()
   assert.match(html, /账户概览/, '标签应显示「账户概览」')
-  assert.match(html, /数据概览/, '用量卡片标题应为「数据概览」')
-  // 订阅与余额同一张卡：卡头是「钱包」，订阅区在卡内，不再单开「订阅套餐」卡
-  assert.match(html, /<h3>钱包<\/h3>/, '余额卡标题应为「钱包」')
+  assert.match(html, /数据看板/, '标签应显示「数据看板」')
+  assert.match(html, /id="panel-dashboard"/, '缺少数据看板面板')
+  assert.match(html, /id="dash-cards"/, '缺少统计卡片容器')
+  assert.match(html, /id="dash-usage-chart"/, '缺少消耗分布图')
+  // 钱包宽卡：左余额、右订阅，不再有「数据概览」小卡
+  assert.match(html, /class="wallet-title"/, '钱包标题应为可点击的「钱包 ↗」')
+  assert.match(html, /card wallet-wide/, '钱包与订阅应是同一张宽卡')
   assert.match(html, /id="subscriptions-body"[^>]*class="wallet-sub"/, '订阅区应挂在钱包卡内')
   assert.equal(html.includes('<h3>订阅套餐</h3>'), false, '订阅不再单开卡片')
   assert.equal(html.includes('>账户</h3>'), false, '「账户」应改名为「钱包」')
+  assert.equal(html.includes('数据概览'), false, '数据概览应从账户页移走')
 
   const js = await (await fetch(base + '/ui/app.js')).text()
-  assert.match(js, /function usageChart\(/, '缺少消耗柱状图')
-  assert.match(js, /class: 'chart-bars'/, '缺少柱状图容器')
+  assert.match(js, /function dashChart\(/, '缺少数据看板图表')
+  assert.match(js, /class: 'dash-svg'/, '缺少 SVG 图表')
   assert.match(js, /class: 'acct-num'/, '账户卡应有大金额')
-  assert.match(js, /acct-hero/, '账户卡应照站点版式：大字余额 + 刷新')
+  assert.match(js, /acct-hero/, '账户卡应照站点版式：大字余额 + 订阅同卡')
 })
 
 test('PAT 保存后区分「已验证 / 未验证 / 缺 scope」，不当成功一笔带过', async () => {
@@ -637,7 +642,7 @@ test('使用日志页：筛选条 + 统计条 + 明细表都在，且列与 Near
   const html = await (await fetch(base + '/')).text()
   const js = await (await fetch(base + '/ui/app.js')).text()
 
-  assert.match(html, /id="logs-range"/, '缺少时间范围切换')
+  assert.match(html, /id="logs-range-btn"/, '缺少时间范围胶囊')
   assert.match(html, /id="logs-model"/, '缺少模型名筛选')
   assert.match(html, /id="logs-group"/, '缺少分组筛选')
   assert.match(html, /id="logs-kind"/, '缺少类型筛选')
@@ -647,17 +652,24 @@ test('使用日志页：筛选条 + 统计条 + 明细表都在，且列与 Near
   assert.match(html, /id="logs-chips"/, '缺少统计条')
   assert.match(html, /id="logs-body"/, '缺少明细表容器')
 
-  // 表头 8 列：请求体大小已移除；令牌与分组叠在同一列（上游版式）
-  assert.match(js, /'时间', '分组', '模型', '费用', '流', 'Token', '耗时', '详情'/, '八列表头不符')
+  // 表头 8 列由 LOG_COLS 生成：请求体大小已移除；令牌与分组同列（上游版式）
+  assert.match(js, /const LOG_COLS = \[/, '缺少列定义 LOG_COLS')
+  for (const label of ['时间', '令牌', '模型', '流', 'Token', '费用', '耗时', '详情']) {
+    assert.ok(js.includes(`label: '${label}'`), `LOG_COLS 缺少「${label}」列`)
+  }
   assert.equal(js.includes('请求体大小'), false, '请求体大小列应已移除')
-  // 费用 / 模型 / 令牌都做成胶囊；费用按钱包/订阅换图标，金额 6 位小数
+  // 费用 / 模型 / 令牌都做成胶囊；费用按钱包/订阅换图标，金额与站点同格式
   assert.match(js, /lg-cost-pill/, '费用应是胶囊')
   assert.match(js, /lg-model-pill/, '模型应是胶囊')
   assert.match(js, /lg-pill/, '令牌应是胶囊')
   assert.match(js, /lg-group-meta/, '分组列应是分组 + 倍率')
   assert.match(js, /billingSource/, '费用要区分钱包与订阅扣费')
   assert.match(js, /vendorOfModel/, '模型胶囊要带厂商标记')
-  assert.match(js, /toFixed\(6\)/, '费用金额按上游给 6 位小数')
+  assert.match(js, /function statMoney\(/, '金额格式应与站点一致（4/6 位）')
+  // 统计条取站点 /api/log/self/stat：用量 / RPM / TPM
+  assert.match(js, /logStats/, '缺少日志统计请求')
+  assert.match(js, /class: 'lg-stat'/, '统计应是胶囊')
+  assert.match(js, /logs-view-pop/, '缺少「查看」列显隐菜单')
   // 原生 select 的候选列表是系统白底，必须换成主题内的下拉
   assert.match(js, /function enhanceSelect\(/, '缺少主题内下拉组件')
   assert.match(js, /enhanceSelect\(sizeSel, 'sel-sm'\)/, '每页行数下拉也要换')

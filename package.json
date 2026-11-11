@@ -1,6 +1,6 @@
 {
   "name": "@fish-under-sea/magpie-dragonapi",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "DragonAPI for magpie: a provider plugin whose models, groups and prices come from the site's public /api/pricing, with balance and per-call usage from an sk- key, plus a local page that lists the market (read-only), shows usage and can mint new keys for a group.",
   "type": "module",
   "main": "index.mjs",
@@ -43,19 +43,19 @@
     "access": "public"
   },
   "magpie": {
-    "icon": "page/icon.png",
-    "name": "@fish-under-sea/magpie-dragonapi",
+    "icon": "page/star.png",
+    "name": "DragonAPI",
     "summary": {
       "zh": "把 DragonAPI 接进 magpie：模型目录、余额与用量，外加一个按分组建钥匙的本地控制台。",
       "en": "DragonAPI for magpie: model catalog, balance and usage, plus a local console for minting per-group keys."
     },
     "page": {
-      "title": "@fish-under-sea/magpie-dragonapi",
+      "title": "DragonAPI",
       "titles": {
-        "zh": "@fish-under-sea/magpie-dragonapi",
-        "zh-TW": "@fish-under-sea/magpie-dragonapi",
-        "ja": "@fish-under-sea/magpie-dragonapi",
-        "de": "@fish-under-sea/magpie-dragonapi"
+        "zh": "DragonAPI",
+        "zh-TW": "DragonAPI",
+        "ja": "DragonAPI",
+        "de": "DragonAPI"
       },
       "file": "page/index.html",
       "icon": "page/star.png",

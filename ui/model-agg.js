@@ -162,6 +162,9 @@ const BRAND_TESTS = [
  */
 const CATEGORY_BRAND_ORDER = {
   video: ['seed', 'h3', 'wan', 'veo', 'omni', 'grok', 'muse'],
+  // 图片：OpenAI 的 gpt-image 先，其次 Google 的 gemini 图像系列
+  // （含 nano-banana / banana），最后 xAI 的 grok-imagine-image。
+  image: ['gpt-image', 'gemini-image', 'grok'],
 }
 
 /**

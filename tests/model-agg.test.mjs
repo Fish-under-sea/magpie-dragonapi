@@ -408,3 +408,14 @@ test('视频区按品牌顺序排', () => {
     'grok-imagine-video-1.5', 'muse-video',
   ])
 })
+
+test('图片区按品牌顺序：OpenAI → Google → xAI', () => {
+  const list = [
+    agg('grok-imagine-image', 'xAI'),
+    agg('gemini-3-pro-image-preview', 'Google'),
+    agg('gpt-image-2.6', 'OpenAI'),
+  ].map((a) => ({ ...a, cat: 'image' }))
+  const catOf = () => 'image'
+  const names = orderDefault(list, { catOf, catOrder: ['image'] }).map((x) => x.name)
+  assert.deepEqual(names, ['gpt-image-2.6', 'gemini-3-pro-image-preview', 'grok-imagine-image'])
+})

@@ -114,7 +114,7 @@ test('config 声明了供应商名、npm 与 base', async () => {
   await plugin.config(cfg)
   const p = cfg.provider.dragonapi
   assert.ok(p, 'config 必须声明 dragonapi')
-  // 外显名与 npm 包名一致（用户要求）\n  assert.equal(p.name, '@fish-under-sea/magpie-dragonapi')
+  assert.equal(p.name, 'DragonAPI', '供应商列表显示产品名；包名留给插件管理器')
   assert.ok(p.npm, '必须给 npm 方言')
   assert.match(p.api, /\/v1$/, 'base 要以 /v1 结尾')
 })

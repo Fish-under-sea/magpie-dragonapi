@@ -187,7 +187,7 @@ export default async function dragonapi(input, options) {
         cfg.provider ??= {}
         cfg.provider[PROVIDER_ID] ??= {}
         const p = cfg.provider[PROVIDER_ID]
-        p.name = '@fish-under-sea/magpie-dragonapi'
+        p.name = 'DragonAPI'
         if (!p.npm) p.npm = '@ai-sdk/openai-compatible'
         if (!p.api) p.api = ctx.site + '/v1'
         // 不要声明 models：空对象会被理解成「这个供应商声明的模型是 0 个」。

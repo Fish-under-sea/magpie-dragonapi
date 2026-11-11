@@ -103,6 +103,18 @@ test('priceOf：倍率计费要乘分组倍率', () => {
   assert.equal(p.output, '$1.00/M')
 })
 
+test('priceOf：同时给可计算的数值（页面要切 /1K 与按价格排序）', () => {
+  const row = { quota_type: 0, model_ratio: 1, completion_ratio: 5, cache_ratio: 0.1 }
+  const p = priceOf(row, 0.1, CUR)
+  // 2 × 0.1、10 × 0.1、0.2 × 0.1
+  assert.equal(p.inputNum, 0.2)
+  assert.equal(p.outputNum, 1)
+  assert.equal(p.cacheNum, 0.02)
+  // 按次计费的模型没有「每百万 token」数值，不该编一个
+  const call = priceOf({ quota_type: 1, model_price: 0.65, billing_mode: 'tiered_expr', billing_expr: 'tier("按次", 0.65)' }, 1, CUR)
+  assert.equal(call.inputNum, undefined)
+})
+
 test('priceOf：表达式计费取第一档的 p / c 系数', () => {
   const row = {
     quota_type: 0,

@@ -256,30 +256,37 @@ test('/api/ping 的版本来自 package.json，不是硬编码', async () => {
 
 // ── 模型广场卡片网格 ────────────────────────────────────────────────
 // 用户报过「卡片不等高」。等高不是靠调数值，而是三处结构同时到位：
-//   网格 align-items: stretch（别写 start）、卡片 flex 纵向、页脚 margin-top:auto。
+//   网格 align-items: stretch（别写 start）、卡片 flex 纵向、内容高度一致。
 // 少任何一处，同一排卡片就会参差，所以这里逐条钉住。
-test('并排卡片必须等高：网格用 stretch，不写 align-items: start', async () => {
-  // 剥掉注释再比对：这些规则附近就写着「不要写 align-items: start」的说明，
-  // 不剥掉会把注释当规则。
+test('卡片高度跟着内容走：网格不拉伸，详紧紧跟内容', async () => {
+  // 曾经要求「等高」，于是用 stretch 把矮卡撑到和最高的一样高，结果矮卡中间
+  // 空出一段、看起来像「详情没挪上去」。现在改成按内容定高 + 内容本身对齐
+  // （描述锁两行、组名单行省略、端点最多两个），高度自然一致。
   const css = (await (await fetch(base + '/ui/style.css')).text()).replace(/\/\*[\s\S]*?\*\//g, '')
 
   const grid2 = css.match(/\.grid-2\s*\{[^}]*\}/)
   assert.ok(grid2, '找不到 .grid-2')
   assert.match(grid2[0], /align-items:\s*stretch/, '.grid-2 必须 stretch')
-  assert.equal(/align-items:\s*start/.test(grid2[0]), false, '.grid-2 不该写 align-items: start')
 
-  const modelGrid = css.match(/\.model-grid\s*\{[^}]*\}/)
+  const modelGrid = css.match(/(?:^|\n)\.model-grid\s*\{[^}]*\}/m)
   assert.ok(modelGrid, '找不到 .model-grid')
-  assert.match(modelGrid[0], /align-items:\s*stretch/, '.model-grid 必须 stretch')
+  assert.match(modelGrid[0], /align-items:\s*start/, '.model-grid 必须按内容定高，不要 stretch')
 
-  const foot = css.match(/\.mc-foot\s*\{[^}]*\}/)
+  const foot = css.match(/(?:^|\n)\.mc-foot\s*\{[^}]*\}/m)
   assert.ok(foot, '找不到 .mc-foot')
-  assert.match(foot[0], /margin-top:\s*auto/, '卡片页脚必须 margin-top:auto 才吸到卡底')
+  // 页脚只放「详情」，紧跟内容右对齐——不再吸到卡底（那会在中间留一片空白）
+  assert.match(foot[0], /justify-content:\s*flex-end/, '详情应右对齐')
+  assert.equal(/margin-top:\s*auto/.test(foot[0]), false, '详情不要吸到卡底，避免空白')
 
-  const mc = css.match(/\.mc\s*\{[^}]*\}/)
+  const mc = css.match(/(?:^|\n)\.mc\s*\{[^}]*\}/m)
   assert.ok(mc, '找不到 .mc')
   assert.match(mc[0], /display:\s*flex/, '.mc 必须是 flex 容器')
   assert.match(mc[0], /flex-direction:\s*column/, '.mc 必须纵向排布')
+
+  // 组名单行省略：换行会把别的卡撑出空白
+  const group = css.match(/\.mc-group\s*\{[^}]*\}/)
+  assert.ok(group, '找不到 .mc-group')
+  assert.match(group[0], /white-space:\s*nowrap/, '组名要单行省略')
 })
 
 test('模型广场是筛选栏 + 卡片网格，不再是表格', async () => {
@@ -288,7 +295,6 @@ test('模型广场是筛选栏 + 卡片网格，不再是表格', async () => {
   assert.match(html, /class="market-aside"/, '缺少左侧筛选栏')
   assert.match(html, /class="model-grid"/, '缺少卡片网格容器')
   assert.match(html, /id="group-chips"/, '缺少分组筛选')
-  assert.match(html, /id="kind-chips"/, '缺少类型筛选')
 
   const js = await (await fetch(base + '/ui/app.js')).text()
   assert.match(js, /function modelCard\(/, '缺少 modelCard 渲染函数')
@@ -300,13 +306,22 @@ test('卡片含 NearToken 那套信息位：名称/厂商/描述/计费/价格/�
   const js = await (await fetch(base + '/ui/app.js')).text()
   const fn = js.match(/function modelCard\([\s\S]*?\n\}/)
   assert.ok(fn, '找不到 modelCard')
-  for (const cls of ['mc-name', 'mc-vendor', 'mc-desc', 'mc-billing', 'mc-prices', 'mc-group', 'mc-ends', 'mc-foot']) {
+  for (const cls of ['mc-name', 'mc-vendor', 'mc-desc', 'mc-billing', 'mc-prices', 'mc-ends', 'mc-foot']) {
     assert.match(fn[0], new RegExp(cls), `卡片缺少 ${cls}`)
   }
-  // 价格三列：输入 / 输出 / 缓存读取
-  assert.match(fn[0], /输入/)
-  assert.match(fn[0], /输出/)
-  assert.match(fn[0], /缓存读取/)
+  // 分组：一个模型可能跨多个分组，抽成 groupChipsEl
+  const groupChips = js.match(/function groupChipsEl\([\s\S]*?\n\}/)
+  assert.ok(groupChips, '找不到 groupChipsEl')
+  assert.match(groupChips[0], /mc-group/, '分组 chip 缺少 mc-group')
+  assert.match(groupChips[0], /ratioTag\(/, '分组 chip 应带倍率标签')
+  assert.match(fn[0], /groupChipsEl\(m\)/, '卡片应调用分组 chip 渲染')
+  // 价格三列：输入 / 输出 / 缓存读取（价格格单独一个函数，卡片调用它）
+  assert.match(fn[0], /priceCellsOf\(/, '卡片应调用价格格渲染')
+  const prices = js.match(/function priceCellsOf\([\s\S]*?\n\}/)
+  assert.ok(prices, '找不到 priceCellsOf')
+  for (const label of ['输入', '输出', '缓存读取']) {
+    assert.ok(prices[0].includes(label), `价格格缺少「${label}」`)
+  }
 })
 
 test('卡片不伪造健康度：没有延迟/吞吐/成功率这类我们拿不到的数据', async () => {
@@ -327,6 +342,69 @@ test('没设 PAT 时给引导式空态，不甩红色错误横幅', async () => 
   assert.match(js, /去设置访问令牌/, '应给一条通往 PAT 页的路')
 })
 
+test('广场工具条：价格单位 /1M-/1K、排序、双列-列表都是真功能', async () => {
+  const html = await (await fetch(base + '/')).text()
+  for (const id of ['unit-seg', 'sort-trigger', 'sort-pop', 'view-seg', 'catalog-search']) {
+    assert.ok(html.includes('id="' + id + '"'), `工具条缺少 #${id}`)
+  }
+  const js = await (await fetch(base + '/ui/app.js')).text()
+  assert.match(js, /function fmtTok\(/, '缺少按单位换算的格式化函数')
+  assert.match(js, /filters\.unit/, '单位应参与渲染')
+  assert.match(js, /as-list/, '缺少列表视图')
+  assert.match(js, /filters\.sort/, '排序应参与渲染')
+
+  // 排序：默认「最新版本」，四项齐全，且是自绘弹层（原生 select 弹白底）
+  assert.match(html, /id="sort-label">最新版本</, '默认排序应是最新版本')
+  for (const want of ['最新版本', '名称', '价格：从低到高', '价格：从高到低']) {
+    assert.ok(html.includes(want), `排序菜单缺少「${want}」`)
+  }
+  assert.match(js, /function byLatestVersion\(/, '缺少「最新版本」排序实现')
+  assert.equal(html.includes('id="sort-select"'), false, '排序不该再用原生 select，弹层跟不了深色主题')
+  assert.equal(js.includes('kind-chips'), false, '类型分段控件应已移除（分类在侧栏）')
+})
+
+test('PAT 保存：不做前缀硬校验，且有即时反馈与超时', async () => {
+  const js = await (await fetch(base + '/ui/app.js')).text()
+  // 站点令牌前缀由站点决定（文档写过 nap-、代码写过 nap_），前端按猜测拦下来
+  // 就会变成「点保存没反应」——这是用户真实遇到的问题。
+  assert.equal(/startsWith\('nap_'\)/.test(js), false, '不该按 nap_ 前缀硬拦')
+  assert.match(js, /\^sk\[-_\]/, '只应挡明显拿错的 sk- 钥匙')
+  assert.match(js, /正在向站点验证/, '点保存后要立刻有反馈')
+  assert.match(js, /AbortSignal\.timeout\(/, '请求必须有超时，不能无限转圈')
+})
+
+test('列表视图是七列表格：模型/类型/价格/缓存/供应商/端点/分组', async () => {
+  const js = await (await fetch(base + '/ui/app.js')).text()
+  assert.match(js, /function listHead\(/, '缺少列表表头')
+  assert.match(js, /function modelRow\(/, '缺少列表行渲染')
+  const head = js.match(/function listHead\([\s\S]*?\n\}/)
+  for (const col of ['模型', '类型', '价格', '缓存', '供应商', '端点', '分组']) {
+    assert.ok(head[0].includes(col), `表头缺少「${col}」`)
+  }
+  const css = (await (await fetch(base + '/ui/style.css')).text()).replace(/\/\*[\s\S]*?\*\//g, '')
+  assert.match(css, /\.model-grid\.as-list \.ml-row\s*\{/, '缺少列表行样式')
+  assert.match(css, /\.model-grid\.as-list \.ml-head,/, '缺少表头样式')
+})
+
+test('标签栏是胶囊，余额页是账户概览 + 数据概览', async () => {
+  const css = (await (await fetch(base + '/ui/style.css')).text()).replace(/\/\*[\s\S]*?\*\//g, '')
+  const tabs = css.match(/(?:^|\n)\.tabs\s*\{[^}]*\}/m)
+  assert.ok(tabs, '找不到 .tabs')
+  assert.match(tabs[0], /border-radius:\s*999px/, '标签栏外框应是胶囊')
+  const tab = css.match(/(?:^|\n)\.tab\s*\{[^}]*\}/m)
+  assert.ok(tab, '找不到 .tab')
+  assert.match(tab[0], /border-radius:\s*999px/, '标签按钮应是胶囊')
+
+  const html = await (await fetch(base + '/')).text()
+  assert.match(html, /账户概览/, '余额卡片标题应为「账户概览」')
+  assert.match(html, /数据概览/, '用量卡片标题应为「数据概览」')
+
+  const js = await (await fetch(base + '/ui/app.js')).text()
+  assert.match(js, /function usageChart\(/, '缺少消耗柱状图')
+  assert.match(js, /class: 'chart-bars'/, '缺少柱状图容器')
+  assert.match(js, /class: 'money'/, '账户概览应有大金额')
+})
+
 test('PAT 保存后区分「已验证 / 未验证 / 缺 scope」，不当成功一笔带过', async () => {
   const js = await (await fetch(base + '/ui/app.js')).text()
   assert.match(js, /已设置 · 已验证/, 'PAT 页应显示验证状态')
@@ -335,16 +413,28 @@ test('PAT 保存后区分「已验证 / 未验证 / 缺 scope」，不当成功�
   assert.match(js, /payload\.hint/, '保存失败时应把服务端的可操作提示带出来')
 })
 
-test('四个标签页各有页面级标题（h2），卡片标题用 h3', async () => {
+test('页面标题：广场直接进工具条，其余三页保留 h2 页头，卡片标题用 h3', async () => {
   const html = await (await fetch(base + '/')).text()
 
-  // 每个面板都要有 page-head + h2 + page-sub
+  // 模型广场去掉了页头：整页第一块就是横跨全宽的工具条（侧栏在它下面）
+  const catalogPanel = html.match(/data-panel="catalog"[\s\S]*?<\/section>/)
+  assert.ok(catalogPanel, '找不到模型广场面板')
+  assert.equal(/class="page-head"/.test(catalogPanel[0]), false, '模型广场不设页头')
+  assert.match(catalogPanel[0], /class="market-top"/, '缺少工具条')
+  assert.ok(
+    catalogPanel[0].indexOf('class="market-top"') < catalogPanel[0].indexOf('class="market-body"'),
+    '工具条要在布局最前面，侧栏在它下面',
+  )
+
+  // 其余三个面板仍是 page-head + h2 + page-sub
   const heads = [...html.matchAll(/class="page-head"[\s\S]{0,220}?<h2>([^<]+)<\/h2>[\s\S]{0,120}?class="page-sub"/g)]
-  assert.equal(heads.length, 4, `应有 4 个页面级标题，实际 ${heads.length}`)
+  assert.equal(heads.length, 3, `应有 3 个页面级标题，实际 ${heads.length}`)
   const titles = heads.map((m) => m[1])
-  for (const want of ['模型广场', '余额与用量', '密钥', '访问令牌']) {
+  for (const want of ['余额与用量', '密钥', '访问令牌']) {
     assert.ok(titles.includes(want), `缺少页面标题「${want}」：${titles.join(', ')}`)
   }
+  // 面板本身仍有可访问名称：由 tab 的 aria-labelledby 提供
+  assert.match(html, /aria-labelledby="tab-catalog"/, '广场面板要靠 tab 标出可访问名称')
 
   // 卡片标题必须降到 h3：card-head 里不该再出现 h2，否则层级和页头打平
   assert.equal(/class="card-head"[\s\S]{0,80}?<h2>/.test(html), false, 'card-head 里不该有 h2')
@@ -359,16 +449,20 @@ test('账户卡不重复显示打码钥匙', async () => {
   assert.match(js, /!String\(a\.label \|\| ''\)\.includes\(mask\)/, '应按 label 是否已含打码来判断')
 })
 
-// ── 重绘后的广场：厂商筛选 + 分组横幅 + 供应商图标 ──────────────────
-test('模型广场有厂商筛选与分组横幅，供应商图标都能取到', async () => {
+// ── 重绘后的广场：按厂商分类的分组筛选 + 分组横幅 + 供应商图标 ──────
+test('模型广场：侧栏按厂商分类分组，分组 chip 前面是倍率', async () => {
   const html = await (await fetch(base + '/')).text()
-  assert.match(html, /id="vendor-chips"/, '缺少厂商筛选栏')
-  assert.match(html, /id="group-banner"/, '缺少选中分组的横幅')
-  assert.match(html, /id="kind-chips"/, '缺少类型分段控件')
+  assert.match(html, /id="group-chips"/, '缺少分组/分类筛选栏')
+  assert.match(html, /id="group-banner"/, '缺少选中分组/分类的横幅')
 
   const js = await (await fetch(base + '/ui/app.js')).text()
+  assert.match(js, /const CATEGORY_ORDER = \[[^\]]*'claude'[^\]]*'gpt'[^\]]*'gemini'[^\]]*'grok'[^\]]*'guomo'[^\]]*'image'[^\]]*'video'/, '分类顺序应为 claude-gpt-gemini-grok-国模-image-video')
+  assert.match(js, /function renderGroupedChips\(/, '缺少按分类渲染分组的函数')
+  assert.match(js, /function renderGroupBanner\(/, '缺少顶部横幅渲染')
+  assert.match(js, /function categoryOf\(/, '缺少分组归类函数')
+  assert.match(js, /function ratioTag\(/, '分组 chip 应显示倍率胶囊')
+  assert.match(js, /gb-tag/, '倍率/标签应统一成 gb-tag 胶囊样式')
   assert.match(js, /function vendorBadge\(/, '缺少厂商标记渲染')
-  assert.match(js, /function renderGroupBanner\(/, '缺少分组横幅渲染')
 
   // 图标是运行时按厂商名引用的，列不进 HTML 的 src，所以要单独核对文件真的在。
   const files = [...new Set([...js.matchAll(/'([A-Za-z0-9._-]+\.svg)'/g)].map((m) => m[1]))]

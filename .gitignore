@@ -5,6 +5,9 @@ node_modules/
 dragonapi-state.json
 dragonapi-state.json.tmp-*
 
+# 本地预览的状态目录（node dev.mjs 用，含 PAT，绝不进库）
+.dev-state/
+
 # 打包产物
 *.tgz
 

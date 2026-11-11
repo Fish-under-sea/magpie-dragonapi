@@ -138,10 +138,35 @@ node serve.mjs
 ## 开发
 
 ```powershell
-npm test        # 150 个用例：价格解析、详情页 billing 折算、目录构建、用量解析、PAT 保存的四种结局、入口只导出默认工厂、源与刷新链路、服务冒烟、插件入口、界面
+npm test        # 156 个用例：价格解析、详情页 billing 折算、目录构建、用量解析、PAT 保存的四种结局、入口只导出默认工厂、源与刷新链路、服务冒烟、插件入口、界面
 ```
 
 测试用站点 2026-11-10 的真实快照（[证据-站点定价快照-2026-11-10.json](证据-站点定价快照-2026-11-10.json)）当夹具，站点改了写法就会被发现。
+
+### 本地实时预览（改界面时用这个）
+
+```powershell
+node dev.mjs              # http://127.0.0.1:3671/?theme=dark
+node dev.mjs --sandbox    # 套一层 magpie 同款沙箱 iframe
+```
+
+改 `ui/` 里任何文件（html / css / js）都会自动整页刷新，不需要装 magpie，也不用重装插件。
+
+它起两个进程内的服务：内部服务（`3672`）是真的 `lib/service.mjs`，带真实站点目录与 `/api/*`；
+开发服务（`3671`）只负责发静态文件、注入热刷新脚本、把 `/api/*` 反代过去。所以界面走的
+还是生产那条请求路径，只是文件每次从磁盘现读。
+
+**两种模式都要看一遍**，尤其是改请求、存储、导航的时候：
+
+| 模式 | 地址 | 什么时候用 |
+| --- | --- | --- |
+| 顶层直开 | `/?theme=dark` | 日常改样式最快，devtools 干净 |
+| 沙箱 iframe | `/__sandbox?theme=dark` | 和 magpie 里一致：`sandbox="allow-scripts"`，安全源不透明（`localStorage` 会抛 `SecurityError`） |
+
+这个差异造成过真实事故：顶层一切正常，装进 magpie 后所有接口都「连不上本地服务」——
+不透明源里相对路径的 `fetch` 会被判 `Failed to fetch`。沙箱模式就是为了提前看见这类问题。
+
+预览状态写在 `.dev-state/`（含 PAT，已进 `.gitignore`）。
 
 目录结构：
 
@@ -159,6 +184,7 @@ page/                   带路页（把自己导航到本地服务）
 ui/                     真正的界面
 ui/vendor-icons/        厂商品牌图标（来自同期 magpie-neartoken 仓库，MIT）
 serve.mjs               独立启动
+dev.mjs                 本地实时预览（不打包进 npm）
 ```
 
 ### 两个「源」为什么单独存在

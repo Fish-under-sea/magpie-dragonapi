@@ -1414,42 +1414,23 @@ function renderSubscriptions() {
   const box = $('#subscriptions-body');
   const d = cache.subscriptions;
   if (!box || !d) return;
-  if (d.needPat) {
-    box.replaceChildren(h('div', { class: 'empty' },
-      h('p', { text: '设置 PAT 后显示我的订阅和套餐列表，需要 wallet:read 权限。' }),
-      h('button', { class: 'btn ghost', type: 'button', onclick: () => activateTab('pat') }, '去设置访问令牌')));
-    return;
-  }
+  // 没有 PAT：钱包卡的空态已经带「去设置访问令牌」，这里不再重复一条引导。
+  if (d.needPat) { box.replaceChildren(); return; }
   if (d.ok === false) { regionError(box, `订阅没读到：${d.error}`, () => loadSubscriptions(true)); return; }
-  const subscriptions = Array.isArray(d.subscriptions) ? d.subscriptions : [];
-  const plans = Array.isArray(d.plans) ? d.plans : [];
+  // 订阅最多一条：优先当前生效的，其次第一条历史记录。
+  // 套餐列表不再展示——只读、不能买，摆进钱包卡只会把余额挤下去。
+  const list = Array.isArray(d.subscriptions) ? d.subscriptions : [];
+  const current = list.find((s) => s.active) || list[0] || null;
   const preference = BILLING_LABEL[d.billingPreference] || '站点未返回可识别的扣费偏好';
   box.replaceChildren(
-    h('div', { class: 'subscription-toolbar' },
-      h('p', { class: 'hint', text: `扣费偏好：${preference}（只读）` }),
-      h('button', { class: 'btn ghost', type: 'button', onclick: () => loadSubscriptions(true) }, '刷新订阅')),
-    h('h4', { class: 'subscription-heading', text: '我的订阅' }),
-    subscriptions.length ? h('div', { class: 'subscription-grid' }, subscriptions.map(subscriptionCard))
-      : h('p', { class: 'empty', text: '当前没有订阅记录。' }),
-    h('h4', { class: 'subscription-heading', text: '套餐列表' }),
-    d.plansError ? h('div', { class: 'region-error-text', text: `套餐列表没读到：${d.plansError}。已读取的订阅仍显示在上方。` })
-      : plans.length ? h('div', { class: 'subscription-grid' }, plans.map((p) => h('article', { class: 'subscription-item' },
-        h('div', { class: 'subscription-title' }, h('b', { text: p.title }), h('span', { class: 'mono', text: p.price || '标价未提供' })),
-        p.subtitle ? h('p', { class: 'hint', text: p.subtitle }) : null,
-        h('dl', { class: 'acct-facts' },
-          h('dt', { text: '周期' }), h('dd', { text: durationLabel(p) }),
-          h('dt', { text: '额度' }), h('dd', { text: p.unlimited ? '不限量' : p.total || '—' }),
-          h('dt', { text: '重置周期' }), h('dd', { text: resetLabel(p.quotaResetPeriod) })),
-        h('p', { class: 'hint', text: '仅展示 · 不提供购买与支付' }))))
-        : h('p', { class: 'empty', text: '站点没有返回可展示的套餐。' }),
+    h('div', { class: 'wallet-sub-head' },
+      h('h4', { class: 'subscription-heading', text: '订阅' }),
+      h('span', { class: 'hint', text: `扣费偏好：${preference}（只读）` })),
+    current
+      ? subscriptionCard(current)
+      : h('p', { class: 'empty', text: '当前没有订阅。' }),
   );
 }
-
-function durationLabel(p) {
-  const unit = { day: '天', week: '周', month: '个月', year: '年', hour: '小时', custom: '秒' }[p.durationUnit];
-  return unit && Number.isFinite(p.durationValue) ? `${p.durationValue} ${unit}` : '站点未提供可识别的周期';
-}
-function resetLabel(v) { return { daily: '每日', weekly: '每周', monthly: '每月', yearly: '每年', never: '不重置', custom: '自定义' }[v] || v || '—'; }
 
 function subscriptionCard(s) {
   const status = s.status === 'active'
@@ -1639,7 +1620,9 @@ function renderAccounts() {
   box.classList.toggle('is-empty', accounts.length === 0);
   if (!accounts.length) {
     if (st.userError) regionError(box, `PAT 账户没读到：${st.userError}`, () => loadWallet(true));
-    else box.replaceChildren(h('div', { class: 'empty', text: '设置 PAT 后可读取账户钱包与用量，无需先绑定 sk- 钥匙。绑定钥匙的额度会单独展示。' }));
+    else box.replaceChildren(h('div', { class: 'empty' },
+      h('p', { text: '设置 PAT 后可读取钱包余额、用量与订阅，无需先绑定 sk- 钥匙。绑定钥匙的额度会单独展示。' }),
+      h('button', { class: 'btn ghost', type: 'button', onclick: () => activateTab('pat') }, '去设置访问令牌')));
     return;
   }
 
@@ -1709,12 +1692,6 @@ function splitMoney(text) {
   return { unit: (m && m[1]) || '', value: (m && m[2]) || '—' };
 }
 
-/** 账户钱包余额，不把绑定钥匙的限额求和冒充钱包。 */
-function totalBalanceText() {
-  // 钱包余额和钥匙限额是不同口径；即使都有也绝不能相加。
-  return cache.state?.user?.balance || '—';
-}
-
 function fig(k, v, cls = '', title = '') {
   return h('div', { class: 'fig' },
     h('span', { class: 'fig-k', text: k }),
@@ -1768,6 +1745,7 @@ function renderUsage() {
   }
 
   const byModel = data.byModel || [];
+  const calls = byModel.reduce((n, m) => n + (Number(m.calls) || 0), 0);
   const rows = byModel.map((m) => [
     { text: m.model || '—', cls: 'mono' },
     { text: fmtInt(m.calls), cls: 'num' },
@@ -1780,10 +1758,10 @@ function renderUsage() {
     || rows.length > 0 || Number(data.tokens) > 0;
 
   box.replaceChildren(
-    // 三个数字一行，照 neartoken 的「数据概览」
+    // 三个数字一行：消耗 / 请求 / Token。余额在钱包卡里，不在这儿重复。
     h('div', { class: 'stats' },
       statBlock('消耗', data.spent || '—'),
-      statBlock('账户钱包', totalBalanceText()),
+      statBlock('请求', fmtInt(calls)),
       statBlock('Token', fmtInt(data.tokens))),
     h('p', { class: 'range-note', text: `区间 ${fmtAt(data.start)} → ${fmtAt(data.end)}` }),
     ...(data.note ? [h('p', { class: 'hint', text: data.note })] : []),

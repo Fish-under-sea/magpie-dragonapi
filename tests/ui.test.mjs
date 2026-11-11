@@ -531,6 +531,11 @@ test('标签栏是胶囊，余额页是账户概览 + 数据概览', async () =>
   const html = await (await fetch(base + '/')).text()
   assert.match(html, /账户概览/, '标签应显示「账户概览」')
   assert.match(html, /数据概览/, '用量卡片标题应为「数据概览」')
+  // 订阅与余额同一张卡：卡头是「钱包」，订阅区在卡内，不再单开「订阅套餐」卡
+  assert.match(html, /<h3>钱包<\/h3>/, '余额卡标题应为「钱包」')
+  assert.match(html, /id="subscriptions-body"[^>]*class="wallet-sub"/, '订阅区应挂在钱包卡内')
+  assert.equal(html.includes('<h3>订阅套餐</h3>'), false, '订阅不再单开卡片')
+  assert.equal(html.includes('>账户</h3>'), false, '「账户」应改名为「钱包」')
 
   const js = await (await fetch(base + '/ui/app.js')).text()
   assert.match(js, /function usageChart\(/, '缺少消耗柱状图')

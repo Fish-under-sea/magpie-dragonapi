@@ -83,7 +83,7 @@ test('用量读取失败会同时更新日志和概览，不保留旧数据', as
 })
 
 test('PAT-only 账户显示钱包，绑定钥匙单独标记且不合并余额', () => {
-  const { c, get, run } = harness(['renderAccounts', 'splitMoney', 'totalBalanceText'])
+  const { c, get, run } = harness(['renderAccounts', 'splitMoney'])
   c.cache.state = { pat: { set: true }, user: { username: 'PAT User', balance: '$12.00', used: '$2.00' }, accounts: [] }
   run('renderAccounts()')
   let shown = JSON.stringify(get('#account-body').children)
@@ -93,7 +93,9 @@ test('PAT-only 账户显示钱包，绑定钥匙单独标记且不合并余额',
   run('renderAccounts()')
   shown = JSON.stringify(get('#account-body').children)
   assert.match(shown, /钥匙额度/)
-  assert.equal(run('totalBalanceText()'), '$12.00')
+  assert.match(shown, /90.00/)
+  // 钱包与钥匙额度各自展示，不求和（旧实现会把两者相加冒充钱包）
+  assert.match(shown, /12.00/)
 })
 
 test('订阅超额百分比保留文本，进度条视觉 clamp；不限量无假百分比', () => {
@@ -118,20 +120,38 @@ test('订阅接口失败和未配置 PAT 分开显示，不当作没有订阅', 
   c.cache.subscriptions = null
   await run('loadSubscriptions(true)')
   assert.equal(c.cache.subscriptions.needPat, true)
-  assert.match(JSON.stringify(get('#subscriptions-body').children), /去设置访问令牌/)
+  // 没有 PAT 时引导只出现在钱包卡里，订阅区留空，避免同一张卡两段空态
+  assert.equal(get('#subscriptions-body').children.length, 0)
   c.api.subscriptions = async () => { throw Error('wallet:read 权限不足') }
   await run('loadSubscriptions(true)')
   assert.match(JSON.stringify(get('#subscriptions-body').children), /订阅没读到.*权限不足/)
 })
 
-test('套餐列表单独失败保留我的订阅，并显示原始错误说明', () => {
+test('没有 PAT 时钱包卡给出设置入口', () => {
+  const { c, get, run } = harness(['renderAccounts', 'splitMoney'])
+  c.cache.state = { pat: { set: false }, accounts: {} }
+  run('renderAccounts()')
+  assert.match(JSON.stringify(get('#account-body').children), /去设置访问令牌/)
+})
+
+test('订阅只显示当前生效那一条，不再渲染套餐列表', () => {
   const { c, get, run } = harness(['renderSubscriptions', 'subscriptionCard'])
-  c.cache.subscriptions = { ok: true, subscriptions: [{ title: 'My Plus', status: 'active', active: true, total: '$30', used: '$12', remaining: '$18', progress: 40 }], plans: [], plansError: 'HTTP 503 unavailable' }
+  c.cache.subscriptions = {
+    ok: true,
+    billingPreference: 'subscription_first',
+    plans: [{ title: '套餐 A' }],
+    plansError: 'HTTP 503 unavailable',
+    subscriptions: [
+      { title: 'Old Plan', status: 'expired', active: false },
+      { title: 'My Plus', status: 'active', active: true, total: '$30', used: '$12', remaining: '$18', progress: 40 },
+    ],
+  }
   run('renderSubscriptions()')
   const rendered = JSON.stringify(get('#subscriptions-body').children)
   assert.match(rendered, /My Plus/)
-  assert.match(rendered, /套餐列表没读到.*503/)
-  assert.doesNotMatch(rendered, /当前没有订阅记录/)
+  assert.equal(rendered.includes('Old Plan'), false, '只展示当前生效的订阅')
+  assert.equal(rendered.includes('套餐列表'), false, '套餐列表不再单开一区')
+  assert.match(rendered, /扣费偏好/)
 })
 
 test('粘贴 PAT 规范化与打码匹配用于保存超时后的核对', () => {

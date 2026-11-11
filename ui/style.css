@@ -2750,9 +2750,24 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
 #panel-wallet .acct-layout > .card { overflow: visible; }
 #panel-wallet .keys-page { flex: none; min-height: 240px; overflow: visible; }
 #panel-wallet #keys-body { flex: none; overflow-y: visible; }
-.subscription-toolbar, .subscription-title { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
-.subscription-heading { margin: 16px 0 10px; font-size: 12px; }
-.subscription-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+/* 订阅：贴在钱包卡底部（和余额同一张卡），只展示当前那一条 */
+.wallet-sub {
+  flex: none;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.wallet-sub-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.wallet-sub .subscription-heading { margin: 0; }
+.wallet-sub .subscription-item { margin-top: 10px; }
+.subscription-title { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.subscription-heading { font-size: 12px; }
 .subscription-item { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--sunken); }
 .subscription-item .acct-facts { margin-top: 12px; }
 .subscription-item dd, .subscription-title b { overflow-wrap: anywhere; }
@@ -2763,7 +2778,6 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
 .pat-state { margin: 4px 0 10px; gap: 4px; padding: 7px 10px; }
 .pat-state > p { margin: 4px 0; }
 .banner[data-tone="ok"] { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
-@media (max-width: 720px) { .subscription-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (forced-colors: active) { .subscription-progress { forced-color-adjust: auto; } }
 
 @media (max-width: 900px) {

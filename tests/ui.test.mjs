@@ -126,7 +126,7 @@ test('API 不写死主机名，换端口/换代理前缀也不坏', async () => 
 test('三个标签页：密钥已并入账户页，不再单开标签', async () => {
   const html = await (await fetch(base + '/')).text()
   const tabs = [...html.matchAll(/data-tab="([^"]+)"/g)].map((m) => m[1])
-  assert.deepEqual(tabs, ['catalog', 'wallet', 'pat'], `标签应只剩三个，实际 ${tabs.join(', ')}`)
+  assert.deepEqual(tabs, ['wallet', 'catalog', 'pat'], `标签应只剩三个且账户在前，实际 ${tabs.join(', ')}`)
   assert.equal(/id="panel-keys"/.test(html), false, '密钥面板应已并入账户页')
   // 密钥的能力还在：建钥匙表单挂在账户页里
   assert.match(html, /id="key-form"/, '账户页里应保留建钥匙表单')
@@ -501,13 +501,14 @@ test('标签栏是胶囊，余额页是账户概览 + 数据概览', async () =>
   assert.match(tab[0], /border-radius:\s*999px/, '标签按钮应是胶囊')
 
   const html = await (await fetch(base + '/')).text()
-  assert.match(html, /账户概览/, '余额卡片标题应为「账户概览」')
+  assert.match(html, /账户概览/, '标签应显示「账户概览」')
   assert.match(html, /数据概览/, '用量卡片标题应为「数据概览」')
 
   const js = await (await fetch(base + '/ui/app.js')).text()
   assert.match(js, /function usageChart\(/, '缺少消耗柱状图')
   assert.match(js, /class: 'chart-bars'/, '缺少柱状图容器')
-  assert.match(js, /class: 'money'/, '账户概览应有大金额')
+  assert.match(js, /class: 'acct-num'/, '账户卡应有大金额')
+  assert.match(js, /acct-hero/, '账户卡应照站点版式：大字余额 + 刷新')
 })
 
 test('PAT 保存后区分「已验证 / 未验证 / 缺 scope」，不当成功一笔带过', async () => {

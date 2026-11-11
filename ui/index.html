@@ -41,12 +41,12 @@
   </header>
 
   <nav class="tabs" role="tablist" aria-label="功能分页">
-    <button class="tab" role="tab" type="button" id="tab-catalog" data-tab="catalog"
-            aria-controls="panel-catalog" aria-selected="true" tabindex="0">模型广场</button>
     <button class="tab" role="tab" type="button" id="tab-wallet" data-tab="wallet"
-            aria-controls="panel-wallet" aria-selected="false" tabindex="0">余额与用量</button>
+            aria-controls="panel-wallet" aria-selected="true" tabindex="0">账户概览</button>
+    <button class="tab" role="tab" type="button" id="tab-catalog" data-tab="catalog"
+            aria-controls="panel-catalog" aria-selected="false" tabindex="-1">模型广场</button>
     <button class="tab" role="tab" type="button" id="tab-pat" data-tab="pat"
-            aria-controls="panel-pat" aria-selected="false" tabindex="0">访问令牌</button>
+            aria-controls="panel-pat" aria-selected="false" tabindex="-1">访问令牌</button>
   </nav>
 
   <div class="banners" id="banners" aria-live="polite"></div>
@@ -114,7 +114,7 @@
       <div class="grid-2 wallet-grid">
         <div class="card">
           <header class="card-head">
-            <h3>账户概览</h3>
+            <h3>账户</h3>
             <span class="card-sub" id="account-sub"></span>
           </header>
           <div id="account-body"><p class="loading">正在读取…</p></div>

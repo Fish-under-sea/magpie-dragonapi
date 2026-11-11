@@ -1442,35 +1442,59 @@ function renderAccounts() {
     return;
   }
 
+// 版式照站点控制台的「账户」卡：大字余额 → 已用/用户/分组一行 → 明细 →
+  // 标签行 + 更新时间。**只放我们真有的字段**：站点没有「代金券总额」，
+  // 也没有满血/低价/自有这类标注，就不摆占位符冒充。
   box.replaceChildren(...accounts.map((a) => {
     const mask = a.masked || '';
-    // 服务端的 label 本身就是「分组 · 打码钥匙」，再单列一次打码就是重复。
-    // 只在 label 里没有它时才单独显示。
     const showMask = mask && !String(a.label || '').includes(mask);
-    // 余额是「—」不是因为没有余额，而是插件进程还没拿到这把钥匙的明文
-    // （冷启动后要等宿主调一次 models/usage 才会填）。说清楚，别让人以为没钱了。
     const noKeyHint = a.balance === '—'
       ? '插件还没拿到这把钥匙的明文：在 magpie 里发一次请求、或点右上角「刷新」即可'
       : '';
     const split = splitMoney(a.balance || '—');
-    return h('div', { class: 'acct-overview' },
-      h('div', { class: 'acct-main' },
-        h('div', { class: 'grow' },
-          h('div', { class: 'money' },
-            split.unit ? h('span', { class: 'unit', text: split.unit }) : null,
-            split.value),
-          h('p', {
-            class: 'money-note',
-            text: [
-              a.used && a.used !== '—' ? `已用 ${a.used}` : '',
-              a.group ? `分组 ${a.group}` : '',
-              showMask ? `钥匙 ${mask}` : '',
-              Number.isFinite(a.models) && a.models ? `${fmtInt(a.models)} 个模型` : '',
-              Number.isFinite(a.boundAt) && a.boundAt ? `绑定于 ${fmtAt(a.boundAt)}` : '',
-            ].filter(Boolean).join(' · ') || (a.label || '还没有读到账户'),
-          })),
-        noKeyHint ? h('span', { class: 'acct-hint', text: noKeyHint }) : null,
-      ),
+    const userName = (st.user && (st.user.name || st.user.username)) || '';
+
+    const meta = [
+      a.used && a.used !== '—' ? `已用 ${a.used}` : '',
+      userName ? `用户 ${userName}` : '',
+      a.group ? `分组 ${a.group}` : '',
+    ].filter(Boolean).join(' · ');
+
+    const chips = [
+      a.group ? h('span', { class: 'acct-chip', text: a.group }) : null,
+      showMask ? h('span', { class: 'acct-chip mono', text: mask }) : null,
+    ].filter(Boolean);
+
+    const facts = [
+      Number.isFinite(a.models) ? ['模型数', fmtInt(a.models)] : null,
+      Number.isFinite(a.boundAt) && a.boundAt ? ['绑定于', fmtAt(a.boundAt)] : null,
+    ].filter(Boolean);
+
+    return h('div', { class: 'acct-card' },
+      h('div', { class: 'acct-hero' },
+        h('div', { class: 'acct-money' },
+          split.unit ? h('span', { class: 'acct-cur', text: split.unit }) : null,
+          h('b', { class: 'acct-num', text: split.value })),
+        h('button', {
+          class: 'btn ghost acct-refresh', type: 'button',
+          title: '重新读取账户与余额',
+          onclick: () => Promise.all([loadState(true), loadUsage(true)]).then(() => { renderAccounts(); renderUsage(); }),
+        }, '刷新')),
+
+      meta ? h('p', { class: 'acct-meta', text: meta }) : null,
+
+      facts.length
+        ? h('dl', { class: 'acct-facts' },
+          facts.flatMap(([k, v]) => [h('dt', { text: k }), h('dd', { class: 'mono', text: v })]))
+        : null,
+
+      (chips.length || a.balanceAt)
+        ? h('div', { class: 'acct-foot' },
+          h('span', { class: 'acct-chips' }, chips),
+          a.balanceAt ? h('span', { class: 'acct-sync', text: `余额截至 ${fmtAt(a.balanceAt)}` }) : null)
+        : null,
+
+      noKeyHint ? h('p', { class: 'acct-hint', text: noKeyHint }) : null,
     );
   }));
 }
@@ -2763,8 +2787,9 @@ async function boot() {
   const wanted = params.get('tab');
   // 密钥已并入账户页；旧的 ?tab=keys 链接仍要能打开（映射到 wallet），
   // 不能因为标签被取消就让人书签失效。
-  const valid = ['catalog', 'wallet', 'pat'];
-  const start = wanted === 'keys' ? 'wallet' : (valid.includes(wanted) ? wanted : 'catalog');
+  const valid = ['wallet', 'catalog', 'pat'];
+  // 账户页放在首位，也作为默认落地页：打开就能看到余额与钥匙。
+  const start = wanted === 'keys' ? 'wallet' : (valid.includes(wanted) ? wanted : 'wallet');
 
   activateTab(start, { focus: false });
 

@@ -2023,3 +2023,65 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   .aff-link { flex-basis: 100%; }
   .aff-sync { display: none; }
 }
+/* ── 账户卡：照站点控制台的版式（大字余额 → 一行元信息 → 明细 → 标签行） ──
+ *
+ * 只画我们真有的东西：站点没有「代金券总额」，也没有满血/低价/自有这类标注，
+ * 就不摆占位符冒充——留白比编一个更诚实。
+ */
+.acct-card { display: flex; flex-direction: column; gap: 8px; }
+.acct-card + .acct-card { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+
+.acct-hero { display: flex; align-items: flex-start; gap: 10px; }
+.acct-money { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 3px; }
+.acct-cur { font-size: 20px; color: var(--muted); }
+.acct-num {
+  font-family: var(--code);
+  font-size: 34px;
+  line-height: 1.05;
+  font-weight: 650;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.acct-refresh { flex: none; align-self: flex-start; }
+
+.acct-meta { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--muted); }
+
+/* 明细：两列定宽，标签在左、值在右，不抢大数字的注意力 */
+.acct-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 14px;
+  margin: 0;
+  font-size: 12px;
+}
+.acct-facts dt { color: var(--muted); font-size: 11.5px; }
+.acct-facts dd { margin: 0; }
+.acct-facts dd.mono { font-family: var(--code); font-variant-numeric: tabular-nums; }
+
+.acct-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.acct-chips { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; min-width: 0; }
+.acct-chip {
+  padding: 1px 7px;
+  font-size: 10px;
+  color: var(--muted);
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+.acct-chip.mono { font-family: var(--code); }
+.acct-sync { margin-left: auto; font-family: var(--code); font-size: 10.5px; color: var(--muted); }
+
+.acct-hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--warn);
+}
+
+@media (max-width: 720px) {
+  .acct-num { font-size: 28px; }
+}

@@ -206,8 +206,14 @@ async function request(path, { method = 'GET', body } = {}) {
       cache: 'no-store',         // 服务端已经自己缓存目录，浏览器别再叠一层
       headers: body ? { 'content-type': 'application/json' } : undefined,
       body: body ? JSON.stringify(body) : undefined,
+      // 必须自己设上限：保存 PAT 要串行探三个站点端点，站点半死不活时
+      // 没有信号就会一直转圈，用户看到的是「点了没反应」。
+      signal: AbortSignal.timeout(45000),
     });
   } catch (err) {
+    if (err && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
+      throw new ApiError('本地服务 45 秒没有返回：站点可能卡住了，稍后再试；如果一直这样，检查一下网络或代理。', 0, null);
+    }
     // 网络层失败（服务没起来 / 端口变了）统一成一句人话
     throw new ApiError('连不上本地服务，插件可能已经退出，或端口被改了。', 0, null);
   }
@@ -322,8 +328,33 @@ function fmtInt(n) {
   return Number.isFinite(n) ? n.toLocaleString('zh-CN') : '—';
 }
 
+/**
+ * fmtRatio 统一两位小数：0.1 → 0.10×、1.2 → 1.20×。
+ *
+ * 定长不只是好看——分组列表里一排胶囊的倍率标签宽度一致，右边的组名才能对齐成一条线。
+ */
 function fmtRatio(r) {
-  return Number.isFinite(r) ? `${r}×` : '—';
+  const n = Number(r);
+  return Number.isFinite(n) ? `${n.toFixed(2)}×` : '—';
+}
+
+/**
+ * ratioLevel 给倍率配一个色档，照 neartoken 那种「小标签」的配色：
+ * 便宜偏绿、中间偏蓝、偏贵偏红。同一个倍率在任何地方都是同一个颜色。
+ */
+function ratioLevel(r) {
+  const n = Number(r);
+  if (!Number.isFinite(n) || n <= 0) return 'plain';
+  if (n < 0.3) return 'green';
+  if (n < 1) return 'blue';
+  if (n < 2) return 'gold';
+  return 'red';
+}
+
+/** ratioTag 就是 neartoken 的「低价」小胶囊：白字、圆角 4px、一圈淡描边。 */
+function ratioTag(r, extraClass = '') {
+  const text = Number(r) > 0 ? fmtRatio(r) : 'auto';
+  return h('span', { class: `gb-tag ${ratioLevel(r)} ${extraClass}`.trim(), text });
 }
 
 /** 把服务端给的原始 quota 折成站点币种；金额本身仍优先用服务端格式化好的字符串。 */
@@ -363,7 +394,7 @@ const cache = {
 
 const loading = { state: false, catalog: false, keys: false, bind: false, health: false, usage: false, logs: false };
 
-const filters = { group: '', vendor: '', kind: '', q: '', range: 'day', account: '' };
+const filters = { category: '', group: '', vendor: '', kind: '', q: '', unit: 'M', sort: 'latest', view: 'grid', range: 'day', account: '' };
 
 let activeTab = 'catalog';
 
@@ -598,6 +629,155 @@ function vendorBadge(name, { size = 16, cls = '' } = {}) {
 }
 
 
+// ── 分组归类 ──────────────────────────────────────────────
+//
+// 站点的分组名是渠道商随便起的（gpt-promax、claude-kiro正价、国模-原厂…），
+// 直接平铺 14 个 chip 很难找。这里按「厂商家族」归成 7 类，侧栏按
+// claude → gpt → gemini → grok → 国模 → image → video 的顺序展示，
+// 每类下面才是它的分组（前面带倍率）。
+//
+// 「国模」是一个聚合类：DeepSeek / Qwen / Moonshot / 智谱 / 字节… 都算，
+// 所以这一类的下面是**多厂商并列**的厂商 chip，再下面是分组。
+const CATEGORY_ORDER = ['claude', 'gpt', 'gemini', 'grok', 'guomo', 'image', 'video', 'other'];
+const CATEGORY_META = {
+  claude: { title: 'Claude', icon: 'Claude.Color.svg' },
+  gpt: { title: 'GPT', icon: 'OpenAI.svg' },
+  gemini: { title: 'Gemini', icon: 'Gemini.Color.svg' },
+  grok: { title: 'Grok', icon: 'XAI.svg' },
+  guomo: { title: '国模', icon: '' },
+  image: { title: 'Image', icon: '' },
+  video: { title: 'Video', icon: '' },
+  other: { title: '其它', icon: '' },
+};
+// 匹配顺序与展示顺序不同：image / video 要先于「国模」判，否则名字里带
+// 「可灵 / 即梦」这类词的分组会被国模抢走。
+const CATEGORY_TESTS = [
+  ['image', /image|img|生图|绘图|draw|flux|midjourney|dall|stable|sdxl/i],
+  ['video', /video|视频|veo|sora|runway|pika|hailuo|可灵|kling|万相|seedance|muse/i],
+  ['claude', /claude|anthropic|kiro/i],
+  ['gpt', /gpt|openai|codex|davinci|o[134]\b/i],
+  ['gemini', /gemini|google|bard/i],
+  ['grok', /grok|xai/i],
+  ['guomo', /国模|deepseek|qwen|通义|千问|glm|智谱|moonshot|kimi|月之暗面|豆包|doubao|hunyuan|混元|文心|ernie|百度|baidu|讯飞|spark|minimax|海螺|阶跃|ling|jimeng|即梦|小米|mimo|零一|yi-/i],
+];
+/** 分组显示名：站点的「视频」按你说的改名成 video。 */
+const GROUP_ALIAS = { 视频: 'video' };
+
+/** categoryOf 判一个分组属于哪一类；名字判不出来就看它的模型类型。 */
+function categoryOf(groupId, groupModels = []) {
+  const id = String(groupId || '');
+  for (const [cat, re] of CATEGORY_TESTS) if (re.test(id)) return cat;
+  const kinds = groupModels.map((m) => m.kind || 'chat');
+  if (kinds.length) {
+    if (kinds.every((k) => k === 'image')) return 'image';
+    if (kinds.every((k) => k === 'video')) return 'video';
+  }
+  return 'other';
+}
+
+function categoryTitle(catId) {
+  return (CATEGORY_META[catId] && CATEGORY_META[catId].title) || catId;
+}
+
+function iconImg(file, size = 14) {
+  const img = h('img', { class: 'cat-icon', src: 'vendor-icons/' + file, alt: '', width: size, height: size, loading: 'lazy' });
+  img.addEventListener('error', () => { img.style.display = 'none' }, { once: true });
+  return img;
+}
+
+/** fmtTok 把一个「每百万 token」的数值按当前单位（M/K）印出来。 */
+function fmtTok(num, unit) {
+  if (!Number.isFinite(num)) return '—';
+  const v = unit === 'K' ? num / 1000 : num;
+  // 位数跟站点原来的写法一致：/M 时 ≥0.01 两位、更小四位；/K 再补两位。
+  const digits = unit === 'K' ? (v >= 0.01 ? 4 : 6) : (v >= 0.01 ? 2 : 4);
+  const cur = cache.state && cache.state.currency;
+  return `${(cur && cur.symbol) || '$'}${v.toFixed(digits)}/${unit}`;
+}
+
+/** 卡片的三个价格格：有数值就按单位换算，没有就退回服务端给的字符串。 */
+function priceCellsOf(pricing, unit) {
+  const cell = (label, num, text) => h('div', null,
+    h('span', { text: label }),
+    h('b', { text: Number.isFinite(num) ? fmtTok(num, unit) : (text || '—') }));
+  return [
+    cell('输入', pricing.inputNum, pricing.input),
+    cell('输出', pricing.outputNum, pricing.output),
+    cell('缓存读取', pricing.cacheNum, pricing.cache),
+  ];
+}
+
+/** versionRank 取模型名里的版本号（gpt-6.1-sol → [6,1]，deepseek-v4 → [4]）。 */
+function versionRank(name) {
+  const m = String(name || '').match(/\d+(?:[.-]\d+)*/);
+  return m ? m[0].split(/[.-]/).map(Number) : null;
+}
+
+/** byLatestVersion 新版本在前；没有版本号的排到最后，同版本按名称。 */
+function byLatestVersion(a, b) {
+  const x = versionRank(a.name);
+  const y = versionRank(b.name);
+  if (x && y) {
+    const n = Math.max(x.length, y.length);
+    for (let i = 0; i < n; i++) {
+      const d = (y[i] || 0) - (x[i] || 0);
+      if (d) return d;
+    }
+  } else if (x) return -1;
+  else if (y) return 1;
+  return String(a.name).localeCompare(String(b.name), 'zh');
+}
+
+/** billingLabel 计费方式的一句话标签（卡片与列表行共用同一套判据）。 */
+function billingLabel(pricing, isAuto, priceKind) {
+  const kind = priceKind || (pricing && pricing.kind) || 'unknown';
+  if (isAuto) return { cls: 'auto', label: '以实际命中通道为准' };
+  if (kind === 'unknown') return { cls: 'unknown', label: '价格未知' };
+  if (kind === 'percall') return { cls: 'call', label: /\/秒/.test(pricing.input || '') ? '按秒计费' : '按次计费' };
+  if (kind === 'tiered') return { cls: 'dyn', label: '分档计费' };
+  return { cls: 'flat', label: '按量计费' };
+}
+
+/** fmtTokValue 只给数值（不带单位），列表里单位单独占一行。 */
+function fmtTokValue(num, unit) {
+  if (!Number.isFinite(num)) return '—';
+  const v = unit === 'K' ? num / 1000 : num;
+  const digits = unit === 'K' ? (v >= 0.01 ? 4 : 6) : (v >= 0.01 ? 2 : 4);
+  const cur = cache.state && cache.state.currency;
+  return `${(cur && cur.symbol) || '$'}${v.toFixed(digits)}`;
+}
+
+/** 端点 id → 看得懂的名字（站点给的是 openai / openai-response / anthropic 这类内部名）。 */
+const ENDPOINT_LABEL = {
+  openai: 'Chat',
+  'openai-response': 'Response',
+  anthropic: 'Anthropic',
+  gemini: 'Gemini',
+  'image-generation': '图片',
+  '视频任务': '视频',
+  'jina-rerank': 'Rerank',
+  rerank: 'Rerank',
+  embedding: '嵌入',
+  audio: '语音',
+  tts: '语音合成',
+  asr: '语音识别',
+  transcription: '转写',
+  speech: '语音',
+};
+
+function endLabel(e) {
+  return ENDPOINT_LABEL[e] || String(e || '');
+}
+
+function endpointEls(list, max) {
+  const all = Array.isArray(list) ? list : [];
+  const shown = typeof max === 'number' ? all.slice(0, max) : all;
+  return [
+    shown.map((e) => h('span', { class: 'mc-end', text: endLabel(e), title: String(e) })),
+    typeof max === 'number' && all.length > max ? h('span', { class: 'mc-end more', text: `+${all.length - max}` }) : null,
+  ];
+}
+
 function renderCatalog() {
   const data = cache.catalog;
   const body = $('#catalog-body');
@@ -608,28 +788,39 @@ function renderCatalog() {
   const groups = data.groups || [];
   const groupMap = new Map(groups.map((g) => [g.id, g]));
 
-  renderGroupChips(groups, models);
-  renderVendorChips(models);
-  renderKindSeg(models);
-  renderGroupBanner(groups, models);
+  // 每个分组下有哪些模型 / 属于哪一类，一次算好，供侧栏与过滤共用。
+  const modelsByGroup = new Map();
+  for (const m of models) {
+    const arr = modelsByGroup.get(m.group) || [];
+    arr.push(m);
+    modelsByGroup.set(m.group, arr);
+  }
+  const groupCat = new Map(groups.map((g) => [g.id, categoryOf(g.id, modelsByGroup.get(g.id) || [])]));
+
+  renderGroupedChips(groups, models, modelsByGroup, groupCat);
+  renderGroupBanner(groups, models, groupCat);
 
   const counts = catalogCounts(data);
   const query = filters.q.trim().toLowerCase();
-  const rows = models.filter((m) => {
+  const matched = models.filter((m) => {
+    if (filters.category && groupCat.get(m.group) !== filters.category) return false;
     if (filters.group && m.group !== filters.group) return false;
     if (filters.vendor && (m.vendor || '') !== filters.vendor) return false;
-    if (filters.kind && m.kind !== filters.kind) return false;
     if (!query) return true;
     const hay = [m.name, m.id, m.group, m.vendor, m.description, m.tags, ...(m.endpoints || [])]
       .filter(Boolean).join(' ').toLowerCase();
     return hay.includes(query);
   });
 
+  // 一行 = 一个「分组 × 模型」。跨分组聚合成一张卡留到下一个 PR。
+  const rows = matched;
+
   if (meta) {
     // replaceChildren 吃 null 会把它印成字符串「null」——先过滤掉空项再加。
     meta.replaceChildren(...[
       h('b', { text: fmtInt(rows.length) }),
       h('span', { text: ` 个模型 · 全站 ${fmtInt(counts.models)} 个 / ${fmtInt(counts.rows)} 行 / ${fmtInt(counts.groups)} 个分组` }),
+      filters.category ? h('span', { text: ` · 分类 ${categoryTitle(filters.category)}` }) : null,
       filters.vendor ? h('span', { text: ` · 厂商 ${filters.vendor}` }) : null,
       h('span', { class: 'spacer' }),
       h('span', {
@@ -640,157 +831,218 @@ function renderCatalog() {
   }
 
   if (!rows.length) {
-    body.replaceChildren(h('div', { class: 'empty', text: '没有符合条件的模型。放宽分组、厂商或搜索词再试。' }));
+    body.className = 'model-grid' + (filters.view === 'list' ? ' as-list' : '');
+    body.replaceChildren(h('div', { class: 'empty', text: '没有符合条件的模型。放宽分类、分组或搜索词再试。' }));
     return;
   }
 
-  body.replaceChildren(...rows.map((m) => modelCard(m, groupMap)));
+  // 排序：默认保留站点顺序（宿主列表与页面一致），另外给价格与名称两种。
+  // 排序：默认「最新版本」——按模型名里的版本号从新到旧。
+  const priceKey = (m) => (Number.isFinite(m.pricing?.inputNum) ? m.pricing.inputNum : Infinity);
+  if (filters.sort === 'price-asc') {
+    rows.sort((a, b) => priceKey(a) - priceKey(b) || String(a.name).localeCompare(String(b.name)));
+  } else if (filters.sort === 'price-desc') {
+    rows.sort((a, b) => priceKey(b) - priceKey(a) || String(a.name).localeCompare(String(b.name)));
+  } else if (filters.sort === 'name') {
+    rows.sort((a, b) => String(a.name).localeCompare(String(b.name), 'zh'));
+  } else {
+    rows.sort(byLatestVersion);
+  }
+
+  body.className = 'model-grid' + (filters.view === 'list' ? ' as-list' : '');
+  if (filters.view === 'list') {
+    body.replaceChildren(listHead(), ...rows.map((m) => modelRow(m, groupMap)));
+  } else {
+    body.replaceChildren(...rows.map((m) => modelCard(m, groupMap)));
+  }
 }
 
-/** 类型筛选：做成 neartoken 那种分段控件，数量直接跟在标签后面。 */
-function renderKindSeg(models) {
-  const host = $('#kind-chips');
-  if (!host) return;
-
-  const counts = new Map();
-  for (const m of models) {
-    const k = m.kind || 'chat';
-    counts.set(k, (counts.get(k) || 0) + 1);
-  }
-
-  const order = ['chat', 'image', 'video', 'audio', 'embedding'];
-  const kinds = [...counts.keys()].sort((a, b) => {
-    const ia = order.indexOf(a);
-    const ib = order.indexOf(b);
-    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
-  });
-
-  const seg = [h('button', {
-    type: 'button',
-    'aria-pressed': String(filters.kind === ''),
-    onclick: () => { filters.kind = ''; renderCatalog(); },
-  }, '全部', h('span', { class: 'seg-count', text: String(models.length) }))];
-
-  for (const k of kinds) {
-    seg.push(h('button', {
-      type: 'button',
-      'aria-pressed': String(filters.kind === k),
-      onclick: () => {
-        filters.kind = filters.kind === k ? '' : k;
-        renderCatalog();
-      },
-    }, KIND_LABEL[k] || k, h('span', { class: 'seg-count', text: String(counts.get(k) || 0) })));
-  }
-
-  host.replaceChildren(...seg);
+/** 列表模式的表头：照 neartoken 的七列（模型 / 类型 / 价格 / 缓存 / 供应商 / 端点 / 分组）。 */
+function listHead() {
+  return h('div', { class: 'ml-head' },
+    ['模型', '类型', '价格', '缓存', '供应商', '端点', '分组'].map((t) => h('span', { text: t })));
 }
 
-/** 厂商筛选：侧栏第二组，带 16px 品牌图标。按模型数从多到少排，常用的在上面。 */
-function renderVendorChips(models) {
-  const host = $('#vendor-chips');
-  const total = $('#vendor-total');
-  if (!host) return;
+/** modelRow 列表模式的一行；点整行打开详情。 */
+function modelRow(m, groupMap) {
+  const info = groupMap.get(m.group);
+  const pricing = m.pricing || {};
+  const kind = m.kind || 'chat';
+  const priceKind = pricing.kind || 'unknown';
+  const isAuto = m.group === 'auto' || (info && info.auto === true);
+  const billing = billingLabel(pricing, isAuto, priceKind);
+  const ends = Array.isArray(m.endpoints) ? m.endpoints : [];
+  const unit = filters.unit;
+  const open = () => openModelDrawer(m);
 
-  const counts = new Map();
-  for (const m of models) {
-    const v = String(m.vendor || '').trim();
-    if (!v) continue;
-    counts.set(v, (counts.get(v) || 0) + 1);
-  }
+  const priceCell = priceKind === 'percall' || priceKind === 'unknown' || isAuto
+    ? h('span', { class: 'ml-cell ml-price' },
+      h('span', { class: 'ml-p-line' }, h('span', { class: 'ml-p-v', text: pricing.input || '—' })))
+    : h('span', { class: 'ml-cell ml-price' },
+      h('span', { class: 'ml-p-line' },
+        h('span', { class: 'ml-p-k', text: '输入' }), h('span', { class: 'ml-p-v', text: fmtTokValue(pricing.inputNum, unit) }),
+        h('span', { class: 'ml-p-k', text: '输出' }), h('span', { class: 'ml-p-v', text: fmtTokValue(pricing.outputNum, unit) })),
+      h('span', { class: 'ml-p-unit', text: `${(cache.state && cache.state.currency && cache.state.currency.symbol) || '$'} / 1${unit}` }));
 
-  const vendors = [...counts.keys()].sort((a, b) => (counts.get(b) - counts.get(a)) || a.localeCompare(b, 'zh'));
-  if (total) total.textContent = String(vendors.length);
-
-  if (!vendors.length) {
-    host.replaceChildren(h('p', { class: 'ma-note', text: '站点没有给厂商信息。' }));
-    return;
-  }
-
-  const chips = [h('button', {
-    class: 'market-chip', type: 'button',
-    'aria-pressed': String(filters.vendor === ''),
-    onclick: () => { filters.vendor = ''; renderCatalog(); },
-  }, h('span', { class: 'chip-name', text: '全部厂商' }), h('span', { class: 'chip-count', text: String(models.length) }))];
-
-  for (const v of vendors) {
-    chips.push(h('button', {
-      class: 'market-chip', type: 'button',
-      'aria-pressed': String(filters.vendor === v),
-      onclick: () => {
-        filters.vendor = filters.vendor === v ? '' : v;
-        renderCatalog();
-      },
+  return h('div', {
+    class: 'ml-row',
+    role: 'button',
+    tabindex: '0',
+    title: `打开 ${m.name} 的详情`,
+    onclick: open,
+    onkeydown: (ev) => {
+      if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(); }
     },
-    vendorBadge(v),
-    h('span', { class: 'chip-name', text: v }),
-    h('span', { class: 'chip-count', text: String(counts.get(v)) })));
-  }
+  },
+  h('span', { class: 'ml-cell ml-model' },
+    vendorBadge(m.vendor, { size: 13 }),
+    h('span', { class: 'ml-name', text: m.name }),
+    kind !== 'chat' ? h('span', { class: 'ml-kind', text: KIND_LABEL[kind] || kind }) : null),
 
-  host.replaceChildren(...chips);
+  h('span', { class: `ml-cell ml-type ${billing.cls}`, text: billing.label }),
+
+  priceCell,
+
+  h('span', { class: 'ml-cell ml-cache' },
+    h('span', {
+      class: 'ml-c-v',
+      text: Number.isFinite(pricing.cacheNum) ? fmtTokValue(pricing.cacheNum, unit) : (pricing.cache || '—'),
+    }),
+    Number.isFinite(pricing.cacheNum) ? h('span', { class: 'ml-c-unit', text: `/ 1${unit}` }) : null),
+
+  h('span', { class: 'ml-cell ml-vendor' },
+    vendorBadge(m.vendor, { size: 13 }),
+    h('span', { text: m.vendor || '—' })),
+
+  h('span', { class: 'ml-cell ml-ends' },
+    ends.length ? endpointEls(ends, 3) : h('span', { class: 'ml-dash' })),
+
+  h('span', { class: 'ml-cell ml-groups' }, groupChipsEl(m)));
 }
 
-/** 选中分组时的横幅：分组名、倍率、该组模型数，以及站点对这个分组的说明。 */
-function renderGroupBanner(groups, models) {
+/** 顶部横幅：选中分组时给分组信息，只选了分类时给分类信息，都没选就收起。 */
+function renderGroupBanner(groups, models, groupCat) {
   const host = $('#group-banner');
   if (!host) return;
 
   const info = filters.group ? groups.find((g) => g.id === filters.group) : null;
-  if (!info) { host.hidden = true; host.replaceChildren(); return; }
+  if (info) {
+    const n = models.filter((m) => m.group === info.id).length;
+    const ratio = Number(info.ratio) > 0 ? fmtRatio(info.ratio) : (info.auto ? '按命中通道计费' : '');
+    host.hidden = false;
+    host.replaceChildren(...[
+      h('div', { class: 'gb-head' },
+        h('span', { class: 'gb-name', text: GROUP_ALIAS[info.id] || info.id }),
+        ratio ? h('span', { class: 'gb-ratio', text: ratio }) : null,
+        h('span', { class: 'gb-count', text: `${n} 个模型` }),
+        h('button', {
+          class: 'link gb-actions', type: 'button',
+          onclick: () => { filters.group = ''; renderCatalog(); },
+        }, '取消筛选')),
+      info.note ? h('p', { class: 'gb-note', text: info.note }) : null,
+    ].filter(Boolean));
+    return;
+  }
 
-  const n = models.filter((m) => m.group === info.id).length;
-  const ratio = Number(info.ratio) > 0 ? `×${fmtRatio(info.ratio)}` : (info.auto ? '按命中通道计费' : '');
-
-  host.hidden = false;
-  host.replaceChildren(...[
-    h('div', { class: 'gb-head' },
-      h('span', { class: 'gb-name', text: info.id }),
-      ratio ? h('span', { class: 'gb-ratio', text: ratio }) : null,
+  if (filters.category) {
+    const n = models.filter((m) => groupCat.get(m.group) === filters.category).length;
+    host.hidden = false;
+    host.replaceChildren(h('div', { class: 'gb-head' },
+      h('span', { class: 'gb-name', text: categoryTitle(filters.category) }),
       h('span', { class: 'gb-count', text: `${n} 个模型` }),
       h('button', {
         class: 'link gb-actions', type: 'button',
-        onclick: () => { filters.group = ''; renderCatalog(); },
-      }, '取消筛选')),
-    info.note ? h('p', { class: 'gb-note', text: info.note }) : null,
-  ].filter(Boolean));
+        onclick: () => { filters.category = ''; filters.vendor = ''; renderCatalog(); },
+      }, '取消筛选')));
+    return;
+  }
+
+  host.hidden = true;
+  host.replaceChildren();
 }
 
-function renderGroupChips(groups, models) {
+/**
+ * 侧栏分组：按分类（claude → gpt → gemini → grok → 国模 → image → video）分组展示。
+ *
+ * 每个分类一行标题（图标 + 名字 + 模型数，点一下按这一整类筛选），下面列它的
+ * 分组；分组的 chip 前面就是倍率，后面是组名与模型数。
+ */
+function renderGroupedChips(groups, models, modelsByGroup, groupCat) {
   const host = $('#group-chips');
   const total = $('#group-total');
   if (!host) return;
-
-  const counts = new Map();
-  for (const m of models) counts.set(m.group, (counts.get(m.group) || 0) + 1);
   if (total) total.textContent = String(groups.length);
 
-  const chips = [
-    h('button', {
-      class: 'market-chip', type: 'button',
-      'aria-pressed': String(filters.group === ''),
-      onclick: () => { filters.group = ''; renderCatalog(); },
-    }, '全部', h('span', { class: 'chip-count', text: String(models.length) })),
-  ];
-
+  const countOf = (g) => (modelsByGroup.get(g.id) || []).length || g.models || 0;
+  const buckets = new Map();
   for (const g of groups) {
-    const ratio = g.ratio != null && Number(g.ratio) > 0 ? `×${fmtRatio(g.ratio)}` : '';
-    chips.push(h('button', {
-      class: 'market-chip', type: 'button',
-      'aria-pressed': String(filters.group === g.id),
-      title: [
-        g.auto ? '该分组费率取决于实际命中的通道，站点没有给固定倍率' : (ratio ? `分组倍率 ${ratio}` : ''),
-        g.note || '',
-      ].filter(Boolean).join(' · '),
+    const cat = groupCat.get(g.id);
+    const arr = buckets.get(cat) || [];
+    arr.push(g);
+    buckets.set(cat, arr);
+  }
+
+  const clearGroupFilters = () => {
+    filters.category = '';
+    filters.group = '';
+    filters.vendor = '';
+    renderCatalog();
+  };
+
+  const nodes = [h('button', {
+    class: 'market-chip', type: 'button',
+    'aria-pressed': String(!filters.category && !filters.group && !filters.vendor),
+    onclick: clearGroupFilters,
+  }, h('span', { class: 'chip-name', text: '全部' }), h('span', { class: 'chip-count', text: String(models.length) }))];
+
+  for (const catId of CATEGORY_ORDER) {
+    const list = buckets.get(catId);
+    if (!list || !list.length) continue;
+    const meta = CATEGORY_META[catId];
+    const catCount = list.reduce((n, g) => n + countOf(g), 0);
+
+    nodes.push(h('button', {
+      class: 'cat-head', type: 'button',
+      'aria-pressed': String(filters.category === catId),
       onclick: () => {
-        filters.group = filters.group === g.id ? '' : g.id;
+        filters.category = filters.category === catId ? '' : catId;
+        filters.group = '';
+        filters.vendor = '';
         renderCatalog();
       },
     },
-    h('span', { class: 'chip-name', text: g.id }),
-    ratio ? h('span', { class: 'ratio', text: ratio }) : null,
-    h('span', { class: 'chip-count', text: String(counts.get(g.id) || g.models || 0) })));
+    meta.icon ? iconImg(meta.icon) : null,
+    h('span', { class: 'cat-title', text: meta.title }),
+    h('span', { class: 'cat-count', text: String(catCount) })));
+
+    const chips = libraryGroupChips(list, modelsByGroup, countOf);
+    nodes.push(h('div', { class: 'cat-chips' }, chips));
   }
 
-  host.replaceChildren(...chips);
+  host.replaceChildren(...nodes);
+}
+
+/** libraryGroupChips 造一组分组 chip：倍率在前，组名在后。便宜的排前面。 */
+function libraryGroupChips(list, modelsByGroup, countOf) {
+  return list
+    .slice()
+    .sort((a, b) => (Number(a.ratio) || 0) - (Number(b.ratio) || 0) || a.id.localeCompare(b.id, 'zh'))
+    .map((g) => {
+      return h('button', {
+        class: 'market-chip group-chip', type: 'button',
+        'aria-pressed': String(filters.group === g.id),
+        title: [g.note || '', g.auto ? '该分组费率取决于实际命中的通道' : '', `模型 ${countOf(g)} 个`].filter(Boolean).join(' · '),
+        onclick: () => {
+          filters.group = filters.group === g.id ? '' : g.id;
+          filters.category = '';
+          filters.vendor = '';
+          renderCatalog();
+        },
+      },
+      Number(g.ratio) > 0 ? ratioTag(g.ratio) : null,
+      h('span', { class: 'chip-name', text: GROUP_ALIAS[g.id] || g.id }),
+      h('span', { class: 'chip-count', text: String(countOf(g)) }));
+    });
 }
 
 /**
@@ -807,22 +1059,38 @@ function renderGroupChips(groups, models) {
  *   2. 它有实时健康度（延迟、吞吐、成功率条）。我们没有这些数据，
  *      编一个出来比留白更糟，所以那个位置换成上下文长度与计费档位。
  */
+/**
+ * groupChipsEl 卡片／列表行里的分组：一个模型可能同时在好几个分组里卖。
+ *
+ * 「全部」视图下这里列的是它所在的全部（最多两个 + +N，title 里给全量）；
+ * 选了具体分组时 groups 只有一个，看起来和以前一样。
+ */
+function groupChipsEl(m) {
+  const list = Array.isArray(m.groups) && m.groups.length
+    ? m.groups
+    : [{ group: m.group, groupRatio: m.groupRatio, groupAuto: m.groupAuto }];
+  const shown = list.slice(0, 2);
+  const more = list.length - shown.length;
+  const title = list
+    .map((g) => `${GROUP_ALIAS[g.group] || g.group}${Number(g.groupRatio) > 0 ? ' ' + fmtRatio(g.groupRatio) : ''}`)
+    .join('\n');
+  return h('span', { class: 'mc-groups', title },
+    shown.map((g) => h('span', { class: 'mc-gb' },
+      Number(g.groupRatio) > 0 ? ratioTag(g.groupRatio) : null,
+      h('span', { class: 'mc-group', text: GROUP_ALIAS[g.group] || g.group || '—' }))),
+    more > 0 ? h('span', { class: 'mc-more', text: `+${more}` }) : null);
+}
+
 function modelCard(m, groupMap) {
   const info = groupMap.get(m.group);
   const isAuto = m.group === 'auto' || (info && info.auto === true);
   const pricing = m.pricing || {};
   const priceKind = pricing.kind || 'unknown';
-  const ratio = m.groupRatio != null ? m.groupRatio : (info ? info.ratio : null);
   const kind = m.kind || 'chat';
   const endpoints = Array.isArray(m.endpoints) ? m.endpoints : [];
 
   // 计费方式的说法要跟价格表一致：按次/按秒只给一列，别硬凑出「输出价 —」。
-  let billing = { cls: 'flat', label: '按量计费' };
-  if (isAuto) billing = { cls: 'auto', label: '以实际命中通道为准' };
-  else if (priceKind === 'unknown') billing = { cls: 'unknown', label: '价格未知' };
-  else if (priceKind === 'percall') {
-    billing = { cls: 'call', label: /\/秒/.test(pricing.input || '') ? '按秒计费' : '按次计费' };
-  } else if (priceKind === 'tiered') billing = { cls: 'dyn', label: '分档计费' };
+  const billing = billingLabel(pricing, isAuto, priceKind);
 
   let priceCells;
   if (isAuto) {
@@ -832,16 +1100,12 @@ function modelCard(m, groupMap) {
   } else if (priceKind === 'percall') {
     priceCells = [h('div', { class: 'wide' }, h('span', { text: '单价' }), h('b', { text: pricing.input || '—' }))];
   } else {
-    priceCells = [
-      h('div', null, h('span', { text: '输入' }), h('b', { text: pricing.input || '—' })),
-      h('div', null, h('span', { text: '输出' }), h('b', { text: pricing.output || '—' })),
-      h('div', null, h('span', { text: '缓存读取' }), h('b', { text: pricing.cache || '—' })),
-    ];
+    priceCells = priceCellsOf(pricing, filters.unit);
   }
 
-  const desc = m.description || '';
+  const desc = m.description || autoDescription(m);
   const titleBits = [
-    desc,
+    m.description ? desc : desc + '（站点没有给说明，这段是按目录信息拼的）',
     m.tags ? `标签：${m.tags}` : '',
     pricing.note || '',
     m.context ? `上下文 ${fmtInt(m.context)}` : '',
@@ -863,7 +1127,7 @@ function modelCard(m, groupMap) {
       // 绝大多数是对话模型，每张卡都挂一个「对话」只会变成噪音；只在生图/视频这类上标。
       kind !== 'chat' ? h('span', { class: 'mc-kind', text: KIND_LABEL[kind] || kind }) : null),
 
-    h('p', { class: desc ? 'mc-desc' : 'mc-desc is-empty', text: desc || '站点没有提供说明' }),
+    h('p', { class: 'mc-desc', text: desc }),
 
     h('div', { class: `mc-billing ${billing.cls}`, text: billing.label }),
 
@@ -871,18 +1135,37 @@ function modelCard(m, groupMap) {
 
     h('div', { class: 'mc-line' },
       h('span', { class: 'k', text: '分组' }),
-      h('span', { class: 'mc-group', text: m.group || '—' }),
-      ratio != null && Number(ratio) > 0 ? h('span', { class: 'mc-ratio', text: `×${fmtRatio(ratio)}` }) : null),
+      groupChipsEl(m)),
 
-    h('div', { class: 'mc-line' },
+    h('div', { class: 'mc-line mc-line-ends' },
       h('span', { class: 'k', text: '端点' }),
       endpoints.length
-        ? h('span', { class: 'mc-ends' }, endpoints.map((e) => h('span', { class: 'mc-end', text: e })))
+        ? h('span', { class: 'mc-ends' }, ...endpointEls(endpoints, 4))
         : h('span', { class: 'muted', text: '—' })),
 
     h('div', { class: 'mc-foot' },
-      h('span', { class: 'mc-ctx', text: m.context ? `上下文 ${fmtInt(m.context)}` : '' }),
-      h('button', { class: 'link', type: 'button', onclick: open }, '详情')));
+      h('button', { class: 'link mc-detail', type: 'button', onclick: open }, '详情', h('span', { class: 'mc-detail-arrow', text: '›' }))));
+}
+
+/**
+ * autoDescription 给「站点没写说明」的模型补一句由目录信息拼出来的说明。
+ *
+ * 只陈述目录里确实存在的字段（厂商 / 类型 / 端点 / 计价），不编用途与能力；
+ * 卡片的 tooltip 里会注明这句是按目录拼的，不冒充站点原文。
+ */
+function autoDescription(m) {
+  const vendor = m.vendor || '站点';
+  const kind = KIND_LABEL[m.kind] || '模型';
+  const ends = (Array.isArray(m.endpoints) ? m.endpoints : []).slice(0, 2);
+  const p = m.pricing || {};
+  const billing = p.kind === 'tiered' ? '分档计费'
+    : p.kind === 'percall' ? '按次/按秒计费'
+      : p.kind === 'ratio' ? '按倍率计费'
+        : '';
+  const price = p.input && p.input !== '价格未知'
+    ? (p.kind === 'percall' ? `，单价 ${p.input}` : `，输入 ${p.input}`)
+    : '';
+  return `${vendor} 的${kind}模型${ends.length ? `，支持 ${ends.join(' / ')} 端点` : ''}${billing ? `；${billing}` : ''}${price}。`;
 }
 
 function bindCatalogControls() {
@@ -894,16 +1177,80 @@ function bindCatalogControls() {
     if (cache.catalog) renderCatalog();
   });
 
-  // 类型筛选现在是主区的分段控件（renderKindSeg），不再是一个 select。
+  // 重置只清筛选条件；单位、排序、视图属于「怎么看」，保留。
   reset.addEventListener('click', () => {
+    filters.category = '';
     filters.group = '';
     filters.vendor = '';
-    filters.kind = '';
     filters.q = '';
     search.value = '';
     if (cache.catalog) renderCatalog();
     search.focus();
   });
+
+  // 价格单位：/1M ↔ /1K
+  for (const btn of $$('#unit-seg button')) {
+    btn.addEventListener('click', () => {
+      filters.unit = btn.dataset.unit === 'K' ? 'K' : 'M';
+      for (const other of $$('#unit-seg button')) other.setAttribute('aria-pressed', String(other === btn));
+      if (cache.catalog) renderCatalog();
+    });
+  }
+
+  // 排序菜单：自绘弹层——原生 <select> 的弹层由系统画，深色页面里会弹出一块白底
+  const trigger = $('#sort-trigger');
+  const pop = $('#sort-pop');
+  const label = $('#sort-label');
+  if (trigger && pop) {
+    const items = $$('#sort-pop [data-sort]');
+    const setOpen = (open) => {
+      pop.hidden = !open;
+      trigger.setAttribute('aria-expanded', String(open));
+      if (open) {
+        const current = items.find((it) => it.getAttribute('aria-selected') === 'true') || items[0];
+        current.focus();
+      }
+    };
+    const choose = (btn) => {
+      if (!btn) return;
+      filters.sort = btn.dataset.sort;
+      for (const it of items) it.setAttribute('aria-selected', String(it === btn));
+      if (label) label.textContent = btn.textContent;
+      setOpen(false);
+      trigger.focus();
+      if (cache.catalog) renderCatalog();
+    };
+
+    trigger.addEventListener('click', () => setOpen(pop.hidden));
+    for (const it of items) it.addEventListener('click', () => choose(it));
+    document.addEventListener('click', (ev) => {
+      if (!pop.hidden && !(ev.target instanceof Element && ev.target.closest('#sort-menu'))) setOpen(false);
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (pop.hidden) return;
+      if (ev.key === 'Escape') { ev.preventDefault(); setOpen(false); trigger.focus(); return; }
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+        ev.preventDefault();
+        const i = items.indexOf(document.activeElement);
+        const next = ev.key === 'ArrowDown' ? (i + 1) % items.length : (i - 1 + items.length) % items.length;
+        items[next].focus();
+        return;
+      }
+      if ((ev.key === 'Enter' || ev.key === ' ') && items.includes(document.activeElement)) {
+        ev.preventDefault();
+        choose(document.activeElement);
+      }
+    });
+  }
+
+  // 视图：双列卡片 / 单列列表
+  for (const btn of $$('#view-seg button')) {
+    btn.addEventListener('click', () => {
+      filters.view = btn.dataset.view === 'list' ? 'list' : 'grid';
+      for (const other of $$('#view-seg button')) other.setAttribute('aria-pressed', String(other === btn));
+      if (cache.catalog) renderCatalog();
+    });
+  }
 }
 
 // ── 2. 余额与用量 ─────────────────────────────────────────
@@ -944,20 +1291,41 @@ function renderAccounts() {
     const noKeyHint = a.balance === '—'
       ? '插件还没拿到这把钥匙的明文：在 magpie 里发一次请求、或点右上角「刷新」即可'
       : '';
-    return h('div', { class: 'acct' },
-      h('div', { class: 'acct-top' },
-        h('span', { class: 'acct-label', text: a.label || a.tokenName || '未命名账号' }),
-        a.group ? h('span', { class: 'tag', text: a.group }) : null,
-        showMask ? h('span', { class: 'acct-mask', text: mask }) : null,
-      ),
-      h('div', { class: 'acct-figs' },
-        fig('余额', a.balance ?? '—', 'big pos', noKeyHint || (Number.isFinite(a.balanceRaw) ? `${fmtInt(a.balanceRaw)} quota` : '')),
-        fig('已用', a.used ?? '—', '', Number.isFinite(a.usedRaw) ? `${fmtInt(a.usedRaw)} quota` : ''),
-        fig('模型数', Number.isFinite(a.models) ? fmtInt(a.models) : '—'),
-        fig('绑定于', fmtAt(a.boundAt)),
+    const split = splitMoney(a.balance || '—');
+    return h('div', { class: 'acct-overview' },
+      h('div', { class: 'acct-main' },
+        h('div', { class: 'grow' },
+          h('div', { class: 'money' },
+            split.unit ? h('span', { class: 'unit', text: split.unit }) : null,
+            split.value),
+          h('p', {
+            class: 'money-note',
+            text: [
+              a.used && a.used !== '—' ? `已用 ${a.used}` : '',
+              a.group ? `分组 ${a.group}` : '',
+              showMask ? `钥匙 ${mask}` : '',
+              Number.isFinite(a.models) && a.models ? `${fmtInt(a.models)} 个模型` : '',
+              Number.isFinite(a.boundAt) && a.boundAt ? `绑定于 ${fmtAt(a.boundAt)}` : '',
+            ].filter(Boolean).join(' · ') || (a.label || '还没有读到账户'),
+          })),
+        noKeyHint ? h('span', { class: 'acct-hint', text: noKeyHint }) : null,
       ),
     );
   }));
+}
+
+/** splitMoney 把「$12.34」拆成符号与大数字，照 neartoken 账户卡的做法。 */
+function splitMoney(text) {
+  const m = String(text || '').match(/^([^\d-]*)(.*)$/);
+  return { unit: (m && m[1]) || '', value: (m && m[2]) || '—' };
+}
+
+/** totalBalanceText 把各账号余额相加（quota），按站点币种印出来。 */
+function totalBalanceText() {
+  const accts = (cache.state && cache.state.accounts) || [];
+  if (!accts.length) return '—';
+  const raw = accts.reduce((sum, a) => sum + (Number.isFinite(a.balanceRaw) ? a.balanceRaw : 0), 0);
+  return moneyRaw(raw);
 }
 
 function fig(k, v, cls = '', title = '') {
@@ -1011,18 +1379,44 @@ function renderUsage() {
   ]);
 
   box.replaceChildren(
-    h('div', { class: 'summary-row' },
-      h('div', { class: 'summary-box' },
-        h('span', { class: 'fig-k', text: '花费 spent' }),
-        h('div', { class: 'fig-v', text: data.spent || '—' })),
-      h('div', { class: 'summary-box' },
-        h('span', { class: 'fig-k', text: 'tokens' }),
-        h('div', { class: 'fig-v', text: fmtInt(data.tokens) })),
-    ),
+    // 三个数字一行，照 neartoken 的「数据概览」
+    h('div', { class: 'stats' },
+      statBlock('消耗', data.spent || '—'),
+      statBlock('当前余额', totalBalanceText()),
+      statBlock('Token', fmtInt(data.tokens))),
+    usageChart(data),
     h('p', { class: 'range-note', text: `区间 ${fmtAt(data.start)} → ${fmtAt(data.end)}` }),
     tableEl([{ label: '模型' }, { label: '调用', cls: 'num' }, { label: 'tokens', cls: 'num' }, { label: '费用', cls: 'num' }],
       rows, { empty: '这个区间还没有按模型的用量。' }),
   );
+}
+
+function statBlock(k, v, title = '') {
+  return h('div', { class: 'stat' },
+    h('div', { class: 'k', text: k }),
+    h('div', { class: 'v', title: title || null, text: v }));
+}
+
+/** usageChart 用柱状条画出区间的消耗分布；没有数据就直说，不画空图。 */
+function usageChart(data) {
+  const buckets = Array.isArray(data.buckets) ? data.buckets : [];
+  const max = buckets.reduce((m, b) => Math.max(m, Number(b.costRaw) || 0), 0);
+  if (!buckets.length || max <= 0) {
+    return h('div', { class: 'chart-empty', text: '这个区间还没有消耗，所以没有曲线可画。' });
+  }
+  const bars = buckets.map((b) => {
+    const hgt = Math.max(2, Math.round(((Number(b.costRaw) || 0) / max) * 100));
+    return h('i', {
+      class: 'bar',
+      style: `height:${hgt}%`,
+      title: `${fmtAt(b.at)} · ${b.cost || '—'}`,
+    });
+  });
+  return h('div', {
+    class: 'chart-bars',
+    role: 'img',
+    'aria-label': `消耗趋势：${buckets.length} 个时间段，峰值 ${moneyRaw(max)}`,
+  }, bars);
 }
 
 async function loadFlow(force = false) {
@@ -1525,7 +1919,7 @@ function renderPat() {
   if (!pat.set) {
     box.replaceChildren(
       h('p', { class: 'muted', text: '还没有设置 PAT。设置后才能读账户、建钥匙、看钱包。' }),
-      h('p', { class: 'hint', text: 'PAT 以 nap_ 开头，在控制台「安全 → 访问令牌」创建。' }),
+      h('p', { class: 'hint', text: '在控制台「安全 → 访问令牌」创建后，把整串令牌原样粘过来即可。' }),
     );
     return;
   }
@@ -1617,13 +2011,23 @@ async function onSavePat(ev) {
   const pat = input.value.trim();
 
   if (!pat) { banner('warn', '先粘贴一个 PAT 再保存。', { key: 'pat-form' }); input.focus(); return; }
-  if (!pat.startsWith('nap_')) {
-    banner('warn', 'PAT 一般以 nap_ 开头，确认一下有没有粘错（sk- 是钥匙，不是 PAT）。', { key: 'pat-form' });
+  // 只挡「明显拿错了凭据」：sk- 是模型钥匙，不是访问令牌。
+  // 前缀不做硬校验——站点的令牌前缀由站点自己决定（文档里写过 nap-，代码里写过
+  // nap_，两种都可能是真的），前端按自己的猜测拦下来只会变成「点了没反应」。
+  // 真正的判定交给后端：它会拿令牌去问站点。
+  if (/^sk[-_]/.test(pat)) {
+    banner('warn', '这看起来是一把 sk- 模型钥匙，不是访问令牌。访问令牌在控制台「安全 → 访问令牌」创建。', { key: 'pat-form' });
+    return;
+  }
+  if (pat.length < 8) {
+    banner('warn', '这个值太短了，不像一份访问令牌，确认一下有没有粘全。', { key: 'pat-form' });
     return;
   }
 
   btn.disabled = true;
   btn.textContent = '保存中…';
+  // 立刻给反馈：保存要串行探三个站点端点，没有这句用户会以为没点上。
+  banner('info', '已提交，正在向站点验证这份令牌…', { key: 'pat-form' });
   try {
     const data = await api.savePat(pat);
     if (cache.state) cache.state.pat = data.pat || { set: true };
@@ -1900,7 +2304,37 @@ function modelDetailNodes(model, data) {
     ));
   }
 
-  // ── 6. 原始表达式（证据，默认折叠） ────────────────────
+  // ── 5. 条件乘数（service_tier 这类整单加成） ─────────────
+  const multipliers = billing && Array.isArray(billing.multipliers) ? billing.multipliers : [];
+  if (multipliers.length) {
+    nodes.push(h('section', { class: 'dtl-section' },
+      h('h3', { class: 'dtl-h3', text: '条件乘数' }),
+      h('div', { class: 'mult-list' }, multipliers.map((m) => h('div', { class: 'mult-row' },
+        h('span', { class: 'mult-when', text: `请求体参数 ${m.param} = ${m.value}` }),
+        h('span', { class: 'mult-pill', text: `${m.factor}×` })))),
+    ));
+  }
+
+  // ── 6. 按分组定价：同一个模型在不同分组里的价格 ──────────
+  const siblings = Array.isArray(data.siblings) ? data.siblings : [];
+  if (siblings.length > 1) {
+    nodes.push(h('section', { class: 'dtl-section' },
+      h('h3', { class: 'dtl-h3', text: '按分组定价' }),
+      tableEl(['分组', '倍率', { label: '输入', cls: 'num' }, { label: '输出', cls: 'num' }, { label: '缓存读取', cls: 'num' }],
+        siblings.map((s) => [
+          { node: h('span', { class: 'sib-group' + (s.current ? ' is-current' : '') },
+            h('span', { text: GROUP_ALIAS[s.group] || s.group }),
+            s.current ? h('span', { class: 'sib-now', text: '当前' }) : null) },
+          { text: Number(s.groupRatio) > 0 ? fmtRatio(s.groupRatio) : (s.auto ? '按通道' : '—'), cls: 'num' },
+          { text: s.input || '—', cls: 'num' },
+          { text: s.output || '—', cls: 'num' },
+          { text: s.cache || '—', cls: 'num' },
+        ]),
+        { empty: '站点没有给出这个模型的分组价格。' }),
+    ));
+  }
+
+  // ── 7. 原始表达式（证据，默认折叠） ────────────────────
   if (billing.expr) {
     nodes.push(h('details', { class: 'raw' },
       h('summary', { text: '原始计费表达式（站点原文，一般不用看）' }),
@@ -1971,12 +2405,6 @@ function billingFacts(billing, { isAuto, priceKind, note } = {}) {
     facts.push(hasTokenPrices
       ? `共 ${billing.tiers.length} 档：${names.join(' / ')}。下表每一档的单价已经乘上分组倍率 ${fmtRatio(billing.groupRatio)}。`
       : `共 ${billing.tiers.length} 档：${names.join(' / ')}。这些档按用量计费，单价见下表。`);
-  }
-
-  const multipliers = billing && Array.isArray(billing.multipliers) ? billing.multipliers : [];
-  for (const m of multipliers) {
-    const who = PARAM_LABEL[m.param] || m.param;
-    facts.push(`当请求的「${who}」是 ${m.value} 时，整单乘 ${m.factor}。`);
   }
 
   const usageRows = billing && Array.isArray(billing.usageRows) ? billing.usageRows : [];

@@ -303,42 +303,43 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   color: var(--muted);
 }
 
-/* ── 标签页 ─────────────────────────────────────────────── */
+/* ── 标签页：整条圆角胶囊，内部按钮也是胶囊（照 neartoken 的 .tabs） ── */
 
 .tabs {
-  display: flex;
-  gap: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
   margin: 14px 0 0;
-  border-bottom: 1px solid var(--line);
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
   overflow-x: auto;
   scrollbar-width: none;
 }
 .tabs::-webkit-scrollbar { display: none; }
 
 .tab {
-  position: relative;
-  min-height: 34px;
+  height: 28px;
   padding: 0 14px;
   border: 0;
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  border-radius: 999px;
   background: transparent;
   color: var(--muted);
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 550;
   cursor: pointer;
   white-space: nowrap;
+  flex: none;
   transition: color .12s ease, background-color .12s ease;
 }
-.tab:hover { color: var(--fg); background: var(--card); }
-.tab[aria-selected="true"] { color: var(--fg); }
-.tab[aria-selected="true"]::after {
-  content: "";
-  position: absolute;
-  left: 8px; right: 8px; bottom: -1px;
-  height: 2px;
-  background: var(--accent);
-  border-radius: 2px 2px 0 0;
+.tab:hover { color: var(--fg); }
+.tab[aria-selected="true"] {
+  color: var(--fg);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 /* ── 提示条 ─────────────────────────────────────────────── */
@@ -513,20 +514,22 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   font-variant-numeric: tabular-nums;
 }
 
+/* 分段控件（日 / 周 / 月）：照 neartoken 的 .seg——外框 9px，选中项淡蓝底 + 内描边 */
 .segmented {
   margin-left: auto;
   display: inline-flex;
+  gap: 2px;
   padding: 2px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  border-radius: 9px;
   background: var(--sunken);
 }
 .segmented button {
   min-height: 24px;
   min-width: 34px;
-  padding: 0 9px;
+  padding: 0 10px;
   border: 0;
-  border-radius: 5px;
+  border-radius: 7px;
   background: transparent;
   color: var(--muted);
   font: inherit;
@@ -535,9 +538,10 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 }
 .segmented button:hover { color: var(--fg); }
 .segmented button[aria-pressed="true"] {
-  background: var(--accent);
-  color: #fff;
+  color: var(--fg);
   font-weight: 600;
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 .meta-row {
@@ -791,28 +795,80 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 }
 .loading::after { content: "…"; }
 
-/* ── 余额 / 用量 ────────────────────────────────────────── */
+/* ── 余额 / 用量：账户概览 + 数据概览（照 neartoken 的账户卡与看板） ── */
 
-.acct {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: 11px 12px;
-  background: var(--sunken);
+/* 余额页两张卡各自按内容定高：账户卡内容少时不要被拉出一截空白 */
+.wallet-grid { align-items: start; }
+
+/* 账户概览：整页唯一的大数字 */
+.acct-overview {
+  padding: 6px 0 12px;
+}
+.acct-overview + .acct-overview {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+.acct-main { display: flex; align-items: flex-start; gap: 12px; }
+.acct-main .grow { flex: 1; min-width: 0; }
+.money {
+  font-size: 34px;
+  line-height: 1.15;
+  font-weight: 620;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+.money .unit { font-size: 16px; font-weight: 500; color: var(--muted); margin-right: 2px; }
+.money-note {
+  margin: 5px 0 0;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.acct-hint {
+  flex: 0 1 260px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--warn);
+}
+
+/* 数据概览：三个数字 + 柱状条 */
+.stats { display: flex; gap: 26px; margin: 2px 0 6px; flex-wrap: wrap; }
+.stat .k { font-size: 11px; color: var(--muted); }
+.stat .v {
+  font-size: 19px;
+  font-weight: 580;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em;
+}
+.chart-bars {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: flex-end;
+  gap: 2px;
+  height: 118px;
+  margin: 8px 0 12px;
+  padding-bottom: 1px;
+  border-bottom: 1px solid var(--line);
 }
-.acct + .acct { margin-top: 9px; }
-
-.acct-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.acct-label { font-weight: 650; font-size: 12.5px; }
-.acct-mask { font-family: var(--code); font-size: 11.5px; color: var(--muted); }
-
-.acct-figs {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-  gap: 8px 14px;
+.chart-bars .bar {
+  flex: 1;
+  min-width: 2px;
+  min-height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: color-mix(in srgb, var(--accent) 62%, transparent);
+  transition: background-color .12s ease;
 }
+.chart-bars .bar:hover { background: var(--accent); }
+.chart-empty {
+  margin: 10px 0 14px;
+  padding: 18px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+}
+
 .fig { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .fig-k { font-size: 11px; color: var(--muted); }
 .fig-v {
@@ -824,20 +880,6 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 }
 .fig-v.big { font-size: 19px; }
 .fig-v.pos { color: var(--ok); }
-
-.summary-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 12px;
-}
-.summary-box {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--sunken);
-  padding: 9px 11px;
-}
-.summary-box .fig-v { font-size: 17px; }
 
 .range-note { font-size: 11.5px; color: var(--muted); margin: 0 0 10px; }
 
@@ -1221,20 +1263,23 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 .market-chips { display: flex; flex-direction: column; gap: 4px; }
 .market-chips.chips-row { flex-direction: row; flex-wrap: wrap; gap: 5px; }
 
+/* 胶囊：照 neartoken 的 .market-chip —— 999px 圆角、25px 高、10.5px 字 */
 .market-chip {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   min-width: 0;
-  padding: 5px 8px;
+  min-height: 25px;
+  padding: 0 8px;
   font: inherit;
-  font-size: 11.5px;
+  font-size: 10.5px;
   color: var(--muted);
   background: transparent;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: 999px;
   cursor: pointer;
   text-align: left;
+  white-space: nowrap;
   transition: color .12s ease, border-color .12s ease, background .12s ease;
 }
 .market-chip:hover { color: var(--fg); border-color: var(--line-strong); }
@@ -1244,7 +1289,6 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   background: var(--accent-soft);
 }
 .market-chip .chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.market-chip .ratio { font-family: var(--code); font-size: 10px; color: var(--muted); }
 .market-chip .chip-count {
   margin-left: auto;
   padding-left: 6px;
@@ -1253,6 +1297,29 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   color: var(--muted);
 }
 .market-chip[aria-pressed="true"] .chip-count { color: var(--fg); }
+
+/* 小标签统一成 neartoken「低价」那一种：同尺寸、4px 圆角、白字、一圈淡描边，只换底色 */
+.gb-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  /* 定宽 + 居中：0.06× / 0.10× / 1.20× 长度一样，右边组名才对得齐 */
+  min-width: 36px;
+  padding: 0 3px;
+  font-family: var(--code);
+  font-size: 9px;
+  line-height: 1.5;
+  font-weight: 700;
+  color: #fff;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .28);
+}
+.gb-tag.green { background: #2f8f68; }
+.gb-tag.blue { background: #3f6fa8; }
+.gb-tag.gold { background: #b58a2b; }
+.gb-tag.red { background: #b0475c; }
+.gb-tag.plain { background: #5a6270; }
 
 /* 供应商 chip：16px 品牌图标 + 名称 + 数量 */
 .market-chip .vendor-icon {
@@ -1276,7 +1343,73 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   background: var(--card-hover);
 }
 
-/* 分段控件：类型筛选（全部 / 对话 / 生图 / 视频） */
+/* 分组归类：分类标题是一行小字 + 计数（照 neartoken 的 chip-group-name），点一下筛选整类 */
+.cat-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 14px;
+  padding: 0 2px 4px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  text-align: left;
+}
+.cat-head:hover { color: var(--fg); border-bottom-color: var(--line-strong); }
+.cat-head[aria-pressed="true"] { color: var(--accent); border-bottom-color: var(--accent-line); }
+.cat-icon { width: 14px; height: 14px; flex: none; object-fit: contain; }
+.cat-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat-count { font-family: var(--code); font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: 0; }
+
+.cat-chips { display: flex; flex-direction: column; gap: 4px; margin-top: 7px; }
+.market-chip.group-chip { justify-content: flex-start; }
+.market-chip.group-chip .chip-name { flex: 1; }
+
+/* 详情：条件乘数 */
+.mult-list { display: flex; flex-direction: column; gap: 6px; }
+.mult-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--sunken);
+  font-size: 12px;
+}
+.mult-when { min-width: 0; overflow-wrap: anywhere; color: var(--fg); }
+.mult-when { font-family: var(--code); font-size: 11.5px; }
+.mult-pill {
+  flex: none;
+  padding: 2px 8px;
+  font-family: var(--code);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 16%, transparent);
+  border-radius: 999px;
+}
+
+/* 详情：按分组定价 */
+.sib-group { display: inline-flex; align-items: center; gap: 6px; }
+.sib-group.is-current { color: var(--fg); font-weight: 600; }
+.sib-now {
+  padding: 0 5px;
+  font-size: 9.5px;
+  color: var(--accent);
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+}
+
+/* 分段控件：照 neartoken 的 .market-seg（28px 高、9px 圆角、内部分隔线） */
 .market-seg {
   display: inline-flex;
   flex: none;
@@ -1289,8 +1422,8 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  min-height: 30px;
-  padding: 5px 10px;
+  height: 28px;
+  padding: 0 9px;
   font: inherit;
   font-size: 11.5px;
   color: var(--muted);
@@ -1304,6 +1437,8 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 .market-seg button[aria-pressed="true"] { color: var(--fg); background: var(--accent-soft); }
 .market-seg .seg-count { font-family: var(--code); font-size: 10px; color: var(--muted); }
 .market-seg button[aria-pressed="true"] .seg-count { color: var(--accent); }
+/* 视图切换用符号，压窄一点 */
+#view-seg button { padding: 0 8px; font-size: 12px; }
 
 .market-main {
   min-width: 0;
@@ -1311,15 +1446,88 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
      container-type 必须放在祖先上——容器查询查的是「容纳这个元素的容器」。 */
   container-type: inline-size;
 }
+
+/* 顶部工具条：整条一个圆角容器，搜索在左、工具在右（照 neartoken） */
 .market-top {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  padding: 9px 11px;
   margin-bottom: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
 }
-.market-top .field { margin: 0; }
-.market-top .field.grow { flex: 1 1 240px; min-width: 0; }
+.market-search {
+  flex: 1 1 240px;
+  min-width: 160px;
+  height: 30px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--sunken);
+}
+.market-search::placeholder { color: var(--muted); }
+.market-search:focus { outline: 1px solid var(--accent); outline-offset: 0; }
+.market-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: none; }
+/* 下拉/按钮沿用同一条工具的高度与圆角 */
+.market-tool {
+  flex: none;
+  width: auto;
+  max-width: 190px;
+  height: 28px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--muted);
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+
+/* 下拉菜单：自绘的弹层，跟页面同一套底色与圆角（原生 select 的弹层画系统白底） */
+.menu { position: relative; flex: none; }
+.menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.menu-caret { font-size: 9px; color: var(--muted); }
+.menu-pop {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 164px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .38);
+}
+.menu-pop[hidden] { display: none; }
+.menu-pop [role="option"] {
+  padding: 7px 9px;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  color: var(--fg);
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.menu-pop [role="option"]:hover { background: var(--card-hover); }
+.menu-pop [role="option"][aria-selected="true"] { color: var(--accent); background: var(--accent-soft); }
 
 /* 选中分组时的横幅：分组名 + 倍率 + 站点说明，横跨模型区顶部 */
 .group-banner {
@@ -1358,11 +1566,97 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  align-items: stretch;
+  /* 卡片高度由内容决定：拉伸的话，同排卡片会被最高的那张撑高，
+     中间就空出一段——这正是「详情没挪上去」的来源。 */
+  align-items: start;
 }
 /* 空态与加载态要占满整行，否则会缩成半宽的一格 */
 .model-grid > .empty,
 .model-grid > .loading { grid-column: 1 / -1; margin: 0; }
+
+/* 列表视图：整表样式（照 neartoken 的 as-list：七列 + 行 hover + 整行可点） */
+.model-grid.as-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--sunken);
+}
+.model-grid.as-list .ml-head,
+.model-grid.as-list .ml-row {
+  display: grid;
+  grid-template-columns: 1.5fr .75fr 1.25fr .8fr 1fr .9fr 1.25fr;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+}
+.model-grid.as-list .ml-head {
+  border-bottom: 1px solid var(--line);
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.model-grid.as-list .ml-head > span { white-space: nowrap; }
+.model-grid.as-list .ml-row {
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  transition: background-color .12s;
+}
+.model-grid.as-list .ml-row:last-child { border-bottom: 0; }
+.model-grid.as-list .ml-row:hover { background: var(--card-hover); }
+.model-grid.as-list .ml-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
+.model-grid.as-list .ml-cell { min-width: 0; font-size: 11.5px; overflow: hidden; }
+
+.model-grid.as-list .ml-model { display: inline-flex; align-items: center; gap: 6px; color: var(--fg); }
+.model-grid.as-list .ml-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.model-grid.as-list .ml-kind {
+  flex: none;
+  padding: 0 5px;
+  font-size: 9px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.model-grid.as-list .ml-type { font-size: 11px; white-space: nowrap; }
+.model-grid.as-list .ml-type.dyn { color: var(--warn); }
+.model-grid.as-list .ml-type.flat { color: var(--accent); }
+.model-grid.as-list .ml-type.call { color: var(--ok); }
+.model-grid.as-list .ml-type.auto,
+.model-grid.as-list .ml-type.unknown { color: var(--muted); }
+
+/* 价格：上行「输入 X  输出 Y」，下行单位 */
+.model-grid.as-list .ml-price { display: flex; flex-direction: column; gap: 2px; line-height: 17px; white-space: nowrap; }
+.model-grid.as-list .ml-p-line { display: inline-flex; align-items: baseline; gap: 5px; }
+.model-grid.as-list .ml-p-k { font-size: 10.5px; color: var(--muted); }
+.model-grid.as-list .ml-p-v { font-size: 11.5px; color: var(--fg); font-variant-numeric: tabular-nums; margin-right: 10px; }
+.model-grid.as-list .ml-p-unit,
+.model-grid.as-list .ml-c-unit { font-size: 9.5px; color: var(--muted); }
+
+/* 缓存：上行金额，下行 / 1M */
+.model-grid.as-list .ml-cache { display: flex; flex-direction: column; gap: 2px; line-height: 17px; white-space: nowrap; }
+.model-grid.as-list .ml-c-v { font-size: 11.5px; color: var(--fg); font-variant-numeric: tabular-nums; }
+
+.model-grid.as-list .ml-vendor { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); }
+.model-grid.as-list .ml-vendor > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.model-grid.as-list .ml-ends { display: inline-flex; flex-wrap: nowrap; align-items: center; gap: 6px; white-space: nowrap; }
+.model-grid.as-list .ml-end { flex: none; font-size: 10px; color: var(--warn); }
+.model-grid.as-list .ml-end + .ml-end { color: var(--accent); }
+.model-grid.as-list .ml-more { flex: none; font-size: 10px; color: var(--muted); }
+
+.model-grid.as-list .ml-groups { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.model-grid.as-list .ml-gb-name { overflow: hidden; text-overflow: ellipsis; font-family: var(--code); color: var(--fg); }
+
+.model-grid.as-list .ml-dash { display: inline-block; width: 9px; height: 2px; border-radius: 1px; background: var(--muted); opacity: .6; }
+
+/* 窄屏：七列放不下就横向滚动，表头不粘 */
+@media (max-width: 900px) {
+  .model-grid.as-list { overflow-x: auto; }
+  .model-grid.as-list .ml-head,
+  .model-grid.as-list .ml-row { min-width: 660px; }
+}
 
 @container (max-width: 560px) {
   .model-grid { grid-template-columns: minmax(0, 1fr); }
@@ -1499,9 +1793,24 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   font-size: 10.5px;
 }
 .mc-line .k { flex: none; width: 26px; line-height: 18px; color: var(--muted); }
-.mc-group { font-family: var(--code); color: var(--fg); overflow-wrap: anywhere; }
+/* 组名单行省略：换行会让卡片高度不一致，进而把同排其他卡撑出空白 */
+.mc-group {
+  min-width: 0;
+  font-family: var(--code);
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .mc-ratio { font-family: var(--code); color: var(--muted); }
+/* 端点：现在给的是看得懂的名字（Chat / Response / Anthropic…），可以换行 */
 .mc-ends { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.mc-ends .mc-end { display: inline-flex; align-items: center; }
+.mc-ends .mc-end.more { color: var(--muted); }
+/* 分组：一个模型可能同时在多个分组里卖，最多列两个 + +N */
+.mc-groups { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.mc-gb { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.mc-more { flex: none; font-size: 10px; color: var(--muted); }
 .mc-end {
   padding: 1px 5px;
   font-family: var(--code);
@@ -1511,16 +1820,24 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   border-radius: 4px;
 }
 
-/* 把页脚按到卡底：这一行是同排卡片底部对齐的关键 */
+/* 页脚只剩「详情」：紧跟内容，不再吸到卡底，避免中间留一片空白 */
 .mc-foot {
-  margin-top: auto;
-  padding-top: 9px;
+  margin-top: 7px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  justify-content: space-between;
+  justify-content: flex-end;
 }
-.mc-ctx { font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* 用 .mc-foot 前缀提高优先级：.link 在本文件后面定义，不加会被它压回蓝色 */
+.mc-foot .mc-detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--fg);
+}
+.mc-foot .mc-detail:hover { color: var(--accent); text-decoration: none; }
+.mc-detail-arrow { color: var(--muted); font-size: 14px; line-height: 1; }
 
 /* 文字按钮：卡片里的「详情」、侧栏的「重置」 */
 .link {

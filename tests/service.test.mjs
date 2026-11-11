@@ -31,11 +31,12 @@ const STATUS = {
 const CATALOG = {
   data: [
     { model_name: 'gpt-6-sol', enable_groups: ['gpt-plus'], model_ratio: 1, completion_ratio: 5, cache_ratio: 0.1, supported_endpoint_types: ['openai'], vendor_id: 2 },
+    { model_name: 'gpt-6-sol', enable_groups: ['gpt-pro'], model_ratio: 1, completion_ratio: 5, cache_ratio: 0.1, supported_endpoint_types: ['openai'], vendor_id: 2 },
     { model_name: 'gpt-6-sol-tiered', enable_groups: ['gpt-plus'], billing_mode: 'tiered_expr', billing_expr: 'tier("short_context", p*2 + c*10 + cr*0.2) * (param("service_tier") == "priority" ? 2 : 1)', supported_endpoint_types: ['openai'], vendor_id: 2 },
     { model_name: 'claude-sonnet-5', enable_groups: ['claude-max企业'], model_ratio: 1, completion_ratio: 5, supported_endpoint_types: ['anthropic'], vendor_id: 1 },
   ],
-  group_ratio: { 'gpt-plus': 0.1, 'claude-max企业': 1.2 },
-  group_order: ['gpt-plus', 'claude-max企业'],
+  group_ratio: { 'gpt-plus': 0.1, 'gpt-pro': 0.2, 'claude-max企业': 1.2 },
+  group_order: ['gpt-plus', 'gpt-pro', 'claude-max企业'],
   usable_group: { 'gpt-plus': 'GPT 日常档' },
   auto_groups: ['gpt-plus'],
   vendors: [{ id: 2, name: 'OpenAI' }, { id: 1, name: 'Anthropic' }],
@@ -243,6 +244,18 @@ test('状态文件是 0600，且不含任何钥匙明文', () => {
   // 只允许 PAT 与打码后的钥匙；不允许出现 sk- 明文
   assert.equal(/sk-[A-Za-z0-9]{8,}/.test(raw), false, '状态文件里不该有钥匙明文')
   assert.equal(statePath(dir).endsWith('dragonapi-state.json'), true)
+})
+
+test('/api/model 给出同型号在各分组的定价（详情页「按分组定价」）', async () => {
+  const j = await (await fetch(base + '/api/model?group=gpt-plus&model=gpt-6-sol')).json()
+  assert.ok(Array.isArray(j.siblings), '应带 siblings')
+  assert.equal(j.siblings.length, 2, '同一个模型在 gpt-plus 与 gpt-pro 两个分组')
+  // 从低倍率到高倍率
+  assert.equal(j.siblings[0].group, 'gpt-plus')
+  assert.equal(j.siblings[0].current, true, '当前分组要标出来')
+  assert.equal(j.siblings[1].group, 'gpt-pro')
+  // 1 × 2 美元/M × 0.2 = $0.40/M
+  assert.equal(j.siblings[1].input, '$0.40/M')
 })
 
 test('/api/model 给出每档真实单价与整单倍率（详情页要用）', async () => {

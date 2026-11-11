@@ -1,21 +1,13 @@
-/* DragonAPI in Magpie · 本地控制台前端
- *
- * 为什么不用框架：页面由插件自起的本地 HTTP 服务直接托管，没有构建步骤，
- * 四个标签页不值得引入几百 KB 的运行时。
- *
- * 为什么状态全在内存：页面文档的 origin 是 opaque（从 magpie 沙箱 iframe
- * location.replace 过来），碰 localStorage / sessionStorage / indexedDB / cookie
- * 都会抛异常；需要留下来的东西只能交给服务端 API。
- *
- * 为什么所有 fetch 都 credentials: "omit"：opaque origin 下带凭据的跨源请求
- * 会被直接拒，服务端也用 Access-Control-Allow-Origin: * 兜住，不需要 cookie。
- */
-
-// 聚合与默认排序单独成模块（纯函数、可单测）：站点把同一个模型在十几个分组里
-// 各卖一份，目录是「分组 × 模型」的行表，而人要看的是「一个模型一张卡」。
-import { aggregateRows, focusGroupOf, orderDefault } from './model-agg.js';
 
 'use strict';
+
+// 聚合与排序逻辑独立成纯模块，可单测（见 tests/model-agg.test.mjs）。
+import { aggregateRows, focusGroupOf, orderDefault } from './model-agg.js';
+// 演示数据层：网址带 ?demo 时接管全部 GET 读接口，只在内存里，刷新即还原。
+import { createDemoApi } from './demo.js';
+
+const DEMO_PARAMS = new URLSearchParams(location.search);
+const DEMO_API = DEMO_PARAMS.has('demo') && DEMO_PARAMS.get('demo') !== '0' ? createDemoApi() : null;
 
 // ── DOM 小工具 ─────────────────────────────────────────────
 
@@ -202,6 +194,9 @@ class ApiError extends Error {
 }
 
 async function request(path, { method = 'GET', body } = {}) {
+  // 演示模式只拦读接口；写接口（POST/DELETE）一律走真实实现，
+  // 这样「演示模式」永远不可能改到真实账号。
+  if (DEMO_API && method === 'GET') return DEMO_API(path);
   let res;
   try {
     res = await fetch(apiUrl(path), {
@@ -258,9 +253,9 @@ const api = {
   catalog: (force) => request('/api/catalog' + (force ? '?refresh=1' : '')),
   model: (group, name) => request(`/api/model?group=${encodeURIComponent(group)}&model=${encodeURIComponent(name)}`),
   usage: (range) => request(`/api/usage?range=${encodeURIComponent(range)}`),
-  logs: (account) => request(`/api/logs?limit=200&account=${encodeURIComponent(account)}`),
   keys: () => request('/api/keys'),
   aff: () => request('/api/aff'),
+  transferAff: () => request('/api/aff/transfer', { method: 'POST' }),
   createKey: (body) => request('/api/keys', { method: 'POST', body }),
   deleteKey: (id) => request(`/api/keys/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   revealKey: (id) => request(`/api/keys/${encodeURIComponent(id)}/reveal`, { method: 'POST' }),
@@ -395,12 +390,11 @@ const cache = {
   aff: null,
   health: null,
   usage: {},   // range -> response
-  logs: {},    // account key -> rows[]
 };
 
-const loading = { state: false, catalog: false, keys: false, bind: false, health: false, usage: false, logs: false, aff: false };
+const loading = { state: false, catalog: false, keys: false, bind: false, health: false, usage: false, aff: false };
 
-const filters = { category: '', group: '', vendor: '', kind: '', q: '', unit: 'M', sort: 'latest', view: 'grid', range: 'day', account: '' };
+const filters = { category: '', group: '', vendor: '', kind: '', q: '', unit: 'M', sort: 'latest', view: 'grid', range: 'day' };
 
 let activeTab = 'catalog';
 
@@ -423,7 +417,12 @@ function renderHeader() {
   let label = '连接中…';
   let title = '';
 
-  if (cache.stateError) {
+  if (DEMO_API) {
+    // 演示模式没有真实站点连接可探，别拿「站点不可达」吓人。
+    tone = 'ok';
+    label = '演示数据';
+    title = '演示模式：数据只在本页内存，去掉网址里的 ?demo 回到真实数据。';
+  } else if (cache.stateError) {
     tone = 'bad';
     label = '本地服务无响应';
     title = cache.stateError;
@@ -444,17 +443,6 @@ function renderHeader() {
   text.textContent = label;
   pill.title = title || '本地服务与站点连接状态';
 
-  const currency = st && st.currency;
-  const curPill = $('#currency-pill');
-  if (curPill) {
-    curPill.textContent = currency
-      ? `${currency.symbol || ''} ${currency.code || ''}`.trim() || '—'
-      : '—';
-    curPill.title = currency
-      ? `站点币种 ${currency.code || ''}${currency.per ? ` · 1 单位 = ${currency.per} quota` : ''}`
-      : '站点币种';
-  }
-
   const site = st && st.site;
   const link = $('#site-link');
   if (link && site) {
@@ -467,22 +455,6 @@ function renderHeader() {
   }
 }
 
-function populateAccountSelect() {
-  const sel = $('#flow-account');
-  if (!sel) return;
-  const accounts = (cache.state && cache.state.accounts) || [];
-  const current = filters.account;
-
-  // 注意：replaceChildren 只吃 Node / string，数组必须展开，否则直接抛 TypeError
-  sel.replaceChildren(
-    h('option', { value: '', text: '全部账号' }),
-    ...accounts.map((a) => h('option', { value: a.key, text: a.label || a.masked || a.key })),
-  );
-
-  if (current && accounts.some((a) => a.key === current)) sel.value = current;
-  else { sel.value = ''; filters.account = ''; }
-  sel.disabled = accounts.length === 0;
-}
 
 // ── 标签页切换 ────────────────────────────────────────────
 
@@ -521,6 +493,8 @@ function ensureTab(name, force = false) {
       loadBind(force),
     ]);
   }
+  // 使用日志复用 /api/usage 的行，只在前端筛选，所以不用另开接口
+  if (name === 'logs') return loadLogs(force);
   if (name === 'pat') return loadPat(force);
   return Promise.resolve();
 }
@@ -1343,7 +1317,7 @@ function bindCatalogControls() {
 async function loadWallet(force = false) {
   await loadState(force);
   renderAccounts();
-  await Promise.all([loadUsage(force), loadFlow(force), loadAff(force)]);
+  await Promise.all([loadUsage(force), loadAff(force)]);
 }
 
 /**
@@ -1379,47 +1353,145 @@ async function loadAff(force = false) {
   }
 }
 
+// ── 推荐计划：仿原站钱包页的横条 ────────────────────────────────
+// 版式照你截图的原站设计：图标 + 标题/说明 + 三统计列（待确认/总收入/邀请）
+// + 链接胶囊 + 复制图标按钮 + 「转移到余额」蓝色按钮。
+// 站点 /api/user/aff 的字段名随部署而变（aff_count/aff_quota 是 New API 常见写法，
+// 「待确认」没有公认键名），所以每列只在真拿到数字时才渲染。
+
+/** 转入余额需二次确认：第一下改成「确认转入」，5 秒内再点才真的发请求。 */
+let affTransferArmedUntil = 0;
+
 function renderAff() {
   const box = $('#aff-body');
   if (!box) return;
   const d = cache.aff || {};
 
   if (d.ok === false) {
-    box.replaceChildren(h('p', { class: 'aff-note muted', text: `推荐计划没读到：${d.error || '未知原因'}` }));
+    box.replaceChildren(h('p', { class: 'rf-note', text: `推荐计划没读到：${d.error || '未知原因'}` }));
     return;
   }
 
   const link = d.link || '';
-  const count = d.aff && Number.isFinite(d.aff.count) ? fmtInt(d.aff.count) : null;
-  const quota = d.aff && Number.isFinite(d.aff.quota) ? moneyRaw(d.aff.quota) : null;
+  const a = d.aff || {};
+  // 三列：待确认（站点给才显示）/ 总收入 / 邀请。只认真实值，不拿 0 假装同步过。
+  const pending = Number.isFinite(a.pending) ? moneyRaw(a.pending) : null;
+  const total = Number.isFinite(a.quota) ? moneyRaw(a.quota) : null;
+  const invites = Number.isFinite(a.count) ? fmtInt(a.count) : null;
+  const canTransfer = Number.isFinite(a.quota) && a.quota > 0;
+  const armed = Date.now() < affTransferArmedUntil;
 
-  const copyBtn = h('button', {
-    class: 'btn ghost aff-copy', type: 'button',
-    title: '复制推荐链接',
-    onclick: (ev) => copyText(link, ev.currentTarget),
-  }, '复制');
-
-  // replaceChildren 收 null 会把它印成字符串「null」——必须先过滤再加。
-  // 没有数据来源时（没设 PAT / 站点没开端点）也不摆一排「—」：
-  // 那只会让人以为「有 0 个邀请」，把说明写清楚就够了。
-  const stats = (count == null && !quota) ? null : h('div', { class: 'aff-stats' },
-    count == null ? null : h('span', { class: 'aff-k', text: '邀请' }),
-    count == null ? null : h('b', { class: 'aff-v', text: count }),
-    quota ? h('span', { class: 'aff-k', text: '奖励' }) : null,
-    quota ? h('b', { class: 'aff-v', text: quota }) : null);
-
+  // replaceChildren 收 null 会把它印成字符串「null」——先过滤再加。
   box.replaceChildren(...[
-    h('span', { class: 'aff-icon', 'aria-hidden': 'true' }),
-    h('div', { class: 'aff-main' },
-      h('h3', { class: 'aff-title', text: '推荐计划' }),
-      h('p', { class: 'aff-note' }, d.note || '通过你的推荐链接注册的用户，会给你的账号带来奖励；累计奖励可随时转入余额。')),
-    stats,
-    link ? h('div', { class: 'aff-link' },
-      h('input', { class: 'aff-input', readonly: 'readonly', value: link, 'aria-label': '推荐链接', onclick: (ev) => ev.currentTarget.select() }),
-      copyBtn) : null,
-    d.at ? h('span', { class: 'aff-sync', text: `· 同步 ${fmtAt(d.at)}` }) : null,
+    h('div', { class: 'rf-ico', 'aria-hidden': 'true' }, shareIcon()),
+    h('div', { class: 'rf-text' },
+      h('h2', { class: 'rf-title', text: '推荐计划' }),
+      h('p', {
+        class: 'rf-note',
+        text: d.note || '用户通过你的推荐链接注册后，你会获得奖励；累计奖励可随时转入余额。',
+      })),
+    pending ? rfStat('待确认', pending) : null,
+    total ? rfStat('总收入', total) : null,
+    invites ? rfStat('邀请', invites) : null,
+    link ? h('div', { class: 'rf-link' }, h('span', { class: 'mono', text: link })) : null,
+    link
+      ? h('button', {
+        class: 'rf-copy', type: 'button', title: '复制推荐链接', 'aria-label': '复制推荐链接',
+        onclick: (ev) => copyText(link, ev.currentTarget, '已复制'),
+      }, copyIcon())
+      : null,
+    canTransfer
+      ? h('button', {
+        class: `btn primary rf-transfer${armed ? ' is-armed' : ''}`,
+        type: 'button',
+        title: '把累计奖励转到余额（站点上的真实资金操作）',
+        onclick: (ev) => transferAffRewards(ev.currentTarget),
+      }, armed ? '确认转入' : '转移到余额')
+      : null,
+    d.at ? h('span', { class: 'rf-sync', text: `· 同步 ${fmtAt(d.at)}` }) : null,
   ].filter(Boolean));
 }
+
+/** rfStat 一个统计列：小标签在上、数值在下。 */
+function rfStat(k, v) {
+  return h('div', { class: 'rf-stat' },
+    h('div', { class: 'rf-k', text: k }),
+    h('div', { class: 'rf-v', text: v }));
+}
+
+/** transferAffRewards 转账：两段式确认（沙箱里 window.confirm 会被拦成 false）。 */
+async function transferAffRewards(btn) {
+  if (Date.now() >= affTransferArmedUntil) {
+    affTransferArmedUntil = Date.now() + 5000;
+    renderAff();
+    banner('info', '再点一次「确认转入」，就会把累计奖励转进余额。', { key: 'aff-transfer', timeout: 5000 });
+    return;
+  }
+
+  affTransferArmedUntil = 0;
+  btn.disabled = true;
+  btn.textContent = '转入中…';
+  try {
+    const r = await api.transferAff();
+    banner(r.ok ? 'ok' : 'warn', r.message || (r.ok ? '已转入余额' : '站点没有说明原因'), { key: 'aff-transfer' });
+    await Promise.all([loadAff(true), loadState(true)]);
+    renderAccounts();
+  } catch (err) {
+    banner('error', `转入失败：${describeError(err)}`, { key: 'aff-transfer' });
+  } finally {
+    btn.disabled = false;
+    renderAff();
+  }
+}
+
+/** 分享图标：三个节点由连线相接（与原站同一图形语言），放在圆形底上。 */
+function shareIcon() {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', '16');
+  svg.setAttribute('height', '16');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '1.8');
+  svg.setAttribute('stroke-linecap', 'round');
+  for (const d of ['M8.5 6.2 15.5 9.8', 'M8.5 17.8 15.5 14.2']) {
+    const p = document.createElementNS(ns, 'path');
+    p.setAttribute('d', d);
+    svg.appendChild(p);
+  }
+  for (const [cx, cy] of [[5.5, 5], [5.5, 19], [18, 12]]) {
+    const c = document.createElementNS(ns, 'circle');
+    c.setAttribute('cx', String(cx));
+    c.setAttribute('cy', String(cy));
+    c.setAttribute('r', '2.6');
+    svg.appendChild(c);
+  }
+  return svg;
+}
+
+/** 复制图标：两个叠着的圆角矩形，与原站一致。 */
+function copyIcon() {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', '13');
+  svg.setAttribute('height', '13');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '1.8');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  for (const d of ['M9 9h10v10H9z', 'M5 15V5h10']) {
+    const p = document.createElementNS(ns, 'path');
+    p.setAttribute('d', d);
+    svg.appendChild(p);
+  }
+  return svg;
+}
+
+
 
 
 function renderAccounts() {
@@ -1437,6 +1509,8 @@ function renderAccounts() {
 
   const accounts = st.accounts || [];
   if (sub) sub.textContent = accounts.length ? `${accounts.length} 个账号` : '';
+  // 空态时让说明在卡里居中，而不是顶在上面、下面留一大片空白
+  box.classList.toggle('is-empty', accounts.length === 0);
   if (!accounts.length) {
     box.replaceChildren(h('div', { class: 'empty', text: '还没有绑定任何账号。在 magpie 里添加 DragonAPI 账号后，钥匙与余额会出现在这里。' }));
     return;
@@ -1533,7 +1607,7 @@ async function loadUsage(force = false) {
     cache.usage[range] = data;
     clearBanner('usage');
     renderUsage();
-    renderFlow();
+    renderLogs();
     return data;
   } catch (err) {
     const msg = describeError(err);
@@ -1563,16 +1637,27 @@ function renderUsage() {
     { text: m.cost || '—', cls: 'num', title: Number.isFinite(m.costRaw) ? `${fmtInt(m.costRaw)} quota` : null },
   ]);
 
+  // 有没有真实用量：柱、模型明细、token 数任一有值就算有
+  const hasUsage = (Array.isArray(data.buckets) ? data.buckets : []).some((b) => Number(b.costRaw) > 0)
+    || rows.length > 0 || Number(data.tokens) > 0;
+
   box.replaceChildren(
     // 三个数字一行，照 neartoken 的「数据概览」
     h('div', { class: 'stats' },
       statBlock('消耗', data.spent || '—'),
       statBlock('当前余额', totalBalanceText()),
       statBlock('Token', fmtInt(data.tokens))),
-    usageChart(data),
     h('p', { class: 'range-note', text: `区间 ${fmtAt(data.start)} → ${fmtAt(data.end)}` }),
-    tableEl([{ label: '模型' }, { label: '调用', cls: 'num' }, { label: 'tokens', cls: 'num' }, { label: '费用', cls: 'num' }],
-      rows, { empty: '这个区间还没有按模型的用量。' }),
+    // 有数据才画图与明细；没有就只留一处解释。
+    // 以前这里会同时出现三句「没有数据」（虚线框 + 区间 + 空表），
+    // 一屏空白里堆三句废话，反而看不出该怎么让数据出现。
+    ...(hasUsage
+      ? [usageChart(data),
+        tableEl([{ label: '模型' }, { label: '调用', cls: 'num' }, { label: 'tokens', cls: 'num' }, { label: '费用', cls: 'num' }],
+          rows, { empty: '这个区间还没有按模型的用量。' })]
+      : [h('div', { class: 'usage-empty' },
+        h('p', { class: 'usage-empty-title', text: '这个区间还没有消耗。' }),
+        h('p', { class: 'hint', text: '换个区间看看，或在 magpie 里发一次请求后点右上角「刷新」。' }))]),
   );
 }
 
@@ -1604,83 +1689,7 @@ function usageChart(data) {
   }, bars);
 }
 
-async function loadFlow(force = false) {
-  const account = filters.account;
-  if (!account) { renderFlow(); return null; }        // 全部账号直接用 usage.rows
-  if (cache.logs[account] && !force) { renderFlow(); return cache.logs[account]; }
-  if (loading.logs) return cache.logs[account] || null;
 
-  loading.logs = true;
-  renderFlow();
-  try {
-    const data = await api.logs(account);
-    // 契约写的是「同 rows 的扁平列表」，可能直接是数组，也可能包在 rows 里
-    const rows = Array.isArray(data) ? data : (data.rows || data.logs || []);
-    cache.logs[account] = rows;
-    clearBanner('logs');
-    renderFlow();
-    return rows;
-  } catch (err) {
-    const msg = describeError(err);
-    banner('error', `读取账号流水失败：${msg}`, { key: 'logs' });
-    regionError($('#flow-body'), `流水没读到：${msg}`, () => loadFlow(true));
-    return null;
-  } finally {
-    loading.logs = false;
-  }
-}
-
-function renderFlow() {
-  const box = $('#flow-body');
-  const count = $('#flow-count');
-  if (!box) return;
-
-  const account = filters.account;
-  const source = account ? cache.logs[account] : (cache.usage[filters.range] && cache.usage[filters.range].rows);
-
-  if (source === undefined) {
-    regionLoading(box, account ? '正在读取该账号的流水' : '正在读取用量流水');
-    if (count) count.textContent = '';
-    return;
-  }
-
-  const rows = (source || []).slice(0, 200);
-  if (count) {
-    count.textContent = account
-      ? `${fmtInt(rows.length)} 行 · 仅该账号`
-      : `${fmtInt(rows.length)} 行 · 多账号合并`;
-  }
-
-  const tableRows = rows.map((r) => [
-    { text: r.atText || fmtAt(r.at), cls: 'mono' },
-    { text: r.model || '—', cls: 'mono' },
-    { text: r.group || '—', cls: 'mono' },
-    { text: r.tokenName || '—', cls: 'mono' },
-    { text: fmtInt(r.input), cls: 'num' },
-    { text: fmtInt(r.output), cls: 'num' },
-    { text: fmtInt(r.cache), cls: 'num' },
-    { text: r.cost || '—', cls: 'num', title: Number.isFinite(r.costRaw) ? `${fmtInt(r.costRaw)} quota` : null },
-    {
-      text: r.detail || (r.kind ? r.kind : '—'),
-      cls: 'col-desc',
-      title: [
-        r.detail || '',
-        r.kind ? `类型 ${r.kind}` : '',
-        Number.isFinite(r.tps) ? `TPS ${r.tps}` : '',
-        Number.isFinite(r.ttft) ? `TTFT ${r.ttft}s` : '',
-        Number.isFinite(r.dur) ? `耗时 ${r.dur}s` : '',
-        r.isStream ? '流式' : '',
-      ].filter(Boolean).join('\n'),
-    },
-  ]);
-
-  box.replaceChildren(tableEl(
-    ['时间', '模型', '分组', '令牌名', { label: '输入', cls: 'num' }, { label: '输出', cls: 'num' },
-      { label: '缓存', cls: 'num' }, { label: '费用', cls: 'num' }, '详情'],
-    tableRows,
-    { empty: account ? '这个账号还没有用量记录。' : '这个区间还没有用量记录。' },
-  ));
-}
 
 function bindWalletControls() {
   for (const btn of $$('.segmented [data-range]')) {
@@ -1691,17 +1700,343 @@ function bindWalletControls() {
       for (const other of $$('.segmented [data-range]')) {
         other.setAttribute('aria-pressed', String(other === btn));
       }
-      loadUsage(false).then(renderFlow);
+      loadLogs(false);
     });
   }
 
-  const account = $('#flow-account');
-  account.addEventListener('change', () => {
-    filters.account = account.value;
-    if (!filters.account) { renderFlow(); return; }
-    loadFlow(false);
+}
+
+/** spentText 金额：有币种就按币种印（金额保留两位，$0.00 比 $0 更像钱）；
+ *  没有币种就明说是 quota，不印一个像金额的裸数字。 */
+function spentText(raw) {
+  if (!Number.isFinite(raw)) return '—';
+  const cur = cache.state && cache.state.currency;
+  if (!cur || cur.display === false) return `${fmtInt(raw)} quota`;
+  const per = Number(cur.per) > 0 ? Number(cur.per) : 500000;
+  const rate = Number(cur.rate) > 0 ? Number(cur.rate) : 1;
+  return `${cur.symbol || '$'}${((raw / per) * rate).toFixed(2)}`;
+}
+
+// ── 使用日志：对齐 NearToken「通用日志」的详细程度 ────────────────
+// 版式与信息密度照 NearToken 的 logsCard：
+//   工具条（区间/模型/分组/类型/展开）→ 更多筛选（令牌名/请求 ID）→
+//   统计条（用量/请求/Token + 隐私眼睛 + 重置）→
+//   9 列网格表（时间+类型+令牌 | 分组 | 模型+映射 | 费用 | 请求体 | 流 | Token | 耗时 | 详情）→
+//   分页条（总计/每页行数/首上页下末）。
+// 数据仍走 /api/usage 的行，只做前端筛选；不新开接口。
+
+const LOG_KIND_ORDER = ['消耗', '充值', '退款', '管理', '系统', '错误'];
+const LOG_COLS = [['time', '时间'], ['group', '分组'], ['model', '模型'], ['cost', '费用'],
+  ['bytes', '请求体大小'], ['flow', '流'], ['tokenCount', 'Token'], ['duration', '耗时'], ['detail', '详情']];
+const LOG_COL_CLASS = { time: 'hide-c1', group: 'hide-c2', model: 'hide-c3', cost: 'hide-c4',
+  bytes: 'hide-c5', flow: 'hide-c6', tokenCount: 'hide-c7', duration: 'hide-c8', detail: 'hide-c9' };
+
+const logFilter = { model: '', group: '', kind: '', tokenName: '', requestId: '' };
+const logView = { page: 1, pageSize: 20, more: false, private: false };
+
+/** fmtBytes 把请求体大小折成人话。 */
+function fmtBytes(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v) || v <= 0) return '—';
+  if (v >= 1024 * 1024) return `${(v / 1024 / 1024).toFixed(1)} MB`;
+  if (v >= 1024) return `${(v / 1024).toFixed(1)} KB`;
+  return `${Math.round(v)} B`;
+}
+
+/** secs 秒数带单位：4.5 → 4.5s。 */
+function logSecs(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return `${n.toFixed(1)}s`;
+}
+
+/** 耗时分档：与 NearToken 同一组可见阈值——<5s 绿、5–15s 橙黄、≥15s 红。 */
+function logTierClass(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) return 'lg-dur-none';
+  if (n < 5) return 'lg-dur-fast';
+  if (n < 15) return 'lg-dur-mid';
+  return 'lg-dur-slow';
+}
+
+function logRows() {
+  const data = cache.usage[filters.range];
+  if (!data) return null;
+  const all = Array.isArray(data.rows) ? data.rows : [];
+  const q = logFilter.model.trim().toLowerCase();
+  const tn = logFilter.tokenName.trim().toLowerCase();
+  const rid = logFilter.requestId.trim().toLowerCase();
+  return all.filter((r) => {
+    if (q && !String(r.model || '').toLowerCase().includes(q)) return false;
+    if (logFilter.group && String(r.group || '') !== logFilter.group) return false;
+    if (logFilter.kind && String(r.kind || '') !== logFilter.kind) return false;
+    if (tn && !String(r.tokenName || '').toLowerCase().includes(tn)) return false;
+    if (rid && !String(r.account || '').toLowerCase().includes(rid)) return false;
+    return true;
   });
 }
+
+async function loadLogs(force = false) {
+  const box = $('#logs-body');
+  if (box && !cache.usage[filters.range]) regionLoading(box, '正在读取日志');
+  // 币种与账号都来自 state：没有它，「用量」只能印成裸数字。
+  await Promise.all([loadState(force), loadUsage(force)]);
+  renderLogs();
+}
+
+function renderLogs() {
+  const box = $('#logs-body');
+  const chips = $('#logs-chips');
+  const tools = $('#logs-tools');
+  const pager = $('#logs-pager');
+  if (!box) return;
+
+  const rows = logRows();
+  if (rows === null) { regionLoading(box, '正在读取日志'); return; }
+  fillLogFilters((cache.usage[filters.range] && cache.usage[filters.range].rows) || []);
+
+  // 统计条：用量 / 请求 / Token（区间汇总说得清的三个数）。
+  const spent = rows.reduce((sum, r) => sum + (Number(r.costRaw) || 0), 0);
+  const tokens = rows.reduce((sum, r) => sum + (Number(r.input) || 0) + (Number(r.output) || 0), 0);
+  if (chips) {
+    chips.replaceChildren(
+      h('span', { class: 'lg-chip' }, h('i', { class: 'lg-dot' }), '用量 ', h('b', { text: spentText(spent) })),
+      h('span', { class: 'lg-chip' }, h('i', { class: 'lg-dot blue' }), '请求 ', h('b', { text: fmtInt(rows.length) })),
+      h('span', { class: 'lg-chip' }, h('i', { class: 'lg-dot violet' }), 'Token ', h('b', { text: fmtInt(tokens) })),
+    );
+  }
+
+  // 工具条右侧动作：隐私眼睛 + 重置（每次渲染都要重建，保持按下状态）
+  if (tools) {
+    tools.replaceChildren(
+      h('button', {
+        class: `btn ghost lg-icon-btn${logView.private ? ' on' : ''}`, type: 'button',
+        title: logView.private ? '显示敏感信息' : '隐藏敏感信息',
+        'aria-pressed': String(logView.private),
+        onclick: () => { logView.private = !logView.private; renderLogs(); },
+      }, eyeIcon(logView.private)),
+      h('button', {
+        class: 'btn ghost', type: 'button',
+        onclick: () => {
+          logFilter.model = ''; logFilter.group = ''; logFilter.kind = '';
+          logFilter.tokenName = ''; logFilter.requestId = '';
+          const m = $('#logs-model'); if (m) m.value = '';
+          const g = $('#logs-group'); if (g) g.value = '';
+          const k = $('#logs-kind'); if (k) k.value = '';
+          const t = $('#logs-token'); if (t) t.value = '';
+          const r2 = $('#logs-request'); if (r2) r2.value = '';
+          logView.page = 1;
+          renderLogs();
+        },
+      }, '重置'),
+    );
+  }
+
+  // 分页
+  const pageCount = Math.max(1, Math.ceil(rows.length / logView.pageSize));
+  if (logView.page > pageCount) logView.page = pageCount;
+  if (pager) {
+    const pageBtn = (label, title, disabled, fn) => h('button', {
+      class: 'btn ghost lg-page-btn', type: 'button', title, disabled: disabled || null,
+      onclick: () => { fn(); renderLogs(); },
+    }, label);
+    const sizeSel = h('select', {
+      class: 'logs-select lg-pagesize', 'aria-label': '每页行数',
+      onchange: (ev) => { logView.pageSize = Number(ev.currentTarget.value) || 20; logView.page = 1; renderLogs(); },
+    }, [10, 20, 30, 50, 100].map((v) => h('option', { value: String(v), text: String(v) + ' 行/页', selected: v === logView.pageSize || null })));
+    pager.replaceChildren(
+      h('span', { class: 'lg-total', text: `总计 ${fmtInt(rows.length)}` }),
+      sizeSel,
+      pageBtn('«', '第一页', logView.page <= 1, () => { logView.page = 1 }),
+      pageBtn('‹', '上一页', logView.page <= 1, () => { logView.page -= 1 }),
+      h('span', { class: 'lg-page-pill', text: String(logView.page) }),
+      pageBtn('›', '下一页', logView.page >= pageCount, () => { logView.page += 1 }),
+      pageBtn('»', '最后一页', logView.page >= pageCount, () => { logView.page = pageCount }),
+    );
+  }
+
+  const slice = rows.slice((logView.page - 1) * logView.pageSize, logView.page * logView.pageSize);
+  const table = h('div', { class: 'lg-table', role: 'table', 'aria-label': '使用日志明细' },
+    h('div', { class: 'lg-row lg-head', role: 'row' },
+      ...['时间', '分组', '模型', '费用', '请求体大小', '流', 'Token', '耗时', '详情']
+        .map((c) => h('span', { role: 'columnheader', text: c }))),
+    ...slice.map((r) => logRowEl(r)),
+  );
+
+  box.replaceChildren(
+    slice.length
+      ? table
+      : h('p', { class: 'lg-empty', text: logFilter.model || logFilter.group || logFilter.kind || logFilter.tokenName ? '没有符合筛选的日志。' : '这个区间还没有日志。' }),
+  );
+}
+
+/** logRowEl 一行九列，与 NearToken 的 lg-row 同构。 */
+function logRowEl(r) {
+  const dash = (cls = '') => h('span', { class: `lg-dash ${cls}`.trim(), 'aria-hidden': 'true' }, '—');
+  const hasMap = Boolean(r.upModel || r.respModel);
+  const mask = (v) => (logView.private ? '••••' : (v || '—'));
+
+  return h('div', { class: 'lg-row', role: 'row' },
+    // 1 时间：时间 + 类型标签 + 令牌胶囊（令牌跟着消耗走，不单独占列）
+    h('span', { class: 'lg-cell-stack', role: 'cell' },
+      h('span', { class: 'lg-time-str', text: r.atText || fmtAt(r.at) }),
+      h('span', { class: 'lg-meta-row' },
+        h('span', { class: `lg-tag${r.kind === '消耗' ? ' ok' : ''}`, text: r.kind || '消费' }),
+        h('button', {
+          class: 'lg-pill lg-copyable', type: 'button', title: '点击复制令牌名称',
+          onclick: (ev) => copyText(r.tokenName || '', ev.currentTarget),
+        }, '⚿ ', h('span', { text: mask(r.tokenName) })))),
+    // 2 分组
+    h('span', { class: 'lg-group-cell', role: 'cell' },
+      r.group ? h('span', { class: 'lg-gb', title: r.group, text: r.group }) : dash()),
+    // 3 模型 + 思考强度 + 映射（title 里给上游/响应模型）
+    h('span', { class: 'lg-cell-stack', role: 'cell' },
+      h('span', { class: 'lg-model-inline' },
+        h('span', {
+          class: 'lg-model', title: hasMap
+            ? [`请求模型 ${r.model}`, r.upModel ? `上游 ${r.upModel}` : '', r.respModel ? `响应 ${r.respModel}` : ''].filter(Boolean).join('\n')
+            : r.model,
+          text: r.model || '—',
+        }),
+        r.effort ? h('span', { class: 'lg-effort', text: r.effort }) : null,
+        hasMap ? h('span', { class: 'lg-map-mark', title: '查看模型映射', 'aria-hidden': 'true' }, '⇄') : null)),
+    // 4 费用
+    h('span', { class: 'lg-cell-stack', role: 'cell' },
+      h('span', { class: 'lg-cost', text: mask(r.cost) })),
+    // 5 请求体大小
+    h('span', { class: 'lg-num', role: 'cell', text: fmtBytes(r.bytes) }),
+    // 6 流：流/非流 + t/s
+    h('span', { class: 'lg-cell-stack', role: 'cell' },
+      h('span', { class: `lg-flow${r.isStream ? '' : ' off'}`, text: r.isStream ? '流' : '非流' }),
+      h('span', { class: 'lg-sub', text: Number.isFinite(r.tps) && r.tps > 0 ? `${fmtInt(r.tps)} t/s` : '—' })),
+    // 7 Token：入/出 + 缓存（0 也显式写出，空值会被读成「没数据」）
+    h('span', { class: 'lg-cell-stack', role: 'cell' },
+      h('span', { class: 'lg-num', text: `${r.input != null ? fmtInt(r.input) : '—'} / ${r.output != null ? fmtInt(r.output) : '—'}` }),
+      h('span', { class: 'lg-sub', text: `缓存 ${fmtInt(Number(r.cache) || 0)}` })),
+    // 8 耗时：首字与耗时各自分档
+    h('span', { class: 'lg-cell-stack lg-time-col', role: 'cell' },
+      h('span', { class: `lg-dur ${logTierClass(r.ttft)}` }, '首字 ', logSecs(r.ttft) ? h('b', { text: logSecs(r.ttft) }) : dash('in')),
+      h('span', { class: `lg-dur ${logTierClass(r.dur)}` }, '耗时 ', logSecs(r.dur) ? h('b', { text: logSecs(r.dur) }) : dash('in'))),
+    // 9 详情：站点真实计价条件
+    h('span', { class: 'lg-detail', role: 'cell', title: r.detail || '' }, r.detail || dash()),
+  );
+}
+
+/** 把筛选下拉的选项按「实际出现过的值」填：不预先假定站点有哪些分组。 */
+function fillLogFilters(rows) {
+  const groupSel = $('#logs-group');
+  const kindSel = $('#logs-kind');
+  if (groupSel && !groupSel.dataset.filled) {
+    const groups = [...new Set(rows.map((r) => String(r.group || '')).filter(Boolean))].sort();
+    groupSel.replaceChildren(h('option', { value: '', text: '所有分组' }),
+      ...groups.map((g) => h('option', { value: g, text: g })));
+    groupSel.dataset.filled = '1';
+  }
+  if (groupSel) groupSel.value = logFilter.group;
+  if (kindSel && !kindSel.dataset.filled) {
+    const kinds = [...new Set(rows.map((r) => String(r.kind || '')).filter(Boolean))]
+      .sort((a, b) => {
+        const ia = LOG_KIND_ORDER.indexOf(a);
+        const ib = LOG_KIND_ORDER.indexOf(b);
+        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+      });
+    kindSel.replaceChildren(h('option', { value: '', text: '所有类型' }),
+      ...kinds.map((k) => h('option', { value: k, text: k })));
+    kindSel.dataset.filled = '1';
+  }
+  if (kindSel) kindSel.value = logFilter.kind;
+}
+
+function bindLogControls() {
+  for (const btn of $$('#logs-range [data-log-range]')) {
+    btn.addEventListener('click', () => {
+      const range = btn.dataset.logRange;
+      if (filters.range === range) return;
+      filters.range = range;
+      syncRangeButtons();
+      logView.page = 1;
+      loadLogs(false);
+    });
+  }
+
+  const model = $('#logs-model');
+  if (model) {
+    let timer = 0;
+    model.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { logFilter.model = model.value; logView.page = 1; renderLogs(); }, 120);
+    });
+  }
+
+  const token = $('#logs-token');
+  if (token) {
+    let timer = 0;
+    token.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { logFilter.tokenName = token.value; logView.page = 1; renderLogs(); }, 120);
+    });
+  }
+
+  const request = $('#logs-request');
+  if (request) {
+    let timer = 0;
+    request.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { logFilter.requestId = request.value; logView.page = 1; renderLogs(); }, 120);
+    });
+  }
+
+  const group = $('#logs-group');
+  if (group) group.addEventListener('change', () => { logFilter.group = group.value; logView.page = 1; renderLogs(); });
+
+  const kind = $('#logs-kind');
+  if (kind) kind.addEventListener('change', () => { logFilter.kind = kind.value; logView.page = 1; renderLogs(); });
+
+  const more = $('#logs-more');
+  if (more) {
+    more.addEventListener('click', () => {
+      logView.more = !logView.more;
+      more.setAttribute('aria-expanded', String(logView.more));
+      more.classList.toggle('open', logView.more);
+      const row = $('#logs-more-row');
+      if (row) row.hidden = !logView.more;
+    });
+  }
+}
+
+/** eyeIcon 隐私眼睛（睁/闭），与 NearToken 的同一图形。 */
+function eyeIcon(off) {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', '14');
+  svg.setAttribute('height', '14');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '1.8');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  const paths = off
+    ? ['M3 3l18 18', 'M10.6 10.6a2 2 0 0 0 2.8 2.8', 'M9.9 5.2A9.9 9.9 0 0 1 12 5c5 0 9 4.5 10 7-.4 1-1.4 2.5-2.8 3.8', 'M6.1 6.1C3.9 7.6 2.5 9.7 2 12c1 2.5 5 7 10 7 1.4 0 2.7-.3 3.9-.9']
+    : ['M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z', 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'];
+  for (const d of paths) {
+    const p = document.createElementNS(ns, 'path');
+    p.setAttribute('d', d);
+    svg.appendChild(p);
+  }
+  return svg;
+}
+
+/** syncRangeButtons 让日志页与账户页的区间按钮保持一致（两处共用 filters.range）。 */
+function syncRangeButtons() {
+  for (const btn of $$('.segmented [data-range]')) {
+    btn.setAttribute('aria-pressed', String(btn.dataset.range === filters.range));
+  }
+  for (const btn of $$('#logs-range [data-log-range]')) {
+    btn.setAttribute('aria-pressed', String(btn.dataset.logRange === filters.range));
+  }
+}
+
 
 // ── 3. 密钥 ───────────────────────────────────────────────
 
@@ -1783,16 +2118,104 @@ function renderKeyGroupOptions() {
   }
 }
 
+// ── 新建钥匙弹窗：仿原站「创建 API 密钥」对话框 ──────────────────
+// 表单本体沿用原 #key-form 的元素与校验逻辑，只是从左列卡片搬进弹窗。
+
+function openKeyModal() {
+  const modal = $('#key-modal');
+  if (!modal) return;
+  renderKeyGroupOptions();
+  modal.hidden = false;
+  document.body.classList.add('modal-open');
+  const name = $('#key-name');
+  if (name) setTimeout(() => name.focus(), 0);
+}
+
+function closeKeyModal() {
+  const modal = $('#key-modal');
+  if (!modal) return;
+  modal.hidden = true;
+  document.body.classList.remove('modal-open');
+}
+
+function bindKeyModal() {
+  const open = $('#key-create-open');
+  if (open) open.addEventListener('click', openKeyModal);
+  for (const id of ['key-modal-close', 'key-modal-cancel']) {
+    const btn = $('#' + id);
+    if (btn) btn.addEventListener('click', closeKeyModal);
+  }
+  const modal = $('#key-modal');
+  if (modal) {
+    // 点遮罩关（点对话框本体不关）
+    modal.addEventListener('mousedown', (ev) => {
+      if (ev.target === modal) closeKeyModal();
+    });
+    // Esc 关
+    modal.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') closeKeyModal();
+    });
+  }
+}
+
+/** 密钥表筛选：名称 + 分组，纯前端过滤。 */
+const keysFilter = { name: '', group: '' };
+
+function filteredKeys() {
+  const keys = (cache.keys && cache.keys.keys) || [];
+  const q = keysFilter.name.trim().toLowerCase();
+  return keys.filter((k) => {
+    if (q && !String(k.name || '').toLowerCase().includes(q)) return false;
+    if (keysFilter.group && String(k.group || '') !== keysFilter.group) return false;
+    return true;
+  });
+}
+
+function fillKeyGroupFilter(keys) {
+  const sel = $('#keys-filter-group');
+  if (!sel) return;
+  const groups = [...new Set(keys.map((k) => String(k.group || '')).filter(Boolean))].sort();
+  const keep = keysFilter.group;
+  sel.replaceChildren(
+    h('option', { value: '', text: '所有分组' }),
+    ...groups.map((g) => h('option', { value: g, text: g })),
+  );
+  sel.value = groups.includes(keep) ? keep : '';
+  keysFilter.group = sel.value;
+}
+
+function bindKeysFilter() {
+  const name = $('#keys-filter-name');
+  if (name) {
+    let timer = 0;
+    name.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { keysFilter.name = name.value; renderKeys(); }, 120);
+    });
+  }
+  const group = $('#keys-filter-group');
+  if (group) group.addEventListener('change', () => { keysFilter.group = group.value; renderKeys(); });
+  const clear = $('#keys-filter-clear');
+  if (clear) {
+    clear.addEventListener('click', () => {
+      keysFilter.name = '';
+      keysFilter.group = '';
+      if (name) name.value = '';
+      const g = $('#keys-filter-group');
+      if (g) g.value = '';
+      renderKeys();
+    });
+  }
+}
+
 function renderKeys() {
   const box = $('#keys-body');
-  const count = $('#keys-count');
   if (!box) return;
 
   renderKeyGroupOptions();
-  if (count) {
-    const n = cache.keys && Array.isArray(cache.keys.keys) ? cache.keys.keys.length : 0;
-    count.textContent = n ? `${n} 把` : '';
-  }
+  const all = (cache.keys && cache.keys.keys) || [];
+  const keys = filteredKeys();
+  fillKeyGroupFilter(all);
 
   if (!cache.keys) {
     if (cache.keysNeedPat) {
@@ -1810,14 +2233,14 @@ function renderKeys() {
     return;
   }
 
-  const keys = cache.keys.keys || [];
-  if (!keys.length) {
-    box.replaceChildren(h('div', { class: 'empty', text: '还没有钥匙。用左边的表单按分组建一把，建完记得立刻复制 sk-。' }));
+  if (!all.length) {
+    box.replaceChildren(h('div', { class: 'empty', text: '还没有钥匙。点右上「创建 API 密钥」按分组建一把，建完记得立刻复制 sk-。' }));
     return;
   }
 
+  // 列序对齐原站「API 密钥」表：名称 | 状态 | API 密钥 | 额度 | 分组 | 绑定 | 时间 | 过期 | 操作
   const thead = h('thead', null, h('tr', null,
-    ['名称', '分组', '打码', '创建时间', { label: '已用', cls: 'num' }, '状态', '绑定', '操作']
+    ['名称', '状态', 'API 密钥', { label: '额度', cls: 'num' }, '分组', '绑定', '时间', '过期', '操作']
       .map((hd) => {
         const spec = typeof hd === 'string' ? { label: hd } : hd;
         return h('th', { scope: 'col', class: spec.cls || null }, spec.label);
@@ -1826,24 +2249,32 @@ function renderKeys() {
   const tbody = h('tbody');
   for (const k of keys) {
     const status = keyStatus(k);
+    const expireText = Number.isFinite(k.expiredAt) && k.expiredAt > 0
+      ? fmtAt(k.expiredAt)
+      : (k.status === 3 ? '已过期' : '永不');
     tbody.append(h('tr', null,
       h('td', { class: 'col-name' }, k.name || '未命名'),
-      h('td', null, k.group ? h('span', { class: 'tag', text: k.group }) : '—'),
-      h('td', { class: 'mono' }, k.masked || '—'),
-      h('td', { class: 'mono' }, fmtAt(k.createdAt)),
+      h('td', null, h('span', { class: status.cls, text: status.label })),
+      h('td', { class: 'mono keys-key-cell' },
+        k.masked || '—',
+        copyButton(k.masked || '', '⧉')),
       h('td', {
         class: 'num',
         title: Number.isFinite(k.used) ? `${fmtInt(k.used)} quota` : null,
-      }, moneyRaw(k.used)),
-      h('td', null, h('span', { class: status.cls, text: status.label })),
+      }, k.unlimited ? '无限制' : moneyRaw(k.remain)),
+      h('td', null, k.group ? h('span', { class: 'tag', text: k.group }) : '—'),
       h('td', null, k.bound
         ? h('span', { class: 'tag ok', text: '已绑定' })
         : h('span', { class: 'tag', text: '未绑定' })),
+      h('td', { class: 'mono keys-time-cell' },
+        h('span', { text: `创建 ${fmtAt(k.createdAt)}` }),
+        k.lastUsedAt ? h('span', { text: `使用 ${fmtAt(k.lastUsedAt)}` }) : null),
+      h('td', { class: 'mono' }, expireText),
       h('td', null, keyActions(k)),
     ));
 
     if (revealed.has(k.id)) {
-      tbody.append(h('tr', null, h('td', { colspan: 8 }, h('div', { class: 'reveal-box' },
+      tbody.append(h('tr', null, h('td', { colspan: 9 }, h('div', { class: 'reveal-box' },
         h('span', { class: 'reveal-label', text: '完整钥匙' }),
         h('code', { class: 'reveal-value', text: revealed.get(k.id) }),
         copyButton(revealed.get(k.id), '复制'),
@@ -1855,12 +2286,18 @@ function renderKeys() {
     }
   }
 
+  if (!keys.length) {
+    box.replaceChildren(h('div', { class: 'empty', text: '没有符合筛选的钥匙。' }));
+    return;
+  }
+
   // 密钥表也走同一套滚动容器 + 提示，别让它在窄屏上悄悄裁掉「状态」「操作」列。
   const wrap = h('div', { class: 'table-wrap' }, h('table', { class: 'data-table' }, thead, tbody));
   const hint = h('p', { class: 'scroll-hint', 'data-overflow': '0', text: '← 左右滑动看完整列 →' });
   markOverflow(wrap, hint);
   box.replaceChildren(hint, wrap);
 }
+
 
 function keyStatus(k) {
   if (Number.isFinite(k.expiredAt) && k.expiredAt > 0 && k.expiredAt < Date.now()) {
@@ -1986,6 +2423,9 @@ function bindKeyForm() {
   name.addEventListener('input', () => { name.dataset.auto = '0'; });
 
   form.addEventListener('submit', onCreateKey);
+  // 提交按钮在 form 外（脚部钉住不滚），submit 事件到不了它——直接绑 click
+  const submitBtn = $('#key-submit');
+  if (submitBtn) submitBtn.addEventListener('click', onCreateKey);
 }
 
 async function onCreateKey(ev) {
@@ -2028,6 +2468,7 @@ async function onCreateKey(ev) {
     $('#key-name').value = '';
     $('#key-name').dataset.auto = '0';
     $('#key-quota').value = '';
+    closeKeyModal();
     cache.keys = null;
     await loadKeys(true);
     const slot = $('#secret-slot');
@@ -2042,40 +2483,23 @@ async function onCreateKey(ev) {
 }
 
 async function loadBind(force = false) {
-  if (cache.bind && !force) { renderBind(); return cache.bind; }
+  // 绑定说明的卡片已删除，但「新建钥匙成功」面板仍要用这里的步骤，只缓存不渲染。
+  if (cache.bind && !force) return cache.bind;
   if (loading.bind) return cache.bind;
   loading.bind = true;
   try {
     cache.bind = await api.bindInfo();
     clearBanner('bind');
-    renderBind();
     return cache.bind;
   } catch (err) {
     const msg = describeError(err);
     banner('error', `读取绑定说明失败：${msg}`, { key: 'bind' });
-    regionError($('#bind-info-body'), `绑定说明没读到：${msg}`, () => loadBind(true));
     return null;
   } finally {
     loading.bind = false;
   }
 }
 
-function renderBind() {
-  const box = $('#bind-info-body');
-  if (!box) return;
-  const data = cache.bind;
-  if (!data) { regionLoading(box, '正在读取绑定说明'); return; }
-
-  const how = Array.isArray(data.how) ? data.how : (data.how ? [data.how] : []);
-  box.replaceChildren(
-    how.length
-      ? h('ol', { class: 'bind-steps' }, how.map((step) => h('li', { text: String(step) })))
-      : h('p', { class: 'muted', text: '服务端没有给出绑定步骤。' }),
-    data.auto && data.auto.label
-      ? h('p', { class: 'hint', text: `自动方式：${data.auto.label}（method: ${data.auto.method || '—'}）` })
-      : null,
-  );
-}
 
 // ── 4. 访问令牌（PAT） ────────────────────────────────────
 
@@ -2277,10 +2701,6 @@ async function onClearPat(btn) {
 function bindPatControls() {
   $('#pat-form').addEventListener('submit', onSavePat);
   $('#pat-clear').addEventListener('click', (ev) => onClearPat(ev.currentTarget));
-  $('#pat-shortcut').addEventListener('click', () => {
-    activateTab('pat', { focus: true });
-    setTimeout(() => $('#pat-input').focus(), 0);
-  });
 }
 
 // ── 复制：clipboard 失败就退回「选中文本」 ────────────────
@@ -2706,7 +3126,6 @@ async function loadState(force = false) {
     cache.stateError = '';
     clearBanner('state');
     renderHeader();
-    populateAccountSelect();
     renderKeyGroupOptions();
     if (activeTab === 'wallet') renderAccounts();
     if (activeTab === 'pat') renderPat();
@@ -2733,7 +3152,6 @@ function clearCache() {
   cache.bind = null;
   cache.health = null;
   cache.usage = {};
-  cache.logs = {};
   confirmDeleteId = null;
   revealed.clear();
 }
@@ -2779,7 +3197,10 @@ async function boot() {
   bindTabs();
   bindCatalogControls();
   bindWalletControls();
+  bindLogControls();
   bindKeyForm();
+  bindKeyModal();
+  bindKeysFilter();
   bindPatControls();
   bindDrawer();
 
@@ -2787,7 +3208,7 @@ async function boot() {
   const wanted = params.get('tab');
   // 密钥已并入账户页；旧的 ?tab=keys 链接仍要能打开（映射到 wallet），
   // 不能因为标签被取消就让人书签失效。
-  const valid = ['wallet', 'catalog', 'pat'];
+  const valid = ['wallet', 'catalog', 'logs', 'pat'];
   // 账户页放在首位，也作为默认落地页：打开就能看到余额与钥匙。
   const start = wanted === 'keys' ? 'wallet' : (valid.includes(wanted) ? wanted : 'wallet');
 

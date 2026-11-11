@@ -15,16 +15,10 @@
   <header class="topbar">
     <div class="brand">
       <span class="brand-mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" focusable="false">
-          <path d="M12 2.6 20.4 6v6.1c0 4.4-3.5 7.6-8.4 9.3-4.9-1.7-8.4-4.9-8.4-9.3V6L12 2.6Z"
-                fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
-          <path d="M12 7.2 16 9v3.4c0 2.4-1.8 4.2-4 5.1-2.2-.9-4-2.7-4-5.1V9l4-1.8Z"
-                fill="currentColor" opacity=".26"/>
-          <circle cx="12" cy="11.3" r="1.15" fill="currentColor"/>
-        </svg>
+        <img src="icon.png" alt="" width="28" height="28" loading="eager">
       </span>
       <div class="brand-text">
-        <h1>DragonAPI</h1>
+        <h1>@fish-under-sea/magpie-dragonapi</h1>
         <a class="brand-site" id="site-link" href="https://newapi.dragon3api.com" target="_blank" rel="noopener noreferrer">newapi.dragon3api.com</a>
       </div>
     </div>
@@ -34,9 +28,7 @@
         <span class="dot" id="conn-dot" aria-hidden="true"></span>
         <span id="conn-text">连接中…</span>
       </span>
-      <span class="pill pill-mono" id="currency-pill" title="站点币种">—</span>
-      <button class="btn ghost" id="refresh-btn" type="button" title="强制重新拉取全部数据">刷新</button>
-      <button class="btn" id="pat-shortcut" type="button">访问令牌</button>
+      <button class="pill pill-btn" id="refresh-btn" type="button" title="强制重新拉取全部数据">刷新</button>
     </div>
   </header>
 
@@ -45,6 +37,8 @@
             aria-controls="panel-wallet" aria-selected="true" tabindex="0">账户概览</button>
     <button class="tab" role="tab" type="button" id="tab-catalog" data-tab="catalog"
             aria-controls="panel-catalog" aria-selected="false" tabindex="-1">模型广场</button>
+    <button class="tab" role="tab" type="button" id="tab-logs" data-tab="logs"
+            aria-controls="panel-logs" aria-selected="false" tabindex="-1">使用日志</button>
     <button class="tab" role="tab" type="button" id="tab-pat" data-tab="pat"
             aria-controls="panel-pat" aria-selected="false" tabindex="-1">访问令牌</button>
   </nav>
@@ -83,6 +77,10 @@
             <button type="button" data-view="list" aria-pressed="false" title="单列列表">▤</button>
           </div>
         </div>
+
+        <!-- 统计行放工具条内、胶囊下方：不再压在内容区顶部，
+             筛选栏与内容区从同一水平线开始，左右顶部对齐 -->
+        <div class="market-count" id="catalog-meta"></div>
       </div>
 
       <div class="market-body">
@@ -100,7 +98,6 @@
         <div class="market-main">
           <div class="group-banner" id="group-banner" hidden></div>
 
-          <div class="market-count" id="catalog-meta"></div>
           <div class="model-grid" id="catalog-body">
             <p class="loading">正在读取模型目录…</p>
           </div>
@@ -109,10 +106,43 @@
       </div>
     </section>
 
+    <!-- 使用日志：仿 NearToken 的「使用日志」——筛选条 + 统计条 + 明细表 -->
+    <section class="panel" id="panel-logs" role="tabpanel" aria-labelledby="tab-logs" data-panel="logs" hidden>
+      <div class="card logs-card">
+        <div class="logs-bar">
+          <div class="segmented" id="logs-range" role="group" aria-label="时间范围">
+            <button type="button" data-log-range="day" aria-pressed="true">日</button>
+            <button type="button" data-log-range="week" aria-pressed="false">周</button>
+            <button type="button" data-log-range="month" aria-pressed="false">月</button>
+          </div>
+          <label class="sr-only" for="logs-model">模型名称</label>
+          <input id="logs-model" class="logs-input" type="search" placeholder="模型名称" autocomplete="off">
+          <label class="sr-only" for="logs-group">分组</label>
+          <select id="logs-group" class="logs-select"></select>
+          <label class="sr-only" for="logs-kind">类型</label>
+          <select id="logs-kind" class="logs-select"></select>
+          <button class="btn ghost" id="logs-more" type="button" aria-expanded="false">展开</button>
+        </div>
+        <div class="logs-bar" id="logs-more-row" hidden>
+          <label class="sr-only" for="logs-token">令牌名称</label>
+          <input id="logs-token" class="logs-input" type="search" placeholder="令牌名称" autocomplete="off">
+          <label class="sr-only" for="logs-request">请求 ID</label>
+          <input id="logs-request" class="logs-input" type="search" placeholder="请求 ID" autocomplete="off">
+        </div>
+        <div class="logs-chips-bar">
+          <div class="logs-chips" id="logs-chips"></div>
+          <div class="logs-tools" id="logs-tools"></div>
+        </div>
+        <div class="logs-body" id="logs-body"><p class="loading">正在读取日志…</p></div>
+        <div class="logs-pager" id="logs-pager"></div>
+      </div>
+    </section>
+
+    <!-- 2. 余额与用量 -->
     <!-- 2. 余额与用量 -->
     <section class="panel" id="panel-wallet" role="tabpanel" aria-labelledby="tab-wallet" data-panel="wallet" hidden>
-      <div class="grid-2 wallet-grid">
-        <div class="card">
+      <div class="acct-layout">
+        <div class="card acct-main-card">
           <header class="card-head">
             <h3>账户</h3>
             <span class="card-sub" id="account-sub"></span>
@@ -133,69 +163,92 @@
         </div>
       </div>
 
+      <!-- 推荐计划：放在 API 密钥上面（原站钱包页同位）——
+           待确认 / 总收入 / 邀请三列 + 链接胶囊 + 复制 + 转移到余额 -->
       <div class="card aff-card">
-        <div class="aff-row" id="aff-body"><p class="loading">正在读取推荐计划</p></div>
+        <div class="rf" id="aff-body"><p class="loading">正在读取推荐计划</p></div>
       </div>
 
-      <div class="grid-2 keys-grid">
-        <div class="card">
-          <header class="card-head"><h3>新建钥匙</h3></header>
-          <form id="key-form" class="form" novalidate>
+      <!-- 已有钥匙：仿原站「API 密钥」页——标题行（+ 创建按钮）+ 筛选行 + 表格，整宽 -->
+      <div class="card keys-page">
+        <div class="keys-titlebar">
+          <h3>API 密钥</h3>
+          <button class="btn primary" id="key-create-open" type="button">+ 创建 API 密钥</button>
+        </div>
+        <div class="keys-filterbar">
+          <label class="sr-only" for="keys-filter-name">按名称筛选</label>
+          <input id="keys-filter-name" class="keys-input" type="search" placeholder="按名称筛选…" autocomplete="off">
+          <label class="sr-only" for="keys-filter-group">按分组筛选</label>
+          <select id="keys-filter-group" class="keys-select"></select>
+          <button class="btn ghost" id="keys-filter-clear" type="button">重置</button>
+        </div>
+        <div id="keys-body"><p class="loading">正在读取…</p></div>
+      </div>
+
+      <div id="secret-slot"></div>
+    </section>
+
+    <!-- 新建钥匙弹窗：仿原站「创建 API 密钥」对话框（三段式 + 无限配额开关） -->
+    <div class="modal-backdrop" id="key-modal" hidden>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="key-modal-title">
+        <header class="modal-head">
+          <div>
+            <h2 id="key-modal-title">创建 API 密钥</h2>
+            <p class="modal-sub">通过提供必要信息添加新的 API 密钥。</p>
+          </div>
+          <button class="modal-x" id="key-modal-close" type="button" aria-label="关闭">×</button>
+        </header>
+        <form id="key-form" class="form modal-form" novalidate>
+          <section class="modal-sec">
+            <header class="modal-sec-head">
+              <span class="modal-sec-ico" aria-hidden="true">⚿</span>
+              <div>
+                <h3>基本信息</h3>
+                <p>设置令牌的基本信息</p>
+              </div>
+            </header>
+            <div class="field">
+              <label for="key-name">名称</label>
+              <input id="key-name" name="name" type="text" maxlength="64" autocomplete="off"
+                     placeholder="输入名称" required>
+            </div>
             <div class="field">
               <label for="key-group">分组</label>
               <select id="key-group" name="group" required></select>
             </div>
-            <div class="field">
-              <label for="key-name">名称</label>
-              <input id="key-name" name="name" type="text" maxlength="64" autocomplete="off"
-                     placeholder="例如 Magpie-gpt-plus" required>
-            </div>
-            <div class="field">
-              <label class="check" for="key-unlimited">
+          </section>
+
+          <section class="modal-sec">
+            <header class="modal-sec-head">
+              <span class="modal-sec-ico" aria-hidden="true">◎</span>
+              <div>
+                <h3>额度设置</h3>
+                <p>设置令牌可用额度和数量</p>
+              </div>
+            </header>
+            <div class="field quota-row">
+              <div class="grow">
+                <label class="check-label" for="key-unlimited">无限配额</label>
+                <p class="hint">为此 API 密钥启用无限配额</p>
+              </div>
+              <label class="switch">
                 <input type="checkbox" id="key-unlimited" checked>
-                <span>无限额度</span>
+                <i aria-hidden="true"></i>
               </label>
             </div>
             <div class="field">
-              <label for="key-quota">额度</label>
+              <label for="key-quota">额度（站点币种）</label>
               <input id="key-quota" name="quota" type="number" min="0" step="0.01" inputmode="decimal"
                      placeholder="例如 10" disabled>
-              <p class="hint">按站点币种填写；取消「无限额度」后才生效。</p>
             </div>
-            <div class="form-actions">
-              <button class="btn primary" id="key-submit" type="submit">创建钥匙</button>
-            </div>
-          </form>
-        </div>
-
-        <div class="card">
-          <header class="card-head"><h3>怎么绑进 magpie</h3></header>
-          <div id="bind-info-body"><p class="loading">正在读取绑定说明…</p></div>
-        </div>
+          </section>
+        </form>
+        <footer class="modal-foot">
+          <button class="btn ghost" id="key-modal-cancel" type="button">关闭</button>
+          <button class="btn primary" id="key-submit" type="button">保存更改</button>
+        </footer>
       </div>
-
-      <div id="secret-slot"></div>
-
-      <div class="card">
-        <header class="card-head">
-          <h3>已有钥匙</h3>
-          <span class="card-sub" id="keys-count"></span>
-        </header>
-        <div id="keys-body"><p class="loading">正在读取…</p></div>
-      </div>
-
-      <div class="card">
-        <header class="card-head">
-          <h3>用量流水</h3>
-          <div class="card-tools">
-            <label class="sr-only" for="flow-account">按账号查看</label>
-            <select id="flow-account"></select>
-            <span class="card-sub" id="flow-count"></span>
-          </div>
-        </header>
-        <div id="flow-body"><p class="loading">正在读取…</p></div>
-      </div>
-    </section>
+    </div>
 
     <!-- 4. 访问令牌（PAT） -->
     <section class="panel" id="panel-pat" role="tabpanel" aria-labelledby="tab-pat" data-panel="pat" hidden>

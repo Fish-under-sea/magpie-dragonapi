@@ -67,7 +67,11 @@ html, body {
 }
 
 body { min-height: 100vh; }
-/* dvh 让移动端地址栏收起时不跳；不认 dvh 的浏览器保留上面那行 100vh */
+/* 应用外壳：整页不滚（body 定高 overflow hidden），只有主内容区在滚。
+   这样每个标签页都「底部限高、超出转滚动」，页头/标签/页脚始终可见。
+   dvh 让移动端地址栏收起时不跳；不认 dvh 的浏览器保留上面那行。 */
+html, body { height: 100%; }
+body { overflow: hidden; }
 @supports (min-height: 100dvh) {
   body { min-height: 100dvh; }
 }
@@ -111,10 +115,27 @@ a { color: var(--accent); }
 .app {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 18px 22px 40px;
+  padding: 18px 22px 24px;
+  /* 外壳定高不滚：顶部（页头/标签/提示）与页脚钉住，主内容区自己滚 */
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  box-sizing: border-box;
 }
+/* 主内容区：吃掉剩余高度但**自己不滚**——滚动下放到每张卡片内部。
+   这样画布完全固定，页头/标签/页脚不动，超长内容只在卡片里滑。 */
+.panels {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.foot { flex: none; }
 
 .topbar {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -129,12 +150,14 @@ a { color: var(--accent); }
   width: 34px; height: 34px;
   flex: none;
   display: grid; place-items: center;
-  color: var(--accent);
+  overflow: hidden;
   background: var(--accent-soft);
   border: 1px solid var(--accent-line);
   border-radius: 9px;
 }
-.brand-mark svg { width: 21px; height: 21px; display: block; }
+/* 立绘图标：PNG 自带透明底，深浅色主题都用同一张；
+   描边底色来自主题变量，保证两个主题下边缘都可辨 */
+.brand-mark img { width: 100%; height: 100%; display: block; object-fit: cover; }
 
 .brand-text { min-width: 0; }
 .brand-text h1 {
@@ -175,6 +198,16 @@ a { color: var(--accent); }
   white-space: nowrap;
 }
 .pill-mono { font-family: var(--code); font-variant-numeric: tabular-nums; color: var(--fg); }
+
+/* 胶囊按钮：与状态胶囊同形，但是可点的（页头「刷新」） */
+.pill-btn {
+  cursor: pointer;
+  color: var(--fg);
+  font-size: 12px;
+  transition: border-color .15s ease, color .15s ease;
+}
+.pill-btn:hover { border-color: var(--accent-line); color: var(--accent); }
+.pill-btn:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 2px; }
 
 .dot {
   width: 7px; height: 7px;
@@ -306,6 +339,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 /* ── 标签页：整条圆角胶囊，内部按钮也是胶囊（照 neartoken 的 .tabs） ── */
 
 .tabs {
+  flex: none;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -344,7 +378,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 
 /* ── 提示条 ─────────────────────────────────────────────── */
 
-.banners { display: flex; flex-direction: column; gap: 8px; }
+.banners { flex: none; display: flex; flex-direction: column; gap: 8px; }
 .banners:not(:empty) { margin-top: 12px; }
 
 .banner {
@@ -401,7 +435,15 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 /* ── 卡片 / 面板 ────────────────────────────────────────── */
 
 .panels { padding-top: var(--gap); }
-.panel { display: flex; flex-direction: column; gap: var(--gap); }
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  /* 撑满主内容区高度且不溢出：内部各块按 flex 分高度，滚动各自负责 */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
 .panel[hidden] { display: none; }
 
 .card {
@@ -410,6 +452,8 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   background: var(--card);
   padding: var(--pad);
   min-width: 0;
+  /* 卡片默认不参与 grow，靠各自的页面规则分配高度 */
+  min-height: 0;
 }
 .card.flush { padding: 0; overflow: hidden; }
 
@@ -1205,8 +1249,11 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 
 .market-body {
   display: grid;
-  grid-template-columns: 216px minmax(0, 1fr);
-  gap: 16px;
+  /* 侧栏从 216px 收到 188px：筛选行的内容（倍率徽标 + 组名 + 计数）
+     实测 170px 内放得下，216px 会给模型卡挤出不必要的空白。
+     窄屏媒体查询里另有单列规则，不受影响。 */
+  grid-template-columns: 188px minmax(0, 1fr);
+  gap: 14px;
   /* 这一层可以 start：侧栏本来就该比主区短，不该被拉到与列表等高 */
   align-items: start;
 }
@@ -1216,7 +1263,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   top: 12px;
   max-height: calc(100vh - 24px);
   overflow: auto;
-  padding: 12px;
+  padding: 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--sunken);
@@ -1392,12 +1439,13 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   border-radius: 999px;
 }
 
-/* 分段控件：照 neartoken 的 .market-seg（28px 高、9px 圆角、内部分隔线） */
+/* 分段控件：照 neartoken 的 .market-seg，统一 30px 高、胶囊圆角，
+   两段合起来是一个胶囊、中间画分隔线（视觉大小与搜索框/下拉一致） */
 .market-seg {
   display: inline-flex;
   flex: none;
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 999px;
   overflow: hidden;
   background: var(--sunken);
 }
@@ -1405,8 +1453,8 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  height: 28px;
-  padding: 0 9px;
+  height: 30px;
+  padding: 0 12px;
   font: inherit;
   font-size: 11.5px;
   color: var(--muted);
@@ -1430,46 +1478,60 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   container-type: inline-size;
 }
 
-/* 顶部工具条：整条一个圆角容器，搜索在左、工具在右（照 neartoken） */
+/* 顶部工具条：整条一个圆角容器，搜索在左、工具在右（照 neartoken）。
+   统计行（N 个模型 · 全站…）收进工具条、贴着胶囊下方：
+   原来它单独占一行压在内容区顶部，把筛选栏和内容区往下挤，
+   两边顶部永远差一行——挪进来后 market-body 直接从同一水平线开始。 */
 .market-top {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  padding: 9px 11px;
+  padding: 9px 11px 6px;
   margin-bottom: 10px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--card);
 }
-.market-search {
+/* 统计行：在工具条第二行，紧贴上面的胶囊（高度对齐的关键） */
+.market-top .market-count {
+  flex-basis: 100%;
+  margin: 2px 2px 2px;
+}
+/* 搜索框：胶囊样式，与页头「已连接 / 刷新」同一视觉语言。
+   input[type=search] 属性选择器(0,1,1)比单类(0,1,0)高，会拿它的
+   min-height:34px / 圆角 / padding 压回来——所以这里写 input 前缀提权，
+   并显式重置它给的 min-height 与 padding。 */
+.market-top input.market-search {
   flex: 1 1 240px;
   min-width: 160px;
+  min-height: 0;
   height: 30px;
-  padding: 0 10px;
+  padding: 0 14px;
   font: inherit;
   font-size: 12px;
   color: var(--fg);
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 999px;
   background: var(--sunken);
+  box-sizing: border-box;
 }
 .market-search::placeholder { color: var(--muted); }
 .market-search:focus { outline: 1px solid var(--accent); outline-offset: 0; }
 .market-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: none; }
-/* 下拉/按钮沿用同一条工具的高度与圆角 */
+/* 下拉/按钮统一 30px 高、胶囊圆角：与搜索框同尺寸，整排视觉一致 */
 .market-tool {
   flex: none;
   width: auto;
   max-width: 190px;
-  height: 28px;
-  padding: 0 8px;
+  height: 30px;
+  padding: 0 12px;
   font: inherit;
   font-size: 11.5px;
   color: var(--muted);
   background: var(--sunken);
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 999px;
 }
 
 /* 下拉菜单：自绘的弹层，跟页面同一套底色与圆角（原生 select 的弹层画系统白底） */
@@ -1538,10 +1600,11 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   align-items: baseline;
   flex-wrap: wrap;
   gap: 4px;
-  margin: 0 0 10px;
   font-size: 12px;
   color: var(--muted);
 }
+/* 在 market-top 里时贴着胶囊下方（挪进工具条后不再需要底边距） */
+.market-top .market-count { margin: 2px 2px; }
 .market-count b { font-size: 15px; color: var(--fg); font-variant-numeric: tabular-nums; }
 .market-count .spacer { flex: 1 1 12px; }
 
@@ -1615,7 +1678,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 .model-grid.as-list .ml-price { display: flex; flex-direction: column; gap: 2px; line-height: 17px; white-space: nowrap; }
 .model-grid.as-list .ml-p-line { display: inline-flex; align-items: baseline; gap: 5px; }
 .model-grid.as-list .ml-p-k { font-size: 10.5px; color: var(--muted); }
-.model-grid.as-list .ml-p-v { font-size: 11.5px; color: var(--fg); font-variant-numeric: tabular-nums; margin-right: 10px; }
+.model-grid.as-list .ml-p-v { font-size: 10.5px; color: var(--fg); font-variant-numeric: tabular-nums; margin-right: 10px; }
 .model-grid.as-list .ml-p-unit,
 .model-grid.as-list .ml-c-unit { font-size: 9.5px; color: var(--muted); }
 
@@ -1766,7 +1829,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 .mc-prices span { font-size: 10px; color: var(--muted); }
 .mc-prices b {
   font-family: var(--code);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--fg);
   font-variant-numeric: tabular-nums;
@@ -1906,7 +1969,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 }
 /* 价格区间：一列里塞得下才叫区间，塞不下就该换写法而不是省略号 */
 .mc-prices b.with-range {
-  font-size: 10.5px;
+  font-size: 10px;
   letter-spacing: -.01em;
 }
 .mc-billing.mixed { color: var(--muted); font-weight: 500; }
@@ -1955,73 +2018,371 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 
 /* 分组定价里「当前」那一行：整行提亮，比只亮一个徽标更容易扫到 */
 .data-table tbody tr.is-current-row td { background: color-mix(in srgb, var(--accent) 7%, transparent); }
-/* ── 推荐计划：一行横条（图标 / 说明 / 邀请数 / 链接 / 同步时间） ──────
+/* ── 账户页排版：5 : 7 的两列，不搞「等宽双卡」 ─────────────────
  *
- * 放成整条而不是再塞一张等宽小卡：它只有「邀请几个、链接是什么」两件事，
- * 做成方卡会占掉半屏，还把上面两张概览卡的高度节奏打乱。
+ * 数据概览的信息量明显比账户卡大（三个数字 + 曲线 + 按模型明细），
+ * 等宽分栏会让左边空、右边挤。所以按密度分：账户 5 份，数据 7 份。
+ * 窄屏回到单列，顺序不变。
+ */
+.acct-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: var(--gap, 14px);
+  align-items: stretch;
+  /* 上面这排卡片按内容定高，但最多占 42%——超了就在卡内滚；
+     剩余高度全部交给下面的密钥表格（它是表格，行多了更需要空间） */
+  flex: 0 1 auto;
+  max-height: 42%;
+  /* 账户排按内容定高，剩余全部给密钥表格 */
+  min-height: 0;
+}
+.acct-layout > .card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+/* 卡片主体：撑满卡片、超出在卡内滚动 */
+#account-body,
+#usage-body,
+#keys-body,
+#diag-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+/* 账户卡：余额、明细之后接推荐计划说明时用 flex 铺开；
+   现在推荐计划回到独立横条，这里保持容器弹性即可。 */
+.acct-main-card #account-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* 空态：一句话居中，别把它顶在卡片上沿、底下留一大片空白 */
+.acct-main-card #account-body.is-empty {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.acct-main-card #account-body.is-empty .empty { padding: 0; max-width: 40ch; }
+
+@media (max-width: 900px) {
+  .acct-layout { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ── 用量空态：一处解释，不是三处 ───────────────────────────── */
+.usage-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 14px 16px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--sunken) 60%, transparent);
+}
+.usage-empty-title { margin: 0; font-size: 12.5px; color: var(--fg); }
+.usage-empty .hint { margin: 0; font-size: 11px; line-height: 1.55; color: var(--muted); }
+
+/* ── 推荐计划：仿 NearToken 的跨整行长条 ───────────────────────
+ *
+ * 图标 / 说明 / 邀请与奖励两个小统计 / 链接 + 复制 / 转入余额 / 同步时间。
+ * 它不是账户卡的附属信息，而是有自己动作（复制链接、转入余额）的一块，
+ * 所以回到整行，而不是塞进账户卡底部。
  */
 .aff-card { padding: 0; }
-.aff-row {
+.rf {
   display: flex;
   align-items: center;
   gap: 14px;
   flex-wrap: wrap;
   padding: 14px 16px;
 }
-.aff-icon {
+.rf-ico {
   flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
   border: 1px solid var(--accent-line);
 }
-/* 小圆点连线：一个纯 CSS 的「分享」图形，省一张图 */
-.aff-icon::before {
-  content: "";
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  box-shadow:
-    0 -6px 0 -3px var(--accent),
-    0 6px 0 -3px var(--accent),
-    5px 0 0 -3px var(--accent);
-  border: 1.5px solid var(--accent);
-}
-.aff-main { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.aff-title { margin: 0; font-size: 12.5px; font-weight: 650; }
-.aff-note { margin: 0; font-size: 11px; line-height: 1.5; color: var(--muted); }
-.aff-stats { display: flex; align-items: baseline; gap: 6px; flex: none; }
-.aff-k { font-size: 10.5px; color: var(--muted); }
-.aff-v {
+.rf-text { flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rf-title { margin: 0; font-size: 13px; font-weight: 650; }
+.rf-note { margin: 0; font-size: 11px; line-height: 1.5; color: var(--muted); }
+.rf-stat { flex: none; display: flex; flex-direction: column; gap: 1px; min-width: 56px; padding: 0 10px; border-left: 1px solid var(--line); }
+.rf-k { font-size: 10.5px; color: var(--muted); }
+.rf-v {
   font-family: var(--code);
-  font-size: 13px;
+  font-size: 15px;
   font-variant-numeric: tabular-nums;
-  margin-right: 6px;
+  color: var(--fg);
 }
-.aff-link { display: flex; align-items: center; gap: 6px; flex: 1 1 320px; min-width: 0; }
-.aff-input {
-  flex: 1 1 auto;
+.rf-link {
+  flex: 1 1 260px;
   min-width: 0;
   height: 30px;
-  padding: 0 9px;
-  font-family: var(--code);
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
   font-size: 11px;
   color: var(--fg);
   background: var(--sunken);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
-.aff-copy { flex: none; }
-.aff-sync { flex: none; font-family: var(--code); font-size: 10.5px; color: var(--muted); }
+.rf-copy, .rf-transfer { flex: none; }
+/* 复制图标按钮：方形描边小按钮（原站样式），不是文字按钮 */
+.rf-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--muted);
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.rf-copy:hover { color: var(--fg); border-color: var(--accent-line); }
+.rf-transfer.is-armed { border-color: var(--warn); }
+.rf-sync { flex: none; font-family: var(--code); font-size: 10.5px; color: var(--muted); }
 
 @media (max-width: 720px) {
-  .aff-stats { order: 3; }
-  .aff-link { flex-basis: 100%; }
-  .aff-sync { display: none; }
+  .rf-link { flex-basis: 100%; }
+  .rf-sync { display: none; }
+}
+
+/* ── 使用日志：对齐 NearToken「通用日志」的版式与密度 ─────────────
+ *
+ * 9 列网格表（时间 | 分组 | 模型 | 费用 | 请求体 | 流 | Token | 耗时 | 详情），
+ * 每列里的两行小字用 .lg-cell-stack 纵向叠。窄屏不砍列，改横向滚动。
+ */
+.logs-card { display: flex; flex-direction: column; gap: 12px; }
+.logs-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+/* 属性选择器（input[type=search] 等）比特异性更高，会压回 34px 高度——
+   带元素前缀提权，并重置 min-height */
+input.logs-input, select.logs-select {
+  min-height: 0;
+  height: 30px;
+  box-sizing: border-box;
+  padding: 0 9px;
+  font-size: 12px;
+  color: var(--fg);
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+input.logs-input { flex: 1 1 170px; min-width: 120px; }
+select.logs-select { flex: 0 1 auto; max-width: 170px; }
+input.logs-input:focus-visible, select.logs-select:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 1px;
+}
+#logs-more[aria-expanded="true"] { color: var(--accent); }
+
+/* 统计条一行：chips 在左，动作（隐私眼睛 / 重置）在右 */
+.logs-chips-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.logs-chips { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.logs-tools { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.lg-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+.lg-chip b {
+  font-family: var(--code);
+  font-size: 11.5px;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.lg-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
+.lg-dot.blue { background: var(--accent); }
+.lg-dot.violet { background: var(--violet, var(--accent)); }
+.lg-icon-btn.on { color: var(--warn); border-color: var(--warn); }
+
+/* ── 9 列网格表 ─────────────────────────────────────────────── */
+.logs-body { min-width: 0; overflow-x: auto; }
+.lg-table {
+  display: grid;
+  min-width: 980px;
+  font-size: 11.5px;
+}
+.lg-row {
+  display: grid;
+  grid-template-columns: minmax(118px, 1.1fr) minmax(84px, .9fr) minmax(140px, 1.5fr)
+    minmax(72px, .7fr) minmax(70px, .6fr) minmax(72px, .7fr) minmax(120px, 1.1fr)
+    minmax(96px, .8fr) minmax(130px, 1.2fr);
+  gap: 0 12px;
+  align-items: center;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.lg-row:not(.lg-head):hover { background: color-mix(in srgb, var(--sunken) 55%, transparent); }
+.lg-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: var(--muted);
+  font-size: 10.5px;
+  background: var(--card, var(--sunken));
+  border-bottom: 1px solid var(--line-strong, var(--line));
+}
+.lg-cell-stack { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lg-time-str { font-family: var(--code); font-size: 11px; }
+.lg-meta-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.lg-tag {
+  padding: 0 5px;
+  font-size: 9.5px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.lg-tag.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+.lg-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 6px;
+  height: 16px;
+  font-size: 9.5px;
+  font-family: var(--code);
+  color: var(--muted);
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.lg-pill:hover { color: var(--fg); border-color: var(--accent-line); }
+.lg-gb {
+  display: inline-block;
+  max-width: 100%;
+  padding: 1px 7px;
+  font-size: 10px;
+  color: var(--muted);
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.lg-model-inline { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.lg-model {
+  font-family: var(--code);
+  font-size: 11px;
+  color: var(--fg);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.lg-effort {
+  flex: none;
+  padding: 0 5px;
+  font-size: 9.5px;
+  color: var(--violet, var(--accent));
+  border: 1px solid color-mix(in srgb, var(--violet, var(--accent)) 40%, transparent);
+  border-radius: 4px;
+}
+.lg-map-mark { flex: none; color: var(--muted); font-size: 10px; }
+.lg-cost { font-family: var(--code); font-size: 11px; color: var(--fg); }
+.lg-num {
+  font-family: var(--code);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+.lg-flow { font-size: 10.5px; color: var(--accent); }
+.lg-flow.off { color: var(--muted); }
+.lg-sub { font-size: 10px; color: var(--muted); }
+.lg-time-col { gap: 2px; }
+.lg-dur {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.lg-dur b { font-family: var(--code); font-weight: 500; font-variant-numeric: tabular-nums; }
+.lg-dur::before {
+  content: "";
+  width: 3px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--line-strong, var(--line));
+}
+.lg-dur-fast::before { background: var(--ok); }
+.lg-dur-mid::before { background: var(--warn); }
+.lg-dur-slow::before { background: var(--danger, #e5484d); }
+.lg-dash { color: var(--muted); font-size: 10px; }
+.lg-detail {
+  font-size: 10.5px;
+  color: var(--muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.lg-empty { margin: 0; padding: 26px 0; text-align: center; color: var(--muted); font-size: 12px; }
+
+/* 分页条 */
+.logs-pager {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.lg-total { font-size: 11px; color: var(--muted); margin-right: auto; }
+.lg-pagesize { height: 26px; font-size: 11px; }
+.lg-page-btn { height: 26px; min-width: 26px; padding: 0 7px; }
+.lg-page-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 8px;
+  font-family: var(--code);
+  font-size: 11px;
+  color: var(--fg);
+  background: var(--sunken);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-sm);
+}
+
+@media (max-width: 720px) {
+  .lg-row { grid-template-columns: repeat(9, minmax(96px, 1fr)); }
+  .logs-tools { margin-left: 0; }
 }
 /* ── 账户卡：照站点控制台的版式（大字余额 → 一行元信息 → 明细 → 标签行） ──
  *
@@ -2085,3 +2446,313 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 @media (max-width: 720px) {
   .acct-num { font-size: 28px; }
 }
+/* ── 新建钥匙弹窗：仿原站「创建 API 密钥」对话框 ────────────────── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: color-mix(in srgb, #000 55%, transparent);
+  backdrop-filter: blur(2px);
+  overflow-y: auto;
+}
+/* display:flex 的特异性比 hidden 的 UA 样式（display:none）高，
+   不加这条弹窗会永远显示——点 × 后 JS 已设 hidden，视觉上却关不掉 */
+.modal-backdrop[hidden] { display: none; }
+/* 与模型详情面板同一视觉：垂直居中、同宽同圆角同底色 */
+.modal {
+  position: relative;
+  width: min(820px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  margin: auto;          /* 内容超高时配合 overflow-y:auto 回到居中 */
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .38);
+  overflow: hidden;
+}
+.modal-open { overflow: hidden; }
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.modal-head h2 { margin: 0; font-size: 15px; font-weight: 650; }
+.modal-sub { margin: 3px 0 0; font-size: 11.5px; color: var(--muted); }
+.modal-x {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.modal-x:hover { color: var(--fg); background: var(--sunken); }
+/* 表单区可滚（内容超高时），脚部钉在底部不滚 */
+.modal-form { padding: 4px 20px 12px; overflow-y: auto; }
+.modal-sec { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.modal-sec:last-of-type { border-bottom: none; }
+.modal-sec-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.modal-sec-ico {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  font-size: 13px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-radius: 8px;
+}
+.modal-sec-head h3 { margin: 0; font-size: 12.5px; font-weight: 650; }
+.modal-sec-head p { margin: 1px 0 0; font-size: 10.5px; color: var(--muted); }
+.modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--line);
+  flex: none;
+  background: var(--sunken);
+}
+
+/* 无限配额开关：原站是 toggle，不是勾选框。
+   加 .field 前缀提优先级：通用 .field 是纵向排列（label 上、输入下），
+   会把这块也压成竖排——label 居中、开关掉到下一行，就是它干的。 */
+.field.quota-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+.field.quota-row .grow { flex: 1; min-width: 0; }
+.check-label { font-size: 12px; color: var(--fg); }
+.switch { flex: none; position: relative; display: inline-block; cursor: pointer; }
+.switch input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.switch i {
+  display: block;
+  width: 34px;
+  height: 19px;
+  border-radius: 999px;
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  transition: background .15s ease, border-color .15s ease;
+}
+.switch i::after {
+  content: "";
+  position: absolute;
+  top: 2.5px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform .15s ease, background .15s ease;
+}
+.switch input:checked + i {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  border-color: var(--accent-line);
+}
+.switch input:checked + i::after {
+  transform: translateX(14px);
+  background: var(--accent);
+}
+.switch input:focus-visible + i { outline: 2px solid var(--accent-line); outline-offset: 2px; }
+
+/* ── 已有钥匙：仿原站「API 密钥」页 ─────────────────────────── */
+.keys-page { display: flex; flex-direction: column; gap: 10px; }
+.keys-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.keys-titlebar h3 { margin: 0; font-size: 14px; font-weight: 650; }
+.keys-filterbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+input.keys-input, select.keys-select {
+  min-height: 0;
+  height: 30px;
+  box-sizing: border-box;
+  padding: 0 9px;
+  font-size: 12px;
+  color: var(--fg);
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+input.keys-input { flex: 1 1 170px; min-width: 130px; }
+select.keys-select { flex: 0 1 auto; max-width: 180px; }
+input.keys-input:focus-visible, select.keys-select:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 1px;
+}
+.keys-key-cell { white-space: nowrap; }
+.keys-key-cell .btn { margin-left: 2px; }
+.keys-time-cell { white-space: nowrap; }
+.keys-time-cell span { display: block; }
+/* ── 限高策略：画布固定，每张卡片自己滚 ──────────────────────────
+ *
+ * 目标：整页不滚（body/panels 都 hidden），页头、标签、页脚永远在；
+ * 超长内容一律在**卡片内部**滚动。所以每个面板都要把自己那块高度
+ * 分干净：能滚的主体 flex:1 + min-height:0 + overflow-y:auto，
+ * 标题行、工具条、分页条这些固定件 flex:none。
+ */
+
+/* 下面给 #panel-* 写 display:flex 时用了 ID 选择器（1,0,0），
+   特异性高于 .panel[hidden]（0,2,0）——不补这条，隐藏的面板会全部同时显示。 */
+#panel-catalog[hidden],
+#panel-logs[hidden],
+#panel-wallet[hidden],
+#panel-pat[hidden] { display: none; }
+
+/* 卡片里的固定件不参与压缩 */
+.card-head,
+.keys-titlebar,
+.keys-filterbar,
+.logs-bar,
+.logs-chips-bar,
+.logs-pager,
+.modal-head { flex: none; }
+
+/* ── 账户页 ─────────────────────────────────────────────────── */
+/* 推荐计划：一行横条，固定高 */
+#panel-wallet .aff-card { flex: none; }
+/* 密钥卡：吃掉剩余高度，卡内表格滚 */
+#panel-wallet .keys-page {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+#panel-wallet #keys-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+#secret-slot { flex: none; }
+
+/* ── 使用日志页 ─────────────────────────────────────────────── */
+#panel-logs .logs-card {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+/* 只有明细表区滚；筛选/统计/分页钉住 */
+#panel-logs .logs-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+/* ── 模型广场 ───────────────────────────────────────────────── */
+#panel-catalog {
+  /* 工具条固定，下面是 侧栏 + 卡片区 */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+#panel-catalog .market-top { flex: none; }
+#panel-catalog .market-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: stretch;
+}
+/* 侧栏与主区都能滚，各自独立 */
+#panel-catalog .market-aside {
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  position: static;
+}
+#panel-catalog .market-main {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#panel-catalog .group-banner { flex: none; }
+#panel-catalog .model-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  /* 底部留一点内边距，最后一行卡片不贴边 */
+  padding-bottom: 2px;
+  align-content: start;
+}
+/* 列表视图也是同一个滚动容器，别让行被压扁 */
+#panel-catalog .model-grid.as-list { align-content: start; }
+#panel-catalog .foot-note { flex: none; }
+
+/* ── 访问令牌页 ─────────────────────────────────────────────── */
+#panel-pat {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+#panel-pat > .grid-2 {
+  flex: 0 1 52%;
+  min-height: 0;
+}
+#panel-pat > .grid-2 > .card {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+/* 健康与诊断：吃掉剩余高度，卡内滚 */
+#panel-pat > .card {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  /* 窄屏一列时不再强分高度，改为整块可滚——否则每张卡都只剩几十像素 */
+  .panel { overflow: visible; }
+  .panels { overflow-y: auto; }
+  #panel-catalog .market-aside { max-height: 40vh; }
+  #panel-pat > .grid-2,
+  #panel-wallet .acct-layout { flex: none; }
+}
+

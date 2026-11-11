@@ -16,6 +16,7 @@ import { createStatusSource } from '../lib/status-source.mjs'
 import { loadState, saveState, maskKey } from '../lib/store.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
+const root = join(here, '..')
 
 let dir
 let svc
@@ -123,14 +124,22 @@ test('API 不写死主机名，换端口/换代理前缀也不坏', async () => 
   assert.deepEqual(hardcoded, [], `不该写死本地地址：${hardcoded.join(', ')}`)
 })
 
-test('三个标签页：密钥已并入账户页，不再单开标签', async () => {
+test('四个标签页：账户在前，使用日志紧跟模型广场，密钥已并入账户页', async () => {
   const html = await (await fetch(base + '/')).text()
   const tabs = [...html.matchAll(/data-tab="([^"]+)"/g)].map((m) => m[1])
-  assert.deepEqual(tabs, ['wallet', 'catalog', 'pat'], `标签应只剩三个且账户在前，实际 ${tabs.join(', ')}`)
+  assert.deepEqual(tabs, ['wallet', 'catalog', 'logs', 'pat'], `标签顺序不符，实际 ${tabs.join(', ')}`)
+  assert.match(html, /id="panel-logs"/, '应有使用日志面板')
+  assert.equal(/id="flow-body"/.test(html), false, '账户页不再有用量流水卡')
   assert.equal(/id="panel-keys"/.test(html), false, '密钥面板应已并入账户页')
   // 密钥的能力还在：建钥匙表单挂在账户页里
-  assert.match(html, /id="key-form"/, '账户页里应保留建钥匙表单')
-  assert.match(html, /id="keys-body"/, '账户页里应保留已有钥匙列表')
+  assert.match(html, /id="key-form"/, '建钥匙表单应在（弹窗内）')
+  assert.match(html, /id="key-modal"/, '建钥匙应改为弹窗（仿原站）')
+  // .modal-backdrop 是 display:flex，特异性会压过 hidden 的 UA display:none；
+  // 没有这条规则，点 × 之后 JS 设了 hidden、视觉上却永远显示（真实修过的 bug）
+  const css = await (await fetch(base + '/style.css')).text()
+  assert.match(css, /\.modal-backdrop\[hidden\]\s*\{\s*display:\s*none/, '弹窗 hidden 时必须 display:none，否则关不掉')
+  assert.match(html, /id="key-create-open"/, '密钥页应有「创建 API 密钥」入口按钮')
+  assert.match(html, /id="keys-body"/, '应保留已有钥匙列表')
 
   // 旧书签 ?tab=keys 仍要能用，映射到账户页
   const js = await (await fetch(base + '/ui/app.js')).text()
@@ -185,13 +194,20 @@ test('每个「加载中」占位符都有对应的加载函数被 tab 调到（
   assert.match(body, /name === 'wallet'[\s\S]{0,260}loadBind/, '账户页要调 loadBind，否则绑定说明永远加载中')
 })
 
-test('renderBind 的加载中分支只能在没有数据时出现', async () => {
+test('「怎么绑进 magpie」卡片已删除，但步骤仍为新建钥匙面板保留', async () => {
+  const html = await (await fetch(base + '/')).text()
   const js = await (await fetch(base + '/ui/app.js')).text()
-  // renderBind 里必须有一条「有数据就画内容」的分支，不能只有加载中
-  const fn = js.match(/function renderBind\([\s\S]*?\n\}/)
-  assert.ok(fn, '找不到 renderBind')
-  assert.match(fn[0], /replaceChildren/, 'renderBind 必须真的画内容')
-  assert.match(fn[0], /how/, 'renderBind 必须渲染 how 步骤')
+
+  // 卡片与其容器都不该再出现
+  assert.equal(/bind-info-body/.test(html), false, '绑定说明卡片应已删除')
+  assert.equal(/怎么绑进 magpie/.test(html), false, '绑定说明标题应已删除')
+  // 渲染函数一并删掉，避免「有函数没容器」的死代码
+  assert.equal(/function renderBind\(/.test(js), false, 'renderBind 应已删除')
+
+  // 但数据仍要取：新建钥匙成功后，面板里会列出绑定步骤
+  assert.match(js, /async function loadBind\(/, 'loadBind 应保留（取数据）')
+  assert.match(js, /cache\.bind\s*=\s*await api\.bindInfo\(\)/, 'loadBind 仍要缓存步骤')
+  assert.match(js, /cache\.bind && cache\.bind\.how/, '新建钥匙面板仍要用这份步骤')
 })
 
 test('窄屏横向溢出要有提示，且提示在表格上方', async () => {
@@ -598,4 +614,52 @@ test('详情页的中文值不再被套等宽字体', async () => {
   assert.ok(dd, '找不到 .kv-grid dd')
   assert.equal(/font-family/.test(dd[0]), false, '.kv-grid dd 不该统一等宽：中文会掉进等宽字体的 CJK 回退字形')
   assert.match(css, /\.kv-grid dd\.mono\s*\{[^}]*font-family:\s*var\(--code\)/, '需要等宽的值应显式加 .mono')
+})
+
+test('使用日志页：筛选条 + 统计条 + 明细表都在，且列与 NearToken 对齐', async () => {
+  const html = await (await fetch(base + '/')).text()
+  const js = await (await fetch(base + '/ui/app.js')).text()
+
+  assert.match(html, /id="logs-range"/, '缺少时间范围切换')
+  assert.match(html, /id="logs-model"/, '缺少模型名筛选')
+  assert.match(html, /id="logs-group"/, '缺少分组筛选')
+  assert.match(html, /id="logs-kind"/, '缺少类型筛选')
+  assert.match(html, /id="logs-more"/, '缺少展开（更多筛选）')
+  assert.match(html, /id="logs-token"/, '缺少令牌名筛选（展开区）')
+  assert.match(html, /id="logs-pager"/, '缺少分页条')
+  assert.match(html, /id="logs-chips"/, '缺少统计条')
+  assert.match(html, /id="logs-body"/, '缺少明细表容器')
+
+  // 表头列名随 NearToken：请求体大小 / Token（入/出）等
+  assert.match(js, /'时间', '分组', '模型', '费用', '请求体大小', '流', 'Token', '耗时', '详情'/, '九列表头不符')
+  assert.match(js, /function fillLogFilters\(/, '缺少下拉填充')
+  assert.match(js, /fillLogFilters\(\(cache\.usage/, '渲染前要按实际行填充下拉')
+})
+
+test('推荐计划：恢复成跨整行长条，并带「转入余额」', async () => {
+  const html = await (await fetch(base + '/')).text()
+  const js = await (await fetch(base + '/ui/app.js')).text()
+
+  assert.match(html, /class="card aff-card"/, '推荐计划应有独立长条卡')
+  assert.match(html, /class="rf" id="aff-body"/, '推荐计划用 NearToken 的 .rf 版式')
+  assert.equal(/aff-inline/.test(html), false, '不应再有内嵌版')
+
+  for (const cls of ['rf-ico', 'rf-text', 'rf-stat', 'rf-link', 'rf-copy', 'rf-transfer', 'rf-sync']) {
+    assert.match(js, new RegExp(cls), `推荐计划缺少 ${cls}`)
+  }
+  assert.match(js, /用户通过你的推荐链接注册后/, '缺少站点原话说明')
+  assert.match(js, /affTransferArmedUntil/, '转入需二次确认（沙箱里 confirm 会被拦成 false）')
+  assert.match(js, /api\.transferAff\(\)/, '应调用 /api/aff/transfer')
+  assert.match(js, /'确认转入'/, '第一下应提示确认')
+})
+
+test('转入余额：服务端转发站点的 /api/user/aff_transfer，不编结论', async () => {
+  // fixture 设了 PAT 但站点是 example.test（不可达）：应如实报失败。
+  const svc = await (await fetch(base + '/api/aff/transfer', { method: 'POST' })).json()
+  assert.equal(svc.ok, false, '站点不可达时不能报成功：' + JSON.stringify(svc))
+  assert.match(svc.error || '', /转入失败/, '失败要说清是转入失败')
+  // lib/ 不是静态目录，源码直接从磁盘读
+  const site = readFileSync(join(root, 'lib', 'site.mjs'), 'utf8')
+  assert.match(site, /api\/user\/aff_transfer/, '站点端点是 /api/user/aff_transfer')
+  assert.match(site, /env\?\.message/, '成功与否以站点 message 为准')
 })

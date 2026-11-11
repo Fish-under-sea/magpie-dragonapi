@@ -139,7 +139,11 @@ const BRAND_TESTS = [
   ['qwen', /\bqwen\b|通义|千问|阿里/i],
   ['glm', /\bglm\b|智谱|zhipu/i],
   ['hy', /\bhy\d|\bhy\b|混元|hunyuan/i],
-  ['minimax', /minimax|海螺|hailuo/i],
+  // h3 是 MiniMax 的海螺 3（视频），**必须排在 minimax 之前**：
+  // 否则 `minimax-h3` 会先命中 /minimax/ 被判成 minimax 品牌，
+  // 于是它在视频顺序里找不到位置、被排到最后。
+  ['h3', /\bh3\b|hailuo/i],
+  ['minimax', /minimax|海螺/i],
   ['mimo', /\bmimo\b|小米|xiaomi/i],
   // 图片 / 视频这两类各自有厂商顺序（见 CATEGORY_BRAND_ORDER），
   // 先把它们的品牌认出来，排序时按类别查表。

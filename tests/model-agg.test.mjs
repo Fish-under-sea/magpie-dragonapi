@@ -419,3 +419,23 @@ test('图片区按品牌顺序：OpenAI → Google → xAI', () => {
   const names = orderDefault(list, { catOf, catOrder: ['image'] }).map((x) => x.name)
   assert.deepEqual(names, ['gpt-image-2.6', 'gemini-3-pro-image-preview', 'grok-imagine-image'])
 })
+
+test('h3 属于 MiniMax 的海螺视频型号：品牌判成 h3，其余 minimax 型号仍是 minimax', () => {
+  // 名字里同时有 minimax 与 h3，规则顺序决定了归属：h3 必须在前
+  assert.equal(brandOf('minimax-h3', 'MiniMax'), 'h3')
+  assert.equal(brandOf('minimax-m3', 'MiniMax'), 'minimax')
+  assert.equal(brandOf('minimax-m3.1-flash', 'MiniMax'), 'minimax')
+})
+
+test('视频区把 h3 放在 seed 之后、wan 之前', () => {
+  const list = [
+    agg('muse-video', ''), agg('grok-imagine-video-1.5', 'xAI'), agg('omni-flash-video', 'Google'),
+    agg('veo-3.1', 'Google'), agg('wan3.0-video', '阿里云'), agg('minimax-h3', 'MiniMax'),
+    agg('seedance-2.5', '字节跳动'),
+  ].map((a) => ({ ...a, cat: 'video' }))
+  const names = orderDefault(list, { catOf: () => 'video', catOrder: ['video'] }).map((x) => x.name)
+  assert.deepEqual(names, [
+    'seedance-2.5', 'minimax-h3', 'wan3.0-video', 'veo-3.1',
+    'omni-flash-video', 'grok-imagine-video-1.5', 'muse-video',
+  ])
+})

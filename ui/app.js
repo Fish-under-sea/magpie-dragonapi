@@ -663,7 +663,7 @@ const CATEGORY_META = {
 // 「可灵 / 即梦」这类词的分组会被国模抢走。
 const CATEGORY_TESTS = [
   ['image', /image|img|生图|绘图|draw|flux|midjourney|dall|stable|sdxl/i],
-  ['video', /video|视频|veo|sora|runway|pika|hailuo|可灵|kling|万相|seedance|muse/i],
+  ['video', /video|视频|veo|sora|runway|pika|hailuo|\bh3\b|可灵|kling|万相|seedance|muse/i],
   ['claude', /claude|anthropic|kiro/i],
   ['gpt', /gpt|openai|codex|davinci|o[134]\b/i],
   ['gemini', /gemini|google|bard/i],

@@ -51,3 +51,4 @@
 - Responses API：`@ai-sdk/openai` 是 Responses 协议（chat 是 `@ai-sdk/openai-compatible`）。模型只声明 `openai-response` 时自动走 Responses；同时支持 chat 时默认 chat，由 `auth.options` 的 `responsesFirst` 开关切过去。开关通过 `input.magpie.option(PROVIDER_ID, 'responsesFirst')` 读，改完宿主会自动重新列模型。
 
 - magpie 编辑器的「自动/OpenAI/Anthropic/Responses」是按**模型表里实际出现过的协议**归纳出来的；插件供应商没有独立协议地址可填。所以「Responses 选项不出现」= 没有任何模型用 `@ai-sdk/openai`。打开 `responsesFirst` 后 OpenAI 系模型全部改走 `@ai-sdk/openai`，开关才会出现，之后可按模型改回 OpenAI。
+- 「自动」协议 = 模型自己声明的 npm。要让它等于 chat，模型就必须是 `@ai-sdk/openai-compatible`；要让它出现在切换器里，就必须至少有一个模型是 `@ai-sdk/openai`。插件供应商没有独立协议地址，二者只能靠模型表体现，所以默认把对话模型放在 Responses（`responsesFirst` 默认 true），逐个模型可再选 OpenAI。

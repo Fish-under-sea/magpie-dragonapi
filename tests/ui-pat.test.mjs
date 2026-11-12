@@ -82,7 +82,7 @@ test('用量读取失败会同时更新日志和概览，不保留旧数据', as
   assert.match(fn('renderLogs'), /cache\.usageErrors/)
 })
 
-test('PAT-only 账户显示钱包，绑定钥匙单独标记且不合并余额', () => {
+test('PAT-only 账户只显示主钱包，绑定钥匙额度不再占卡', () => {
   const { c, get, run } = harness(['renderAccounts', 'splitMoney'])
   c.cache.state = { pat: { set: true }, user: { username: 'PAT User', balance: '$12.00', used: '$2.00' }, accounts: [] }
   run('renderAccounts()')
@@ -92,9 +92,8 @@ test('PAT-only 账户显示钱包，绑定钥匙单独标记且不合并余额',
   c.cache.state.accounts = [{ label: 'Key', balance: '$90.00' }]
   run('renderAccounts()')
   shown = JSON.stringify(get('#account-body').children)
-  assert.match(shown, /钥匙额度/)
-  assert.match(shown, /90.00/)
-  // 钱包与钥匙额度各自展示，不求和（旧实现会把两者相加冒充钱包）
+  assert.doesNotMatch(shown, /钥匙额度/, '钱包只显示主账户，钥匙额度卡已移除')
+  assert.doesNotMatch(shown, /90.00/, '不能把绑定钥匙额度画进钱包')
   assert.match(shown, /12.00/)
 })
 

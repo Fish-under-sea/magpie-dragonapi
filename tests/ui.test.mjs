@@ -700,14 +700,23 @@ test('推荐计划：恢复成跨整行长条，并带「转入余额」', async
     assert.match(js, new RegExp(cls), `推荐计划缺少 ${cls}`)
   }
   assert.match(js, /用户通过你的推荐链接注册后/, '缺少站点原话说明')
-  assert.match(js, /affTransferArmedUntil/, '转入需二次确认（沙箱里 confirm 会被拦成 false）')
-  assert.match(js, /api\.transferAff\(\)/, '应调用 /api/aff/transfer')
-  assert.match(js, /'确认转入'/, '第一下应提示确认')
+  assert.match(js, /openAffTransfer/, '转入要走浮窗输入金额')
+  assert.match(js, /aff-modal/, '缺少转入余额浮窗')
+  assert.match(js, /api\.transferAff\(\{ quota:/, '应把金额换算成 quota 发给 /api/aff/transfer')
+  assert.match(js, /最低转入 1 元/, '要提示站点最低 1 元')
 })
 
 test('转入余额：服务端转发站点的 /api/user/aff_transfer，不编结论', async () => {
   // fixture 设了 PAT 但站点是 example.test（不可达）：应如实报失败。
-  const svc = await (await fetch(base + '/api/aff/transfer', { method: 'POST' })).json()
+  const tooSmall = await (await fetch(base + '/api/aff/transfer', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ quota: 1 }),
+  })).json()
+  assert.equal(tooSmall.ok, false, '低于最低 1 元不能发出去：' + JSON.stringify(tooSmall))
+  assert.match(tooSmall.error || '', /最低/, '要说明最低 1 元')
+
+  const svc = await (await fetch(base + '/api/aff/transfer', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ quota: 500000 }),
+  })).json()
   assert.equal(svc.ok, false, '站点不可达时不能报成功：' + JSON.stringify(svc))
   assert.match(svc.error || '', /转入失败/, '失败要说清是转入失败')
   // lib/ 不是静态目录，源码直接从磁盘读

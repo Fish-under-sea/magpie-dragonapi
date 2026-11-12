@@ -259,7 +259,7 @@ const api = {
   keys: () => request('/api/keys'),
   aff: () => request('/api/aff'),
   subscriptions: () => request('/api/subscriptions'),
-  transferAff: () => request('/api/aff/transfer', { method: 'POST' }),
+  transferAff: (body) => request('/api/aff/transfer', { method: 'POST', body }),
   createKey: (body) => request('/api/keys', { method: 'POST', body }),
   updateKey: (id, body) => request(`/api/keys/${encodeURIComponent(id)}`, { method: 'PUT', body }),
   deleteKey: (id) => request(`/api/keys/${encodeURIComponent(id)}`, { method: 'DELETE' }),
@@ -1470,9 +1470,6 @@ function subscriptionCard(s) {
 // 站点 /api/user/aff 的字段名随部署而变（aff_count/aff_quota 是 New API 常见写法，
 // 「待确认」没有公认键名），所以每列只在真拿到数字时才渲染。
 
-/** 转入余额需二次确认：第一下改成「确认转入」，5 秒内再点才真的发请求。 */
-let affTransferArmedUntil = 0;
-
 function renderAff() {
   const box = $('#aff-body');
   if (!box) return;
@@ -1485,12 +1482,12 @@ function renderAff() {
 
   const link = d.link || '';
   const a = d.aff || {};
+  const per = Number(d.per) > 0 ? Number(d.per) : 500000;
   // 三列：待确认（站点给才显示）/ 总收入 / 邀请。只认真实值，不拿 0 假装同步过。
   const pending = Number.isFinite(a.pending) ? moneyRaw(a.pending) : null;
   const total = Number.isFinite(a.historyQuota) ? moneyRaw(a.historyQuota) : null;
   const invites = Number.isFinite(a.count) ? fmtInt(a.count) : null;
   const canTransfer = Number.isFinite(a.quota) && a.quota > 0;
-  const armed = Date.now() < affTransferArmedUntil;
 
   // replaceChildren 收 null 会把它印成字符串「null」——先过滤再加。
   box.replaceChildren(...[
@@ -1512,16 +1509,17 @@ function renderAff() {
       link
         ? h('button', {
           class: 'rf-copy', type: 'button', title: '复制推荐链接', 'aria-label': '复制推荐链接',
-          onclick: (ev) => copyText(link, ev.currentTarget, '已复制'),
+          // 按钮只有 30px 宽；「已复制」会竖排溢出，用对勾表示成功。
+          onclick: (ev) => copyText(link, ev.currentTarget, '✓'),
         }, copyIcon())
         : null,
       canTransfer
         ? h('button', {
-          class: `btn primary rf-transfer${armed ? ' is-armed' : ''}`,
+          class: 'btn primary rf-transfer',
           type: 'button',
           title: '把累计奖励转到余额（站点上的真实资金操作）',
-          onclick: (ev) => transferAffRewards(ev.currentTarget),
-        }, armed ? '确认转入' : '转移到余额')
+          onclick: () => openAffTransfer(a, per, d.symbol || '$'),
+        }, '转移到余额')
         : null),
   ].filter(Boolean));
 }
@@ -1533,29 +1531,64 @@ function rfStat(k, v) {
     h('div', { class: 'rf-v', text: v }));
 }
 
-/** transferAffRewards 转账：两段式确认（沙箱里 window.confirm 会被拦成 false）。 */
-async function transferAffRewards(btn) {
-  if (Date.now() >= affTransferArmedUntil) {
-    affTransferArmedUntil = Date.now() + 5000;
-    renderAff();
-    banner('info', '再点一次「确认转入」，就会把累计奖励转进余额。', { key: 'aff-transfer', timeout: 5000 });
-    return;
-  }
+/** closeAffTransfer 关掉转入浮窗。 */
+function closeAffTransfer() {
+  const m = document.querySelector('.aff-modal');
+  if (m) m.remove();
+}
 
-  affTransferArmedUntil = 0;
-  btn.disabled = true;
-  btn.textContent = '转入中…';
-  try {
-    const r = await api.transferAff();
-    banner(r.ok ? 'ok' : 'warn', r.message || (r.ok ? '已转入余额' : '站点没有说明原因'), { key: 'aff-transfer' });
-    await Promise.all([loadAff(true), loadState(true)]);
-    renderAccounts();
-  } catch (err) {
-    banner('error', `转入失败：${describeError(err)}`, { key: 'aff-transfer' });
-  } finally {
-    btn.disabled = false;
-    renderAff();
-  }
+/**
+ * openAffTransfer：和上游一样的浮窗输入金额，最低 1 元。
+ * 站点 /api/user/aff_transfer 要 JSON body（quota 内部单位），不带会 EOF。
+ */
+function openAffTransfer(a, per, symbol) {
+  closeAffTransfer();
+  const available = Number(a?.quota) > 0 ? Number(a.quota) / per : 0;
+  const amount = h('input', {
+    class: 'aff-amount', type: 'number', min: '1', step: '0.01', inputmode: 'decimal',
+    value: available >= 1 ? String(Math.floor(available * 100) / 100) : '1',
+    'aria-label': '转入金额',
+  });
+  const error = h('p', { class: 'aff-modal-error', role: 'alert' });
+  const confirm = h('button', { class: 'btn primary', type: 'button' }, '确认转入');
+  const overlay = h('div', { class: 'aff-modal', role: 'dialog', 'aria-modal': 'true', 'aria-label': '转入余额' },
+    h('div', { class: 'aff-modal-panel' },
+      h('h3', { text: '转入余额' }),
+      h('p', {
+        class: 'aff-modal-hint',
+        text: `可转奖励 ${symbol}${available.toFixed(2)}；单次最低 1 元，按站点规则换算成 quota。`,
+      }),
+      h('label', { class: 'aff-modal-field' }, '转入金额', amount),
+      error,
+      h('div', { class: 'aff-modal-actions' },
+        h('button', { class: 'btn ghost', type: 'button', onclick: closeAffTransfer }, '取消'),
+        confirm)));
+  overlay.addEventListener('click', (ev) => { if (ev.target === overlay) closeAffTransfer(); });
+  const onKey = (ev) => { if (ev.key === 'Escape') { closeAffTransfer(); document.removeEventListener('keydown', onKey); } };
+  document.addEventListener('keydown', onKey);
+  confirm.addEventListener('click', async () => {
+    const yuan = Number(amount.value);
+    if (!Number.isFinite(yuan) || yuan < 1) { error.textContent = '最低转入 1 元。'; return; }
+    if (available > 0 && yuan > available + 1e-6) { error.textContent = `最多可转 ${symbol}${available.toFixed(2)}。`; return; }
+    error.textContent = '';
+    confirm.disabled = true;
+    confirm.textContent = '转入中…';
+    try {
+      const r = await api.transferAff({ quota: Math.round(yuan * per) });
+      closeAffTransfer();
+      document.removeEventListener('keydown', onKey);
+      banner(r.ok ? 'ok' : 'warn', r.message || (r.ok ? '已转入余额' : '站点没有说明原因'), { key: 'aff-transfer' });
+      await Promise.all([loadAff(true), loadState(true)]);
+      renderAccounts();
+    } catch (err) {
+      error.textContent = `转入失败：${describeError(err)}`;
+      confirm.disabled = false;
+      confirm.textContent = '确认转入';
+    }
+  });
+  document.body.append(overlay);
+  amount.focus();
+  amount.select();
 }
 
 /** 分享图标：三个节点由连线相接（与原站同一图形语言），放在圆形底上。 */
@@ -1623,10 +1656,8 @@ function renderAccounts() {
 
   const bound = Array.isArray(st.accounts) ? st.accounts : Object.values(st.accounts || {});
   const user = st.user;
-  const accounts = [
-    ...(user ? [{ ...user, wallet: true, label: user.displayName || user.username, models: undefined }] : []),
-    ...bound,
-  ];
+  // 钱包只显示主账户；绑定钥匙的额度不再各占一张卡（它们仍在上方计数与密钥页）。
+  const accounts = user ? [{ ...user, wallet: true, label: user.displayName || user.username, models: undefined }] : [];
   if (sub) sub.textContent = [user ? 'PAT 账户钱包' : '', bound.length ? `${bound.length} 把绑定钥匙` : ''].filter(Boolean).join(' · ');
   // 空态时让说明在卡里居中，而不是顶在上面、下面留一大片空白
   box.classList.toggle('is-empty', accounts.length === 0);

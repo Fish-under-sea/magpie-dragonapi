@@ -320,19 +320,59 @@ export default async function dragonapi(input, options) {
         const key = found?.secret || ''
         return {
           apiKey: key,
-          baseURL: ctx.site + '/v1',
+          // 不写 baseURL：每个模型在自己 api.url 上按自己的协议（openai/
+          // anthropic/gemini）发请求。全局 base 会把所有模型压回同一个协议。
           fetch: async (input_, init) => {
+            // 每个模型按自己的协议发出：OpenAI 兼容把模型放在 body 里，
+            // Gemini 放在 URL 的 /models/<模型>:generateContent 里，
+            // Anthropic 又在 body 里。所以两处都要还原裸模型名。
+            const href = (() => {
+              try { return String(typeof input_ === 'string' ? input_ : input_?.url || '') } catch { return '' }
+            })()
+
+            /** bareModel 去掉 `分组/` 前缀，只留站点认的模型名。 */
+            const bareModel = (v) => {
+              if (typeof v !== 'string' || !v.includes('/')) return ''
+              const cut = v.indexOf('/')
+              return v.slice(cut + 1)
+            }
+
+            // Gemini：/v1beta/models/<id>:generateContent，id 可能被 URL 编码成 %2F
+            let nextHref = href
+            if (href.includes('/models/')) {
+              const q = href.indexOf('?')
+              const head = q < 0 ? href : href.slice(0, q)
+              const tail = q < 0 ? '' : href.slice(q)
+              const marker = '/models/'
+              const at = head.indexOf(marker)
+              if (at >= 0) {
+                const after = head.slice(at + marker.length)
+                const decoded = decodeURIComponent(after)
+                // `模型:generateContent` —— 冒号后面是动作，只能编码模型名那一段。
+                const colon = decoded.lastIndexOf(':')
+                const namePart = colon < 0 ? decoded : decoded.slice(0, colon)
+                const action = colon < 0 ? '' : decoded.slice(colon)
+                const bare = bareModel(namePart)
+                if (bare && bare !== namePart) {
+                  nextHref = head.slice(0, at + marker.length) + encodeURIComponent(bare) + action + tail
+                }
+              }
+            }
+
             const body = init?.body
-            if (typeof body !== 'string') return fetch(input_, init)
+            if (typeof body !== 'string') {
+              return nextHref !== href ? fetch(nextHref, init) : fetch(input_, init)
+            }
             let parsed
-            try { parsed = JSON.parse(body) } catch { return fetch(input_, init) }
-            const raw = parsed?.model
-            if (typeof raw !== 'string' || !raw.includes('/')) return fetch(input_, init)
+            try { parsed = JSON.parse(body) } catch {
+              return nextHref !== href ? fetch(nextHref, init) : fetch(input_, init)
+            }
+            const bare = bareModel(parsed?.model)
+            if (!bare) return nextHref !== href ? fetch(nextHref, init) : fetch(input_, init)
             // `分组/模型` → `模型`。分组已经由账号选定了，请求里不需要它。
-            const bare = raw.slice(raw.indexOf('/') + 1)
-            if (!bare) return fetch(input_, init)
             parsed.model = bare
-            return fetch(input_, { ...init, body: JSON.stringify(parsed) })
+            const url = nextHref !== href ? nextHref : input_
+            return fetch(url, { ...init, body: JSON.stringify(parsed) })
           },
         }
       },

@@ -174,7 +174,8 @@ test('对话模型带 reasoning 与 variants，功能模型带 kind', async () =
 test('loader 给出 baseURL 与钥匙，且把「分组/模型」还原成裸模型名', async () => {
   const key = 'sk-' + 'b'.repeat(48)
   const loader = await plugin.auth.loader(async () => ({ key, metadata: { group: 'gpt-plus' } }))
-  assert.equal(loader.baseURL, 'https://example.test/v1')
+  // 不设全局 base：每个模型用自己的 api.url / 协议
+  assert.equal(loader.baseURL, undefined)
   assert.equal(loader.apiKey, key)
   assert.equal(typeof loader.fetch, 'function')
 
@@ -262,4 +263,20 @@ test('插件加载不等网络：站点挂住也必须立刻返回', async () =>
     await slowPlugin.dispose()
     silent.close()
   }
+})
+
+test('loader 在 Gemini 协议的 URL 里也把「分组/模型」还原成裸模型名', async () => {
+  const loader = await plugin.auth.loader(async () => ({ key: 'sk-x', metadata: { group: 'image' } }))
+  let seen = null
+  const realFetch = globalThis.fetch
+  globalThis.fetch = async (url) => { seen = String(url); return new Response('{}', { status: 200 }) }
+  try {
+    await loader.fetch('https://example.test/v1beta/models/image%2Fgemini-3-pro-image-preview:generateContent', {
+      method: 'POST', body: JSON.stringify({ contents: [] }),
+    })
+  } finally {
+    globalThis.fetch = realFetch
+  }
+  assert.match(seen, /models\/gemini-3-pro-image-preview:generateContent/, `URL 里的分组前缀没去掉：${seen}`)
+  assert.doesNotMatch(seen, /image%2F|image\//, '不许把分组名带进 URL')
 })

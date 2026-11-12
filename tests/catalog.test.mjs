@@ -237,3 +237,22 @@ test('image 分组里 endpoint 写 openai 的生图模型也归为 image，不�
   assert.equal(m.capabilities.output.text, false, '生图模型不向 LLM 输出文本')
   assert.equal('variants' in m, false, '生图模型不该带 LLM 的思考强度档位')
 })
+test('per-model protocol: Claude 走 Anthropic 根地址，Gemini 走 /v1beta', () => {
+  const c = buildCatalog(snapshot, { cur: CUR, site: SITE })
+  const claudeRow = c.rows.find((r) => r.name === 'claude-opus-5-5')
+  assert.ok(claudeRow, '快照里应有 claude-opus-5-5')
+  const claude = c.models[claudeRow.id]
+  assert.equal(claude.api.npm, '@ai-sdk/anthropic')
+  assert.equal(claude.api.url, SITE, 'Anthropic 的 base 是根地址')
+
+  const gemRow = c.rows.find((r) => r.name === 'gemini-3-pro-image-preview')
+  assert.ok(gemRow, '快照里应有 gemini 图像模型')
+  const gem = c.models[gemRow.id]
+  assert.equal(gem.api.npm, '@ai-sdk/google')
+  assert.equal(gem.api.url, SITE + '/v1beta')
+
+  const bananaRow = c.rows.find((r) => r.name === 'banana-pro-1k')
+  const banana = c.models[bananaRow.id]
+  assert.equal(banana.api.npm, '@ai-sdk/openai-compatible')
+  assert.equal(banana.api.url, SITE + '/v1')
+})

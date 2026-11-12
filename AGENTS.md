@@ -43,3 +43,8 @@
 - 生图模型经常把 `supported_endpoint_types` 写成 `openai`/`gemini`，只按 endpoint 判断会漏进 LLM。`kindOf` 必须同时看 `enable_groups`（image/图像/生图/绘图/绘画）与 `tags`，归为 `image`，并且不要给它们加 `variants`。
 - 对话模型的思考强度档位要覆盖站点实际值：`minimal / low / medium / high / xhigh / max`，不要只给三档。
 - 生图模型的 `capabilities.output` 必须是 `image:true, text:false`；`text:true` 会被 magpie 当成可对话文本模型，导致既不进 LLM 也进不了 Image models 选择器。
+
+## 每个模型走自己的协议端点
+- `npmOf` 按 `supported_endpoint_types` 给模型定协议：有 `anthropic` → `@ai-sdk/anthropic`，有 `gemini` → `@ai-sdk/google`，其余 `@ai-sdk/openai-compatible`。`apiFor` 同时给出对应 base：Anthropic 是根地址，Gemini 是 `/v1beta`，OpenAI 兼容是 `/v1`。
+- `loader` **不要**写全局 `baseURL`：写死会把所有模型压回同一个协议。magpie 的取值顺序是 loader.baseURL → 模型自己的 `api.url` → provider 的 `api` → npm 默认。
+- Gemini 把模型名放在 URL `/models/<id>:generateContent` 里，所以 `loader.fetch` 除了改 body 的 `model`，还要把 URL 里的 `分组/模型` 还原成裸模型名；`:` 后面的动作段不能被编码。

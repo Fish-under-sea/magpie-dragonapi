@@ -161,7 +161,7 @@ test('输出价不能低于输入价（真实站点上不该出现这种定价�
   const bad = []
   for (const r of c.rows) {
     const p = r.pricing
-    if (p.kind !== 'ratio' && p.kind !== 'tiered') continue
+    if (p.kind !== 'ratio' && p.kind !== 'tiered' && p.kind !== 'flat') continue
     const inNum = Number(String(p.input).replace(/[^0-9.]/g, ''))
     const outNum = Number(String(p.output).replace(/[^0-9.]/g, ''))
     if (!Number.isFinite(inNum) || !Number.isFinite(outNum)) continue

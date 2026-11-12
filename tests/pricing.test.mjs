@@ -103,7 +103,7 @@ test('priceOf：倍率计费要乘分组倍率', () => {
   assert.equal(p.output, '$1.00/M')
 })
 
-test('priceOf：同时给可计算的数值（页面要切 /1K 与按价格排序）', () => {
+test('priceOf：同时给可计算的数值（页面要切 /1M 与 /272K、按价格排序）', () => {
   const row = { quota_type: 0, model_ratio: 1, completion_ratio: 5, cache_ratio: 0.1 }
   const p = priceOf(row, 0.1, CUR)
   // 2 × 0.1、10 × 0.1、0.2 × 0.1
@@ -128,6 +128,35 @@ test('priceOf：表达式计费取第一档的 p / c 系数', () => {
   // 多档时 note 要说清「上表是哪一档」，不能让用户以为那就是全部
   assert.match(p.note, /short_context/)
   assert.match(p.note, /2 档/)
+})
+
+test('priceOf：单档表达式算「按量计费」，fast 这类整单倍率写进说明', () => {
+  const row = {
+    quota_type: 0,
+    billing_mode: 'tiered_expr',
+    billing_expr: 'tier("standard", p * 4 + c * 20 + cr * 0.2) * (param("speed") == "fast" ? 2 : 1)',
+  }
+  const p = priceOf(row, 1, CUR)
+  // 只有一个档位就不是分档：站点这类模型只有 fast 倍率，标成「分档」会误导
+  assert.equal(p.kind, 'flat')
+  assert.equal(p.input, '$4.00/M')
+  assert.equal(p.output, '$20.00/M')
+  assert.match(p.note, /standard/)
+  assert.match(p.note, /speed=fast/)
+  assert.match(p.note, /×2/)
+})
+
+test('priceOf：多档仍是「分档计费」，service_tier 的多个取值合并成一句', () => {
+  const row = {
+    quota_type: 0,
+    billing_mode: 'tiered_expr',
+    billing_expr: '(len <= 272000 ? tier("short_context", p*2 + c*10) : tier("long_context", p*4 + c*15)) * (param("service_tier") == "priority" ? 2 : 1) * (param("service_tier") == "fast" ? 2 : 1)',
+  }
+  const p = priceOf(row, 1, CUR)
+  assert.equal(p.kind, 'tiered')
+  assert.match(p.note, /short_context/)
+  assert.match(p.note, /service_tier=priority\/fast/)
+  assert.match(p.note, /×2/)
 })
 
 test('priceOf：表达式解析不出来时明确说未知，不编价格', () => {

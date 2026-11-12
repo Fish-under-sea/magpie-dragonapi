@@ -30,6 +30,8 @@ import { startService } from './lib/service.mjs'
 const PROVIDER_ID = 'dragonapi'
 /** 站点给这把钥匙起的名字前缀，便于用户在控制台认出来。 */
 const KEY_NAME = 'Magpie'
+/** 「优先走 Responses API」开关的 key（magpie 的 auth.options）。 */
+const OPT_RESPONSES = 'responsesFirst'
 
 /**
  * 插件状态。全部放在闭包里，一个进程一份。
@@ -115,6 +117,18 @@ function makeContext(input, options) {
     remember,
     catalog,
     status,
+    /**
+     * preferResponses 读「优先走 Responses API」开关。
+     *
+     * 站点有些模型同时支持 chat 与 Responses；默认走 chat 兼容性最好，
+     * 用户打开这个开关后，声明了 openai-response 的模型改用 Responses。
+     */
+    preferResponses() {
+      try {
+        const v = input?.magpie?.option?.(PROVIDER_ID, OPT_RESPONSES)
+        return v === true
+      } catch { return false }
+    },
     noteModelsError: (why) => { state.lastModelsError = why },
   }
 }
@@ -197,6 +211,18 @@ export default async function dragonapi(input, options) {
 
     auth: {
       provider: PROVIDER_ID,
+      /**
+       * options 是 magpie 自己的开关声明（OpenCode 不读）。用户在插件编辑器里
+       * 打开后，声明了 openai-response 的模型改用 Responses API。
+       */
+      options: [
+        {
+          key: OPT_RESPONSES,
+          label: '优先 Responses API',
+          description: '同时支持 chat 与 Responses 的模型改用 Responses API；关掉则走 chat completions。',
+          default: false,
+        },
+      ],
       get icon() {
         // 站点图标（Ciallo 立绘）：包内 png 编成 data URI。宿主只收 https 与
         // data:image，联网抓会在断网时变成灰书页。
@@ -404,7 +430,7 @@ export default async function dragonapi(input, options) {
           const st = await ctx.status.get({})
           const cur = currencyOf(st)
           const built = cat.env
-            ? buildCatalog(cat.env, { cur, enabledGroups: [], site: ctx.site })
+            ? buildCatalog(cat.env, { cur, enabledGroups: [], site: ctx.site, preferResponses: ctx.preferResponses() })
             : { models: {}, rows: [], groups: [] }
 
           // 保护 1：列表单调不减。站点偶发少给几个模型时用上一次实时表补齐，
@@ -552,7 +578,7 @@ async function authorizeKey(ctx, key) {
   const cat = await ctx.catalog.get({})
   const st = await ctx.status.get({})
   const built = cat.env
-    ? buildCatalog(cat.env, { cur: currencyOf(st), enabledGroups: [], site: ctx.site })
+    ? buildCatalog(cat.env, { cur: currencyOf(st), enabledGroups: [], site: ctx.site, preferResponses: ctx.preferResponses() })
     : { models: {} }
   const known = new Set(Object.keys(built.models).map((id) => {
     const cut = id.indexOf('/')

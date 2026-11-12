@@ -266,6 +266,8 @@ const api = {
   revealKey: (id) => request(`/api/keys/${encodeURIComponent(id)}/reveal`, { method: 'POST' }),
   bindInfo: () => request('/api/bind-info'),
   health: () => request('/api/health'),
+  prefs: () => request('/api/prefs'),
+  savePrefs: (body) => request('/api/prefs', { method: 'PUT', body }),
 };
 
 // ── 提示条：所有失败都必须在界面上说话 ────────────────────
@@ -1865,7 +1867,7 @@ const LOG_COLS = [
 const logFilter = { model: '', group: '', kind: '', tokenName: '', requestId: '', upRequestId: '' };
 const logView = {
   page: 1, pageSize: 20, more: false, private: false, colsOpen: false,
-  cols: new Set(['time', 'key', 'model', 'flow', 'tokens', 'cost', 'duration', 'detail']),
+  cols: new Set(['time', 'key', 'model', 'flow', 'tokens', 'cost', 'duration']),
 };
 
 /** secs 秒数带单位：4.5 → 4.5s。 */
@@ -2010,6 +2012,7 @@ function renderLogs() {
               ev.stopPropagation();
               if (logView.cols.has(c.id)) { if (logView.cols.size > 1) logView.cols.delete(c.id); }
               else logView.cols.add(c.id);
+              saveColPrefs();
               renderLogs();
             },
           }, c.label))),
@@ -2943,6 +2946,33 @@ const KEY_COLS = [
 ];
 const keysView = new Set(['name', 'status', 'key', 'group', 'time', 'expire']);
 
+// 「查看」列的偏好记在服务进程里：沙箱 iframe 没有 localStorage，
+// 只存浏览器刷新就丢；服务活着就能跨刷新恢复。
+const colPrefs = { loaded: false, timer: 0 };
+function applyColPrefs(p) {
+  const logIds = new Set(LOG_COLS.map((c) => c.id));
+  const keyIds = new Set(KEY_COLS.map((c) => c.id));
+  if (Array.isArray(p?.logCols)) {
+    const saved = p.logCols.filter((id) => logIds.has(id));
+    if (saved.length) logView.cols = new Set(saved);
+  }
+  if (Array.isArray(p?.keysCols)) {
+    const saved = p.keysCols.filter((id) => keyIds.has(id));
+    if (saved.length) keysView.clear(), saved.forEach((id) => keysView.add(id));
+  }
+}
+async function loadColPrefs() {
+  if (colPrefs.loaded) return;
+  try { applyColPrefs(await api.prefs()); } catch { /* 服务不支持就用默认列 */ }
+  colPrefs.loaded = true;
+}
+function saveColPrefs() {
+  clearTimeout(colPrefs.timer);
+  colPrefs.timer = setTimeout(() => {
+    api.savePrefs({ logCols: [...logView.cols], keysCols: [...keysView] }).catch(() => {});
+  }, 150);
+}
+
 const keysFilter = { name: '', key: '', status: '' };
 const keysSel = new Set();
 
@@ -3125,7 +3155,11 @@ function renderKeys() {
     const cells = {
       name: h('td', { class: 'keys-name', text: k.name || '未命名' }),
       status: h('td', null, h('span', { class: `keys-status ${status.cls.includes('ok') ? 'on' : 'off'}`, text: status.label })),
-      key: h('td', null, h('span', { class: 'keys-key' }, k.masked || '—', copyButton(k.masked || '', '⧉'))),
+      key: h('td', null, h('span', { class: 'keys-key' }, k.masked || '—',
+      h('button', {
+        class: 'btn ghost', type: 'button', title: '复制完整密钥',
+        onclick: () => copyKeySecret(k),
+      }, '⧉'))),
       quota: h('td', { class: 'keys-quota', title: Number.isFinite(k.used) ? `已用 ${fmtInt(k.used)} quota` : null },
         k.unlimited ? '无限制' : moneyRaw(k.remain)),
       group: h('td', null, k.group
@@ -3175,6 +3209,7 @@ function renderKeys() {
         ev.stopPropagation();
         if (keysView.has(c.id)) { if (keysView.size > 1) keysView.delete(c.id); }
         else keysView.add(c.id);
+        saveColPrefs();
         renderKeys();
       },
     }, h('span', { class: 'keys-check-mark', text: keysView.has(c.id) ? '✓' : '' }), c.label)));
@@ -4277,6 +4312,8 @@ async function boot() {
   bindKeysFilter();
   bindPatControls();
   bindDrawer();
+
+  await loadColPrefs();
 
   const params = new URLSearchParams(location.search);
   const wanted = params.get('tab');

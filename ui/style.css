@@ -115,7 +115,7 @@ a { color: var(--accent); }
 .app {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 18px 22px 24px;
+  padding: 18px 22px 8px;
   /* 外壳定高不滚：顶部（页头/标签/提示）与页脚钉住，主内容区自己滚 */
   height: 100%;
   display: flex;

@@ -165,3 +165,18 @@ test('fmtStamp 输出 MM-DD HH:mm', () => {
   assert.equal(fmtStamp(0), '')
   assert.equal(fmtStamp(undefined), '')
 })
+
+test('详情列解析 tiered_expr 的单价，不再显示错误的 0 / 0', () => {
+  const expr = 'tier("short_context", p * 2 + c * 10 + cr * 0.1)'
+  const rows = rowsOf([{
+    created_at: 1762700000,
+    model_name: 'gpt-6.1-sol',
+    other: JSON.stringify({
+      matched_tier: 'short_context',
+      expr_b64: Buffer.from(expr, 'utf8').toString('base64'),
+      model_ratio: 0,
+      completion_ratio: 0,
+    }),
+  }], CUR)
+  assert.equal(rows[0].detail, 'short_context · $2 / $10/M')
+})

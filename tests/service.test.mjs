@@ -675,3 +675,15 @@ test('/aff returns real history, omits missing columns and does not hide authori
     assert.equal((await r.json()).ok, false)
   })
 })
+
+test('列偏好记在服务里，刷新页面不会丢', async () => {
+  const put = await fetch(base + '/api/prefs', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ logCols: ['time', 'cost'], keysCols: ['name', 'key'] }),
+  })
+  assert.equal(put.status, 200)
+  const j = await (await fetch(base + '/api/prefs')).json()
+  assert.deepEqual(j.logCols, ['time', 'cost'])
+  assert.deepEqual(j.keysCols, ['name', 'key'])
+})

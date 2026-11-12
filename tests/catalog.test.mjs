@@ -234,5 +234,6 @@ test('image 分组里 endpoint 写 openai 的生图模型也归为 image，不�
   const m = c.models[row.id]
   assert.equal(m.kind, 'image')
   assert.equal(m.capabilities.output.image, true)
+  assert.equal(m.capabilities.output.text, false, '生图模型不向 LLM 输出文本')
   assert.equal('variants' in m, false, '生图模型不该带 LLM 的思考强度档位')
 })

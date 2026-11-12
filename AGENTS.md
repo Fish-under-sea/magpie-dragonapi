@@ -42,3 +42,4 @@
 ## 模型分类与思考强度
 - 生图模型经常把 `supported_endpoint_types` 写成 `openai`/`gemini`，只按 endpoint 判断会漏进 LLM。`kindOf` 必须同时看 `enable_groups`（image/图像/生图/绘图/绘画）与 `tags`，归为 `image`，并且不要给它们加 `variants`。
 - 对话模型的思考强度档位要覆盖站点实际值：`minimal / low / medium / high / xhigh / max`，不要只给三档。
+- 生图模型的 `capabilities.output` 必须是 `image:true, text:false`；`text:true` 会被 magpie 当成可对话文本模型，导致既不进 LLM 也进不了 Image models 选择器。

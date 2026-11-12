@@ -48,7 +48,7 @@
 - `npmOf` 按 `supported_endpoint_types` 给模型定协议：有 `anthropic` → `@ai-sdk/anthropic`，有 `gemini` → `@ai-sdk/google`，其余 `@ai-sdk/openai-compatible`。`apiFor` 同时给出对应 base：Anthropic 是根地址，Gemini 是 `/v1beta`，OpenAI 兼容是 `/v1`。
 - `loader` **不要**写全局 `baseURL`：写死会把所有模型压回同一个协议。magpie 的取值顺序是 loader.baseURL → 模型自己的 `api.url` → provider 的 `api` → npm 默认。
 - Gemini 把模型名放在 URL `/models/<id>:generateContent` 里，所以 `loader.fetch` 除了改 body 的 `model`，还要把 URL 里的 `分组/模型` 还原成裸模型名；`:` 后面的动作段不能被编码。
-- Responses API：`@ai-sdk/openai` 是 Responses 协议（chat 是 `@ai-sdk/openai-compatible`）。模型只声明 `openai-response` 时自动走 Responses；同时支持 chat 时默认 chat，由 `auth.options` 的 `responsesFirst` 开关切过去。开关通过 `input.magpie.option(PROVIDER_ID, 'responsesFirst')` 读，改完宿主会自动重新列模型。
+- Responses：插件供应商**无法**在 magpie 编辑器里暴露 Responses 协议位。实测重开宿主后仍只有 OpenAI/Anthropic——magpie 把 `@ai-sdk/openai` 与 `@ai-sdk/openai-compatible` 都算 OpenAI(chat)，Responses 只对**自定义供应商**（可单独填 responses 地址）或账号级「任意协议」才出现。只有站点声明 `openai-response` 且没有普通 `openai` 的模型才用 `@ai-sdk/openai`。别再为这个加开关，加多少都不会出现。
 
-- magpie 编辑器的「自动/OpenAI/Anthropic/Responses」是按**模型表里实际出现过的协议**归纳出来的；插件供应商没有独立协议地址可填。所以「Responses 选项不出现」= 没有任何模型用 `@ai-sdk/openai`。打开 `responsesFirst` 后 OpenAI 系模型全部改走 `@ai-sdk/openai`，开关才会出现，之后可按模型改回 OpenAI。
-- 「自动」协议 = 模型自己声明的 npm。要让它等于 chat，模型就必须是 `@ai-sdk/openai-compatible`；要让它出现在切换器里，就必须至少有一个模型是 `@ai-sdk/openai`。插件供应商没有独立协议地址，二者只能靠模型表体现，所以默认把对话模型放在 Responses（`responsesFirst` 默认 true），逐个模型可再选 OpenAI。
+- 编辑器协议列表来自 `Provider.APIs`；插件供应商的 APIs 只有 Chat/Anthropic/Gemini（由模型 npm 推出），**没有 Responses**。用户要 Responses 只能走「自定义添加」供应商。
+- 自定义供应商的参考参数：chat `https://newapi.dragon3api.com/v1`、responses `https://newapi.dragon3api.com/v1`、anthropic `https://newapi.dragon3api.com`；账号级协议选「任意协议」。

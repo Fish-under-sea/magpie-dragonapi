@@ -30,8 +30,6 @@ import { startService } from './lib/service.mjs'
 const PROVIDER_ID = 'dragonapi'
 /** 站点给这把钥匙起的名字前缀，便于用户在控制台认出来。 */
 const KEY_NAME = 'Magpie'
-/** 「优先走 Responses API」开关的 key（magpie 的 auth.options）。 */
-const OPT_RESPONSES = 'responsesFirst'
 
 /**
  * 插件状态。全部放在闭包里，一个进程一份。
@@ -117,20 +115,7 @@ function makeContext(input, options) {
     remember,
     catalog,
     status,
-    /**
-     * preferResponses 读「走 Responses API」开关。
-     *
-     * 默认**开**：站点是 New API 部署，对话模型统一走 `/v1/responses`，
-     * 这样 magpie 的模型设置里才会出现 Responses 协议选项（协议选项是按
-     * 模型表里实际用到的协议归纳的）。关掉则退回 chat completions。
-     * 旧宿主不提供 option 时按默认（开）处理。
-     */
-    preferResponses() {
-      try {
-        const v = input?.magpie?.option?.(PROVIDER_ID, OPT_RESPONSES)
-        return v === undefined || v === null ? true : v === true
-      } catch { return true }
-    },
+
     noteModelsError: (why) => { state.lastModelsError = why },
   }
 }
@@ -213,18 +198,7 @@ export default async function dragonapi(input, options) {
 
     auth: {
       provider: PROVIDER_ID,
-      /**
-       * options 是 magpie 自己的开关声明（OpenCode 不读）。用户在插件编辑器里
-       * 打开后，声明了 openai-response 的模型改用 Responses API。
-       */
-      options: [
-        {
-          key: OPT_RESPONSES,
-          label: '走 Responses API',
-          description: '默认走 Responses API（模型设置里可看到 Responses 协议）；关掉退回 chat completions。',
-          default: true,
-        },
-      ],
+
       get icon() {
         // 站点图标（Ciallo 立绘）：包内 png 编成 data URI。宿主只收 https 与
         // data:image，联网抓会在断网时变成灰书页。
@@ -432,7 +406,7 @@ export default async function dragonapi(input, options) {
           const st = await ctx.status.get({})
           const cur = currencyOf(st)
           const built = cat.env
-            ? buildCatalog(cat.env, { cur, enabledGroups: [], site: ctx.site, preferResponses: ctx.preferResponses() })
+            ? buildCatalog(cat.env, { cur, enabledGroups: [], site: ctx.site })
             : { models: {}, rows: [], groups: [] }
 
           // 保护 1：列表单调不减。站点偶发少给几个模型时用上一次实时表补齐，
@@ -580,7 +554,7 @@ async function authorizeKey(ctx, key) {
   const cat = await ctx.catalog.get({})
   const st = await ctx.status.get({})
   const built = cat.env
-    ? buildCatalog(cat.env, { cur: currencyOf(st), enabledGroups: [], site: ctx.site, preferResponses: ctx.preferResponses() })
+    ? buildCatalog(cat.env, { cur: currencyOf(st), enabledGroups: [], site: ctx.site })
     : { models: {} }
   const known = new Set(Object.keys(built.models).map((id) => {
     const cut = id.indexOf('/')

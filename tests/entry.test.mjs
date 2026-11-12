@@ -280,32 +280,4 @@ test('loader 在 Gemini 协议的 URL 里也把「分组/模型」还原成裸�
   assert.match(seen, /models\/gemini-3-pro-image-preview:generateContent/, `URL 里的分组前缀没去掉：${seen}`)
   assert.doesNotMatch(seen, /image%2F|image\//, '不许把分组名带进 URL')
 })
-test('auth.options 声明 Responses 开关，默认开', () => {
-  const opts = plugin.auth.options
-  assert.ok(Array.isArray(opts) && opts.length, 'auth.options 应为数组')
-  const one = opts.find((o) => o.key === 'responsesFirst')
-  assert.ok(one, '缺少 responsesFirst 开关')
-  assert.equal(one.default, true, '默认走 Responses，模型设置里才有 Responses 协议')
-  assert.ok(one.label && one.description, '开关要有标签与说明')
-})
 
-test('打开 Responses 开关后，声明了 openai-response 的模型改用 Responses 协议', async () => {
-  const opts = { catalogStub: JSON.parse(readFileSync(join(here, '..', '证据-站点定价快照-2026-11-10.json'), 'utf8')) }
-  const offPlugin = await dragonapi({ directory: dir, magpie: { option: () => false } }, { port: 3634, site: 'https://example.test', ...opts })
-  const onPlugin = await dragonapi({ directory: dir, magpie: { option: () => true } }, { port: 3635, site: 'https://example.test', ...opts })
-  try {
-    const count = (models) => Object.values(models).filter((m) => m.api.npm === '@ai-sdk/openai').length
-    // 关掉开关：OpenAI 系模型走 chat，声明 openai-response 的模型仍走 Responses（站点说的）。
-    const offModels = await offPlugin.provider.models({}, {})
-    const gpt = Object.entries(offModels).find(([id]) => id.endsWith('/gpt-6-sol'))
-    if (gpt) assert.equal(gpt[1].api.npm, '@ai-sdk/openai-compatible', '关掉开关后 OpenAI 系模型走 chat')
-    assert.ok(count(offModels) < count(await onPlugin.provider.models({}, {})), '打开开关后走 Responses 的模型更多')
-    assert.ok(count(await onPlugin.provider.models({}, {})) > 0, '打开开关后应有模型走 Responses')
-    // 生图模型必须留在 openai-compatible，否则 magpie 画不出图
-    const onModels = await onPlugin.provider.models({}, {})
-    assert.equal(onModels['image/banana-pro-1k']?.api.npm, '@ai-sdk/openai-compatible')
-  } finally {
-    await offPlugin.dispose()
-    await onPlugin.dispose()
-  }
-})

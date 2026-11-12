@@ -174,10 +174,7 @@ test('输出价不能低于输入价（真实站点上不该出现这种定价�
 test('npmOf 按端点选方言', () => {
   assert.equal(npmOf({ supported_endpoint_types: ['openai'] }), '@ai-sdk/openai-compatible')
   assert.equal(npmOf({ supported_endpoint_types: ['openai-response'] }), '@ai-sdk/openai', '只支持 Responses 的模型走 Responses API')
-  assert.equal(npmOf({ supported_endpoint_types: ['openai', 'openai-response'] }), '@ai-sdk/openai-compatible', '两者都支持时默认 chat')
-  assert.equal(npmOf({ supported_endpoint_types: ['openai', 'openai-response'] }, { preferResponses: true }), '@ai-sdk/openai', '打开开关后走 Responses')
-  assert.equal(npmOf({ supported_endpoint_types: ['openai'] }, { preferResponses: true }), '@ai-sdk/openai', '打开开关后 OpenAI 系模型也走 Responses，否则编辑器里不会出现 Responses 选项')
-  assert.equal(npmOf({ supported_endpoint_types: ['openai'] }), '@ai-sdk/openai-compatible', '默认仍走 chat')
+  assert.equal(npmOf({ supported_endpoint_types: ['openai', 'openai-response'] }), '@ai-sdk/openai-compatible', '两者都支持时走 chat')
   assert.equal(npmOf({ supported_endpoint_types: ['anthropic'] }), '@ai-sdk/anthropic')
   assert.equal(npmOf({ supported_endpoint_types: ['gemini'] }), '@ai-sdk/google')
   assert.equal(npmOf({}), '@ai-sdk/openai-compatible')

@@ -134,6 +134,17 @@ test('套餐列表单独失败保留我的订阅，并显示原始错误说明',
   assert.doesNotMatch(rendered, /当前没有订阅记录/)
 })
 
+test('PAT 保存按钮不能依赖原生表单提交（magpie 沙箱没有 allow-forms）', () => {
+  const html = readFileSync(new URL('../ui/index.html', import.meta.url), 'utf8')
+  const save = html.match(/<button[^>]*id="pat-save"[^>]*>/)
+  assert.ok(save, '页面里应当有 PAT 保存按钮')
+  assert.match(save[0], /type="button"/, '保存按钮必须是 type=button：沙箱没有 allow-forms 时原生 submit 不会触发事件')
+
+  const bind = fn('bindPatControls')
+  assert.match(bind, /\$\('#pat-save'\)\.addEventListener\('click'/, '应直接给保存按钮绑定 click')
+  assert.doesNotMatch(bind, /addEventListener\('submit'/, '不能把保存挂在 form 的 submit 上')
+})
+
 test('粘贴 PAT 规范化与打码匹配用于保存超时后的核对', () => {
   const { run } = harness(['normalizePatInput', 'patHintOf'])
   assert.equal(run('normalizePatInput(\' "Authorization: Bearer nap_test123456" \' )'), 'nap_test123456')

@@ -2868,7 +2868,16 @@ async function onClearPat(btn) {
 }
 
 function bindPatControls() {
-  $('#pat-form').addEventListener('submit', onSavePat);
+  // 不能挂 form 的 submit：magpie 的插件页是 sandbox="allow-scripts"（没有
+  // allow-forms），原生表单提交会被浏览器在触发 submit 事件之前就拦下，
+  // 表现是点「保存」毫无反应、连「已提交」都不出现。所以保存走 click；
+  // 输入框里的回车也自己处理，避免隐式提交。
+  $('#pat-save').addEventListener('click', onSavePat);
+  $('#pat-input').addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Enter' || ev.isComposing) return;
+    ev.preventDefault();
+    void onSavePat(ev);
+  });
   $('#pat-clear').addEventListener('click', (ev) => onClearPat(ev.currentTarget));
 }
 

@@ -50,3 +50,4 @@
 - Gemini 把模型名放在 URL `/models/<id>:generateContent` 里，所以 `loader.fetch` 除了改 body 的 `model`，还要把 URL 里的 `分组/模型` 还原成裸模型名；`:` 后面的动作段不能被编码。
 - Responses API：`@ai-sdk/openai` 是 Responses 协议（chat 是 `@ai-sdk/openai-compatible`）。模型只声明 `openai-response` 时自动走 Responses；同时支持 chat 时默认 chat，由 `auth.options` 的 `responsesFirst` 开关切过去。开关通过 `input.magpie.option(PROVIDER_ID, 'responsesFirst')` 读，改完宿主会自动重新列模型。
 
+- magpie 编辑器的「自动/OpenAI/Anthropic/Responses」是按**模型表里实际出现过的协议**归纳出来的；插件供应商没有独立协议地址可填。所以「Responses 选项不出现」= 没有任何模型用 `@ai-sdk/openai`。打开 `responsesFirst` 后 OpenAI 系模型全部改走 `@ai-sdk/openai`，开关才会出现，之后可按模型改回 OpenAI。

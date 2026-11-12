@@ -219,7 +219,7 @@ export default async function dragonapi(input, options) {
         {
           key: OPT_RESPONSES,
           label: '优先 Responses API',
-          description: '同时支持 chat 与 Responses 的模型改用 Responses API；关掉则走 chat completions。',
+          description: '打开后 OpenAI 系模型改走 Responses API，模型设置里才会出现 Responses 协议选项；关掉走 chat completions。可再按模型单独改回 OpenAI。',
           default: false,
         },
       ],

@@ -65,13 +65,13 @@ test('enabledGroups 过滤生效；空数组表示全部', () => {
   assert.equal(only.rows.every((r) => r.group === 'gpt-plus' || r.group === 'grok'), true)
 })
 
-test('kind 分布与站点端点类型一致：chat 80 / image 15 / video 27', () => {
+test('kind 分布按分组/tag 识别生图：image 32 / video 27', () => {
   const c = buildCatalog(snapshot, { cur: CUR, site: SITE })
   const byKind = {}
   for (const r of c.rows) byKind[r.kind] = (byKind[r.kind] || 0) + 1
-  // 分组 × 模型展开后：image 组 31 个模型里 15 个是 image-generation，
-  // 视频 27 个只属于「视频」分组，所以按行数分别是 15 和 27。
-  assert.equal(byKind.image, 15)
+  // image 分组的生图模型 endpoint 也写 openai/gemini；只看 endpoint 会漏掉一半，
+  // 必须结合 enable_groups/tags，整组 32 个都算 image。
+  assert.equal(byKind.image, 32)
   assert.equal(byKind.video, 27)
   assert.ok(byKind.chat > 0)
 })
@@ -88,7 +88,7 @@ test('视频模型的 capabilities.output 带 video', () => {
 test('生图模型的 capabilities.output 带 image', () => {
   const c = buildCatalog(snapshot, { cur: CUR, site: SITE })
   const imageIds = Object.keys(c.models).filter((id) => c.models[id].kind === 'image')
-  assert.equal(imageIds.length, 15)
+  assert.equal(imageIds.length, 32)
   for (const id of imageIds) {
     assert.equal(c.models[id].capabilities.output.image, true)
   }
@@ -224,4 +224,15 @@ test('rows 不残留内部排序字段', () => {
 test('rows 第一行是对话模型（不是图片/视频）', () => {
   const c = buildCatalog(snapshot, { cur: CUR, site: SITE })
   assert.equal(c.rows[0].kind, 'chat', `第一行是 ${c.rows[0].kind}：${c.rows[0].id}`)
+})
+
+test('image 分组里 endpoint 写 openai 的生图模型也归为 image，不会混进 LLM', () => {
+  const c = buildCatalog(snapshot, { cur: CUR, site: SITE })
+  const row = c.rows.find((r) => r.name === 'banana-pro-1k')
+  assert.ok(row, '快照里应有 banana-pro-1k')
+  assert.equal(row.kind, 'image')
+  const m = c.models[row.id]
+  assert.equal(m.kind, 'image')
+  assert.equal(m.capabilities.output.image, true)
+  assert.equal('variants' in m, false, '生图模型不该带 LLM 的思考强度档位')
 })

@@ -20,7 +20,7 @@
 - 分组可由 PAT 的 `/api/token/` 列表按 key 尾号匹配，匹配不到再用可用模型与目录做交集打分；分组只用于展示/排序，最终请求仍由钥匙自己的分组决定。
 
 ## 发布流程
-- 改版本 → `node --test --test-isolation=none "tests/*.test.mjs"`（当前 263 条）→ 原子提交 → `git tag vX.Y.Z`。
+- 改版本 → `node --test --test-isolation=none "tests/*.test.mjs"`（当前 265 条）→ 原子提交 → `git tag vX.Y.Z`。
 - `npm publish --access public`。账号启用 staged publishing，registry 生效有延迟；用 `npx npm@11.19.1 view @fish-under-sea/magpie-dragonapi dist-tags` 复核 `latest`。
 - 发布时把 npm cache 指到仓库内 `.npm-cache` 以避开沙箱限制，发布完删除该目录，不要提交。
 - 页面会轮询 `/api/ping` 的 `version` 与 `ui` 时间戳自动热重载；改 `ui/*` 或升级包后无需手动刷新。`/api/ping` 必须保留 `ui` 字段。
@@ -37,3 +37,8 @@
 - 钱包只渲染主账户 `st.user`；绑定钥匙的额度不再生成 `acct-card`，钥匙仍在上方计数与密钥页展示。
 - 推荐链接复制按钮只有 30px 宽，成功态用 `✓`，不要用「已复制」四个字（会竖排溢出）。
 
+
+
+## 模型分类与思考强度
+- 生图模型经常把 `supported_endpoint_types` 写成 `openai`/`gemini`，只按 endpoint 判断会漏进 LLM。`kindOf` 必须同时看 `enable_groups`（image/图像/生图/绘图/绘画）与 `tags`，归为 `image`，并且不要给它们加 `variants`。
+- 对话模型的思考强度档位要覆盖站点实际值：`minimal / low / medium / high / xhigh / max`，不要只给三档。

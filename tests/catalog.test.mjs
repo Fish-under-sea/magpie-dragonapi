@@ -172,12 +172,12 @@ test('输出价不能低于输入价（真实站点上不该出现这种定价�
 })
 
 test('npmOf 按端点选方言', () => {
-  assert.equal(npmOf({ supported_endpoint_types: ['openai'] }), '@ai-sdk/openai-compatible')
+  assert.equal(npmOf({ supported_endpoint_types: ['openai'] }), '@ai-sdk/openai', '对话模型统一走 Responses')
   assert.equal(npmOf({ supported_endpoint_types: ['openai-response'] }), '@ai-sdk/openai', '只支持 Responses 的模型走 Responses API')
-  assert.equal(npmOf({ supported_endpoint_types: ['openai', 'openai-response'] }), '@ai-sdk/openai-compatible', '两者都支持时走 chat')
+  assert.equal(npmOf({ supported_endpoint_types: ['openai', 'openai-response'] }), '@ai-sdk/openai', '两者都支持时仍走 Responses')
   assert.equal(npmOf({ supported_endpoint_types: ['anthropic'] }), '@ai-sdk/anthropic')
   assert.equal(npmOf({ supported_endpoint_types: ['gemini'] }), '@ai-sdk/google')
-  assert.equal(npmOf({}), '@ai-sdk/openai-compatible')
+  assert.equal(npmOf({}), '@ai-sdk/openai')
 })
 
 test('kindOf 只看端点与分组，不猜模型名', () => {

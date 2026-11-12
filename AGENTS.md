@@ -20,7 +20,7 @@
 - 分组可由 PAT 的 `/api/token/` 列表按 key 尾号匹配，匹配不到再用可用模型与目录做交集打分；分组只用于展示/排序，最终请求仍由钥匙自己的分组决定。
 
 ## 发布流程
-- 改版本 → `node --test --test-isolation=none "tests/*.test.mjs"`（当前 261 条）→ 原子提交 → `git tag vX.Y.Z`。
+- 改版本 → `node --test --test-isolation=none "tests/*.test.mjs"`（当前 263 条）→ 原子提交 → `git tag vX.Y.Z`。
 - `npm publish --access public`。账号启用 staged publishing，registry 生效有延迟；用 `npx npm@11.19.1 view @fish-under-sea/magpie-dragonapi dist-tags` 复核 `latest`。
 - 发布时把 npm cache 指到仓库内 `.npm-cache` 以避开沙箱限制，发布完删除该目录，不要提交。
 - 页面会轮询 `/api/ping` 的 `version` 与 `ui` 时间戳自动热重载；改 `ui/*` 或升级包后无需手动刷新。`/api/ping` 必须保留 `ui` 字段。
@@ -30,3 +30,4 @@
 - `detailOf` 遇到 `billing_mode=tiered_expr` 时必须解开 `other.expr_b64`，用 `chatCoeffs` 取 p/c 单价；`model_ratio`/`completion_ratio` 在表达式计费里是 0，照它们拼只会得到错误的 `0 / 0`。
 - 日志「详情」列默认隐藏；密钥/日志「查看」列的勾选存到服务端 `/api/prefs`（内存），因为沙箱 iframe 没有 localStorage。刷新页面靠同一服务恢复，不要回退到浏览器存储。
 - 密钥表格里那个单键复制按钮必须走 `copyKeySecret`（reveal 完整明文），不能 `copyButton(k.masked)`；否则复制到的是打码值。
+

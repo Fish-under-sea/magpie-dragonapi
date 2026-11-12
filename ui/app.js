@@ -4226,6 +4226,34 @@ function bindGlobal() {
   });
 }
 
+/**
+ * startHotReload：监听服务端版本 / UI 文件时间戳，变化就整页重载。
+ * 本地改 ui/* 后不用手动刷新；插件升级到新版本时也会自动换到新界面。
+ */
+function startHotReload() {
+  const every = 5000
+  let baseline = null
+  let reloading = false
+  const check = async () => {
+    if (reloading) return
+    try {
+      const res = await fetch(apiUrl('/api/ping'), { cache: 'no-store', credentials: 'omit' })
+      if (!res.ok) return
+      const info = await res.json()
+      if (!info || info.ok !== true) return
+      const stamp = { version: String(info.version || ''), ui: Number(info.ui) || 0 }
+      if (!baseline) { baseline = stamp; return }
+      if (stamp.version !== baseline.version || stamp.ui > baseline.ui) {
+        reloading = true
+        banner('info', '检测到插件更新，正在热重载…', { key: 'hot-reload' })
+        setTimeout(() => location.reload(), 600)
+      }
+    } catch { /* 服务重启中，下一次再试 */ }
+  }
+  check()
+  setInterval(check, every)
+}
+
 async function boot() {
   initTheme();
   bindGlobal();
@@ -4245,7 +4273,7 @@ async function boot() {
   const wanted = params.get('tab');
   // 密钥已并入账户页；旧的 ?tab=keys 链接仍要能打开（映射到 wallet），
   // 不能因为标签被取消就让人书签失效。
-  const valid = ['wallet', 'catalog', 'logs', 'pat'];
+  const valid = ['wallet', 'dashboard', 'catalog', 'logs', 'pat'];
   // 账户页放在首位，也作为默认落地页：打开就能看到余额与钥匙。
   const start = wanted === 'keys' ? 'wallet' : (valid.includes(wanted) ? wanted : 'wallet');
 
@@ -4255,7 +4283,7 @@ async function boot() {
   await Promise.allSettled([loadPing(false), loadState(false), ensureTab(start, false)]);
 }
 
-boot().catch((err) => {
+boot().then(() => startHotReload()).catch((err) => {
   // 兜底：boot 里任何没接住的异常都不能变成白屏
   banner('error', `页面初始化失败：${describeError(err)}。可以点右上角「刷新」重试。`, { key: 'boot' });
 });

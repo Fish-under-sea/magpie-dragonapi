@@ -276,6 +276,14 @@ test('/api/ping 的版本来自 package.json，不是硬编码', async () => {
   assert.equal(r.version, pkg.version, `ping 版本 ${r.version} 与 package.json ${pkg.version} 不一致`)
 })
 
+test('页面轮询 /api/ping 的 version 与 ui 时间戳做热重载', () => {
+  const src = readFileSync(join(here, '..', 'ui', 'app.js'), 'utf8')
+  assert.match(src, /function startHotReload\(/, '缺少热重载函数')
+  assert.match(src, /setInterval\(check,\s*every\)/, '热重载需要定时轮询')
+  assert.match(src, /info\.ui/, '热重载要比较 UI 文件时间戳')
+  assert.match(src, /location\.reload\(\)/, '版本/时间戳变化后要自动重载')
+})
+
 // ── 模型广场卡片网格 ────────────────────────────────────────────────
 // 用户报过两次「卡片不等高」，两次的要求其实是同一个：整屏看过去要齐。
 // 中间有一版改成 align-items:start（按内容定高），理由是 stretch 会让矮卡

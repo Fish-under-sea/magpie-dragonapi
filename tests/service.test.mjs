@@ -87,6 +87,8 @@ test('/api/ping 有版本与端口', async () => {
   assert.equal(j.ok, true)
   assert.equal(j.port, svc.port)
   assert.ok(j.version)
+  // 热重载靠这个时间戳判断 ui/* 有没有更新；没有它页面只能等用户手动刷新。
+  assert.ok(Number(j.ui) > 0, 'ping 应带 UI 文件时间戳')
 })
 
 test('所有响应都带 CORS 通配头（页面 origin 是 opaque）', async () => {

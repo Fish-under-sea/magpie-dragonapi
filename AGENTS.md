@@ -56,8 +56,8 @@
 ## 协议切换（magpie 源码实证）
 - `pluginProtocol(npm)`：`@ai-sdk/anthropic`→anthropic、`@ai-sdk/openai`→responses、`@ai-sdk/google`→**CodeAssist**、其余→chat。
 - `pluginProtocols(m)` = 主协议 + `m.Also` 里每个 npm 的协议；插件供应商的 provider 级地址只从这三个来：`Chat`/`Responses`/`Anthropic`（见 `pluginProvider` 的 switch），`CodeAssist` 只写进 `Account.codeAssist`，**`p.Gemini` 永不赋值**——所以插件供应商在编辑器里**永远选不到 Gemini 专用协议**，这是 magpie 的限制，不是插件能修的。
-- 模型上带 `also: [npm...]` 就能让编辑器把那些协议列为可选（magpie 会按客户端实际协议原样转发）。本插件对对话模型输出 also = 站点声明的其余协议（chat/responses/anthropic），**不要把 `@ai-sdk/google` 放进 also**（那不是 Gemini 协议，是 Code Assist）。
+- ~~模型上带 `also` 可以让编辑器列出更多协议~~ **已回退**：实测开了 also 之后，Gemini 模型被按 OpenAI 协议转发，站点回 401（gemini/gemini-4-hydrogen 通过 OpenAI 协议没有响应），跨协议转发不可靠。1.5.0 起不再输出 also。
 - Gemini 模型「自动」已经是 Gemini 原生请求：CodeAssist 会去掉信封，按 `/v1beta/models/<id>:streamGenerateContent` 发出去。
 
-- 跨协议转发：模型只有一个 `api.url`，但可能被声明在多个协议上（`also`）。客户端按 chat 发到 Gemini 模型（base `/v1beta`）会拼出 `/v1beta/chat/completions`，站点没有这个端点。`loader.fetch` 的 `pathForProtocol` 把 `/v1beta/(chat/completions|responses)`、根地址下的 `/(chat/completions|responses|messages)` 归一到 `/v1/...`，别再靠改 base 解决（base 只有一个）。
+- ~~跨协议转发时统一端点路径~~ 同样已随 1.5.0 回退：不要在 `loader.fetch` 里改写路径，只保留「还原 `分组/模型`」这一件事。
 

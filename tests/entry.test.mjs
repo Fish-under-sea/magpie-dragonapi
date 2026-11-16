@@ -281,27 +281,3 @@ test('loader 在 Gemini 协议的 URL 里也把「分组/模型」还原成裸�
   assert.doesNotMatch(seen, /image%2F|image\//, '不许把分组名带进 URL')
 })
 
-
-test('跨协议转发时把 base 路径归一：/v1beta/chat/completions → /v1/chat/completions', async () => {
-  const loader = await plugin.auth.loader(async () => ({ key: 'sk-x', metadata: {} }))
-  const seen = []
-  const realFetch = globalThis.fetch
-  globalThis.fetch = async (url) => { seen.push(String(url)); return new Response('{}', { status: 200 }) }
-  try {
-    await loader.fetch('https://example.test/v1beta/chat/completions', {
-      method: 'POST', body: JSON.stringify({ model: 'gemini/gemini-3.1-pro-preview', messages: [] }),
-    })
-    await loader.fetch('https://example.test/v1beta/responses', {
-      method: 'POST', body: JSON.stringify({ model: 'gemini/x', input: 'hi' }),
-    })
-    await loader.fetch('https://example.test/chat/completions', {
-      method: 'POST', body: JSON.stringify({ model: 'claude-kiro/claude-opus-5-5', messages: [] }),
-    })
-  } finally {
-    globalThis.fetch = realFetch
-  }
-  assert.equal(seen[0], 'https://example.test/v1/chat/completions', 'Gemini base 上的 chat 请求要落到 /v1')
-  assert.equal(seen[1], 'https://example.test/v1/responses')
-  assert.equal(seen[2], 'https://example.test/v1/chat/completions', '根地址 base 上的 chat 请求也要落到 /v1')
-  for (const u of seen) assert.doesNotMatch(u, /v1beta\/(chat|responses)/, '不能出现不存在的端点组合')
-})

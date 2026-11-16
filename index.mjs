@@ -332,6 +332,32 @@ export default async function dragonapi(input, options) {
               try { return String(typeof input_ === 'string' ? input_ : input_?.url || '') } catch { return '' }
             })()
 
+            /**
+             * pathForProtocol：把「模型自己的基础地址」和「客户端实际用的协议」
+             * 对齐。一个模型可以同时被声明在多个协议上（also），但 api.url 只有
+             * 一个——Gemini 模型是 `/v1beta`，Anthropic 模型是根地址。客户端按
+             * chat 发过来时，magpie 会原样转发到这个 base，于是拼出
+             * `/v1beta/chat/completions` 这种不存在的地址。这里按路径把它们
+             * 归一到站点真正的端点上。
+             */
+            const pathForProtocol = (url) => {
+              const site = String(ctx.site || '').replace(/\/+$/, '')
+              if (!site || !url.startsWith(site + '/')) return url
+              const rest = url.slice(site.length)
+              const q = rest.indexOf('?')
+              const path = q < 0 ? rest : rest.slice(0, q)
+              const tail = q < 0 ? '' : rest.slice(q)
+              let fixed = path
+                // chat completions / responses 都在 /v1 下
+                .replace(/^\/v1beta\/(chat\/completions|responses)/, '/v1/$1')
+                .replace(/^\/(chat\/completions|responses)/, '/v1/$1')
+                // Messages 在 /v1 下
+                .replace(/^\/v1beta\/messages/, '/v1/messages')
+                .replace(/^\/messages/, '/v1/messages')
+              if (fixed === path) return url
+              return site + fixed + tail
+            }
+
             /** bareModel 去掉 `分组/` 前缀，只留站点认的模型名。 */
             const bareModel = (v) => {
               if (typeof v !== 'string' || !v.includes('/')) return ''
@@ -340,10 +366,10 @@ export default async function dragonapi(input, options) {
             }
 
             // Gemini：/v1beta/models/<id>:generateContent，id 可能被 URL 编码成 %2F
-            let nextHref = href
-            if (href.includes('/models/')) {
-              const q = href.indexOf('?')
-              const head = q < 0 ? href : href.slice(0, q)
+            let nextHref = pathForProtocol(href)
+            if (nextHref.includes('/models/')) {
+              const q = nextHref.indexOf('?')
+              const head = q < 0 ? nextHref : nextHref.slice(0, q)
               const tail = q < 0 ? '' : href.slice(q)
               const marker = '/models/'
               const at = head.indexOf(marker)

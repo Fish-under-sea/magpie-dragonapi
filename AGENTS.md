@@ -20,7 +20,7 @@
 - 分组可由 PAT 的 `/api/token/` 列表按 key 尾号匹配，匹配不到再用可用模型与目录做交集打分；分组只用于展示/排序，最终请求仍由钥匙自己的分组决定。
 
 ## 发布流程
-- 改版本 → `node --test --test-isolation=none "tests/*.test.mjs"`（当前 268 条）→ 原子提交 → `git tag vX.Y.Z`。
+- 改版本 → `node --test --test-isolation=none "tests/*.test.mjs"`（当前 269 条）→ 原子提交 → `git tag vX.Y.Z`。
 - `npm publish --access public`。账号启用 staged publishing，registry 生效有延迟；用 `npx npm@11.19.1 view @fish-under-sea/magpie-dragonapi dist-tags` 复核 `latest`。
 - 发布时把 npm cache 指到仓库内 `.npm-cache` 以避开沙箱限制，发布完删除该目录，不要提交。
 - 页面会轮询 `/api/ping` 的 `version` 与 `ui` 时间戳自动热重载；改 `ui/*` 或升级包后无需手动刷新。`/api/ping` 必须保留 `ui` 字段。
@@ -58,4 +58,6 @@
 - `pluginProtocols(m)` = 主协议 + `m.Also` 里每个 npm 的协议；插件供应商的 provider 级地址只从这三个来：`Chat`/`Responses`/`Anthropic`（见 `pluginProvider` 的 switch），`CodeAssist` 只写进 `Account.codeAssist`，**`p.Gemini` 永不赋值**——所以插件供应商在编辑器里**永远选不到 Gemini 专用协议**，这是 magpie 的限制，不是插件能修的。
 - 模型上带 `also: [npm...]` 就能让编辑器把那些协议列为可选（magpie 会按客户端实际协议原样转发）。本插件对对话模型输出 also = 站点声明的其余协议（chat/responses/anthropic），**不要把 `@ai-sdk/google` 放进 also**（那不是 Gemini 协议，是 Code Assist）。
 - Gemini 模型「自动」已经是 Gemini 原生请求：CodeAssist 会去掉信封，按 `/v1beta/models/<id>:streamGenerateContent` 发出去。
+
+- 跨协议转发：模型只有一个 `api.url`，但可能被声明在多个协议上（`also`）。客户端按 chat 发到 Gemini 模型（base `/v1beta`）会拼出 `/v1beta/chat/completions`，站点没有这个端点。`loader.fetch` 的 `pathForProtocol` 把 `/v1beta/(chat/completions|responses)`、根地址下的 `/(chat/completions|responses|messages)` 归一到 `/v1/...`，别再靠改 base 解决（base 只有一个）。
 

@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { buildCatalog, modelsOfGroup, npmOf, kindOf, kindOutput } from '../lib/catalog.mjs'
+import { buildCatalog, modelsOfGroup, npmOf, alsoNpms, kindOf, kindOutput } from '../lib/catalog.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const snapshot = JSON.parse(readFileSync(join(here, '..', '证据-站点定价快照-2026-11-10.json'), 'utf8'))
@@ -256,4 +256,22 @@ test('per-model protocol: Claude 走 Anthropic 根地址，Gemini 走 /v1beta', 
   const banana = c.models[bananaRow.id]
   assert.equal(banana.api.npm, '@ai-sdk/openai-compatible')
   assert.equal(banana.api.url, SITE + '/v1')
+})
+test('also 让 magpie 的协议切换列出站点声明的其它协议', () => {
+  assert.deepEqual(alsoNpms({ supported_endpoint_types: ['openai'] }, '@ai-sdk/openai'), ['@ai-sdk/openai-compatible'])
+  assert.deepEqual(alsoNpms({ supported_endpoint_types: ['openai', 'openai-response'] }, '@ai-sdk/openai'), ['@ai-sdk/openai-compatible'])
+  assert.deepEqual(alsoNpms({ supported_endpoint_types: ['anthropic', 'openai'] }, '@ai-sdk/anthropic'), ['@ai-sdk/openai-compatible', '@ai-sdk/openai'])
+  assert.deepEqual(alsoNpms({ supported_endpoint_types: ['gemini', 'openai'] }, '@ai-sdk/google'), ['@ai-sdk/openai-compatible', '@ai-sdk/openai'])
+  // 主协议不重复出现在 also 里
+  assert.equal(alsoNpms({ supported_endpoint_types: ['openai'] }, '@ai-sdk/openai-compatible').includes('@ai-sdk/openai-compatible'), false)
+  // 不把 @ai-sdk/google 塞进 also：插件供应商的 Gemini 位是 Code Assist
+  assert.equal(alsoNpms({ supported_endpoint_types: ['openai', 'gemini'] }, '@ai-sdk/openai').includes('@ai-sdk/google'), false)
+})
+
+test('只有对话模型带 also，生图模型不参与协议切换', () => {
+  const c = buildCatalog(snapshot, { cur: CUR, site: SITE })
+  const chat = c.models['gpt-plus/gpt-6-sol']
+  assert.ok(Array.isArray(chat.also) && chat.also.length > 0, '对话模型应带 also')
+  const imgRow = c.rows.find((r) => r.name === 'banana-pro-1k')
+  if (imgRow) assert.equal('also' in c.models[imgRow.id], false, '生图模型不应带 also')
 })

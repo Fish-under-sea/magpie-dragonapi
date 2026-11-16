@@ -52,3 +52,10 @@
 
 - 编辑器协议列表来自 `Provider.APIs`；插件供应商的 APIs 只有 Chat/Anthropic/Gemini（由模型 npm 推出），**没有 Responses**。用户要 Responses 只能走「自定义添加」供应商。
 - 自定义供应商的参考参数：chat `https://newapi.dragon3api.com/v1`、responses `https://newapi.dragon3api.com/v1`、anthropic `https://newapi.dragon3api.com`；账号级协议选「任意协议」。
+
+## 协议切换（magpie 源码实证）
+- `pluginProtocol(npm)`：`@ai-sdk/anthropic`→anthropic、`@ai-sdk/openai`→responses、`@ai-sdk/google`→**CodeAssist**、其余→chat。
+- `pluginProtocols(m)` = 主协议 + `m.Also` 里每个 npm 的协议；插件供应商的 provider 级地址只从这三个来：`Chat`/`Responses`/`Anthropic`（见 `pluginProvider` 的 switch），`CodeAssist` 只写进 `Account.codeAssist`，**`p.Gemini` 永不赋值**——所以插件供应商在编辑器里**永远选不到 Gemini 专用协议**，这是 magpie 的限制，不是插件能修的。
+- 模型上带 `also: [npm...]` 就能让编辑器把那些协议列为可选（magpie 会按客户端实际协议原样转发）。本插件对对话模型输出 also = 站点声明的其余协议（chat/responses/anthropic），**不要把 `@ai-sdk/google` 放进 also**（那不是 Gemini 协议，是 Code Assist）。
+- Gemini 模型「自动」已经是 Gemini 原生请求：CodeAssist 会去掉信封，按 `/v1beta/models/<id>:streamGenerateContent` 发出去。
+

@@ -770,6 +770,10 @@ test('液态玻璃：四个区域各用各的变量，缺变量/玻璃关着时�
   assert.ok(at > 0, '找不到液态玻璃段')
   const glass = css.slice(at).split('\n').filter((line) => !line.includes('@supports')).join('\n')
   assert.equal(/blur\(\s*\d/.test(glass), false, '玻璃段的 blur 必须走 --magpie-glass-*-blur，不能写死像素')
+  // 深色主题必须给文字面留可读性下限：读者可能用很亮的壁纸 + fill=0 的玻璃。
+  for (const [region, floor] of [['content', '78%'], ['sidebar', '82%'], ['control', '88%'], ['overlay', '84%']]) {
+    assert.match(css, new RegExp(`max\\(var\\(--magpie-glass-${region}-fill, 100%\\), ${floor}\\)`), `${region} 缺少深色主题的可读性下限`)
+  }
 })
 
 test('根元素不能声明深色 color-scheme：否则 iframe 画不透明底，玻璃透不出壁纸', async () => {

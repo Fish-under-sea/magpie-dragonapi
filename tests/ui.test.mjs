@@ -770,10 +770,11 @@ test('液态玻璃：四个区域各用各的变量，缺变量/玻璃关着时�
   assert.ok(at > 0, '找不到液态玻璃段')
   const glass = css.slice(at).split('\n').filter((line) => !line.includes('@supports')).join('\n')
   assert.equal(/blur\(\s*\d/.test(glass), false, '玻璃段的 blur 必须走 --magpie-glass-*-blur，不能写死像素')
-  // 深色主题必须给文字面留可读性下限：读者可能用很亮的壁纸 + fill=0 的玻璃。
-  for (const [region, floor] of [['content', '62%'], ['sidebar', '62%'], ['control', '55%'], ['overlay', '70%']]) {
-    assert.match(css, new RegExp(`max\\(var\\(--magpie-glass-${region}-fill, 100%\\), ${floor}\\)`), `${region} 缺少文字面的可读性下限`)
+  // 官方 fill 必须原样用，不能加「最低不透明度」：加了下限会把壁纸颜色压成灰板。
+  for (const [name, region] of [['content', 'content'], ['sidebar', 'sidebar'], ['control', 'control'], ['overlay', 'overlay']]) {
+    assert.match(css, new RegExp(`--mg-${name}-fill: var\\(--magpie-glass-${region}-fill, 100%\\)`), `${region} 必须原样使用官方 fill`)
   }
+  assert.equal(/max\(var\(--magpie-glass-content-fill/.test(css), false, '不能再给玻璃面加最低不透明度')
   // 无底色的长条（密钥标题行/筛选行）不能再带 backdrop-filter，否则玻璃卡片里是一条黑带。
   assert.match(css, /html\[data-magpie-glass\] \.keys-titlebar,\s*\n\s*html\[data-magpie-glass\] \.keys-filterbar \{[\s\S]*?backdrop-filter: none;/, '密钥标题/筛选长条要去掉背景模糊')
   // 表头也必须玻璃化，不能是实色长条。
@@ -793,4 +794,11 @@ test('根元素不能声明深色 color-scheme：否则 iframe 画不透明底�
 
   const app = await (await fetch(base + '/ui/app.js')).text()
   assert.match(app, /meta\.setAttribute\('content', 'light'\)/, 'app.js 不能再把 meta 切回 dark')
+})
+test('滚动条只留拇指：无轨道底、无上下箭头', async () => {
+  const css = await (await fetch(base + '/ui/style.css')).text()
+  assert.match(css, /scrollbar-color:[^;]*transparent/, 'Firefox 的轨道要透明')
+  assert.match(css, /\*::-webkit-scrollbar-track,\s*\n\*::-webkit-scrollbar-corner \{ background: transparent; \}/, 'WebKit 轨道要透明')
+  assert.match(css, /\*::-webkit-scrollbar-button \{ display: none; width: 0; height: 0; \}/, '要隐藏上下箭头')
+  assert.match(css, /\*::-webkit-scrollbar-thumb \{[\s\S]*?border-radius: 999px;/, '拇指要是圆角细条')
 })

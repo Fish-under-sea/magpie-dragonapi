@@ -93,6 +93,28 @@ body { overflow: hidden; }
 }
 :focus:not(:focus-visible) { outline: none; }
 
+/* 滚动条：只要一条细拇指，不要轨道底、不要上下箭头，尽量不抢注意力。
+   颜色仍取宿主的 --magpie-fg（没有就退回本页 --fg）。 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--magpie-fg, var(--fg)) 26%, transparent) transparent;
+}
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-corner { background: transparent; }
+*::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+*::-webkit-scrollbar-thumb {
+  min-height: 28px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--magpie-fg, var(--fg)) 26%, transparent);
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--magpie-fg, var(--fg)) 42%, transparent);
+  background-clip: padding-box;
+}
+
 code, .mono, .num {
   font-family: var(--code);
   font-variant-numeric: tabular-nums;
@@ -3507,19 +3529,20 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
  * 的同款写法。 */
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) and (background: color-mix(in srgb, red, transparent)) {
   /* 玻璃数字全部照官方钩子来：
-       - 画布（整页底）照抄「主界面」content 的数字，0 就是真透——壁纸由宿主
-         画在它自己的 body 上（带 --wall-veil 遮挡），页面不再叠一层灰底；
-       - 成块的文字面（卡片 / 标签 / 浮层 / 控件）各留一个下限，避免 fill=0
-         时整块文字被扔到壁纸上；
-       - 颜色一律用宿主的 --magpie-bg / --magpie-card / --magpie-fg。
-     做法与 Purge 的 page/glass.js、宿主 fish-glass.css 一致。 */
+       - 画布（整页底）与所有面都直接用官方的 fill，0 就是真透——壁纸由宿主
+         画在它自己的 body 上（带 --wall-veil 遮挡），页面不叠底、也不设
+         「最低不透明度」；加下限会把壁纸透出来的颜色压成灰板，和别的插件
+         的玻璃颜色对不上（实机对比）；
+       - 颜色一律用宿主的 --magpie-bg / --magpie-card / --magpie-fg；
+       - 像不像玻璃靠高光边 + 柔和外阴影，不靠加底色。
+     做法与 checkin-relay-probe、Purge 的 page/glass.js、宿主 fish-glass.css 一致。 */
   html[data-magpie-glass] {
     --mg-canvas-fill: var(--magpie-glass-content-fill, 100%);
     --mg-canvas-blur: var(--magpie-glass-content-blur, 0px);
-    --mg-content-fill: max(var(--magpie-glass-content-fill, 100%), 62%);
-    --mg-sidebar-fill: max(var(--magpie-glass-sidebar-fill, 100%), 62%);
-    --mg-control-fill: max(var(--magpie-glass-control-fill, 100%), 55%);
-    --mg-overlay-fill: max(var(--magpie-glass-overlay-fill, 100%), 70%);
+    --mg-content-fill: var(--magpie-glass-content-fill, 100%);
+    --mg-sidebar-fill: var(--magpie-glass-sidebar-fill, 100%);
+    --mg-control-fill: var(--magpie-glass-control-fill, 100%);
+    --mg-overlay-fill: var(--magpie-glass-overlay-fill, 100%);
     --mg-control-blur: var(--magpie-glass-control-blur, 0px);
   }
 
@@ -3527,11 +3550,19 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
   html[data-magpie-glass] {
     background: color-mix(in srgb, var(--magpie-bg, var(--bg)) var(--mg-canvas-fill), transparent);
   }
-  html[data-magpie-glass] body { background: transparent; }
+  html[data-magpie-glass] body {
+    /* 很淡的一层底：只为了不让壁纸的纯白区域在页底显得像「大白底」，
+       不改变玻璃的透感（10% 远低于任何「灰板」）。 */
+    background: color-mix(in srgb, var(--magpie-card, var(--card)) 10%, transparent);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .38);
+  }
+  html[data-theme="light"][data-magpie-glass] body { text-shadow: none; }
 
   /* 阅读面：卡片与列表容器。 */
   html[data-magpie-glass] :is(.card, .dash-stat, .mc, .market-aside, .model-grid.as-list, .banner) {
     background: color-mix(in srgb, var(--magpie-card, var(--card)) var(--mg-content-fill), transparent);
+    -webkit-backdrop-filter: blur(var(--magpie-glass-content-blur, 0px)) saturate(180%) brightness(1.06);
+    backdrop-filter: blur(var(--magpie-glass-content-blur, 0px)) saturate(180%) brightness(1.06);
     box-shadow: inset 0 1px 0 color-mix(in srgb, var(--magpie-fg, var(--fg)) 9%, transparent);
   }
 
@@ -3622,12 +3653,26 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
     box-shadow: inset 0 1px 0 var(--mg-rim-line), inset 0 -1px 0 var(--mg-rim-shade), var(--mg-shadow);
   }
 
-  /* 卡片里的次级块（账户、订阅、推荐、统计、键值行）也各自成一颗玻璃胶囊。 */
-  html[data-magpie-glass] :is(.acct-card, .subscription-item, .rf, .summary-row, .kv, .dash-cards > .dash-stat, .ins-facts, .ins-callout) {
+  /* 卡片里的次级块（订阅、推荐、统计、事实块）各自成一颗玻璃胶囊；
+     账户余额卡与键值行不在此列——它们在卡片里保持原来的平铺，不再套第二层。 */
+  html[data-magpie-glass] :is(.subscription-item, .rf, .summary-row, .dash-cards > .dash-stat, .ins-facts, .ins-callout) {
     background: color-mix(in srgb, var(--magpie-card, var(--card)) var(--mg-content-fill), transparent);
     border: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
     border-radius: 12px;
     box-shadow: inset 0 1px 0 var(--mg-rim-line), inset 0 -1px 0 var(--mg-rim-shade);
+  }
+
+  /* PAT 状态：整块一张卡，里面 hint / scopes 两行不再各画自己的框。 */
+  html[data-magpie-glass] .pat-state {
+    background: color-mix(in srgb, var(--magpie-card, var(--card)) var(--mg-content-fill), transparent);
+    border: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+    border-radius: 12px;
+    box-shadow: inset 0 1px 0 var(--mg-rim-line), inset 0 -1px 0 var(--mg-rim-shade);
+  }
+  html[data-magpie-glass] .pat-state :is(.kv, .kv-grid > *) {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
   }
 
   /* 表头不再是一条实色长条：不吸顶、透明，只留一条细分隔线。 */

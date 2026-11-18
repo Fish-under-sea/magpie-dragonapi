@@ -63,10 +63,13 @@ button,
 
 * { box-sizing: border-box; }
 
+/* 画布永远是透的：本页由插件本地服务提供，外面那层画布的底色属于宿主窗口
+   （桌面窗口的壁纸、gateway 的页面底）。页面自己一旦铺 --bg，嵌进宿主就是
+   一整块白/灰遮罩——这是「底部白块」的唯一来源。可读性交给卡片与控件。 */
 html, body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
+  background: transparent;
   color: var(--fg);
   font-family: var(--font);
   font-size: 13px;
@@ -3751,8 +3754,7 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
 /* 环境不支持背景模糊：回落实底（整段增强在上面已按 @supports 关掉，这里
    只为把「不支持时是什么样」写清楚，并兜住个别实现）。 */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  html[data-magpie-glass] { background: var(--bg); }
-  html[data-magpie-glass] body { background: var(--bg); }
+  /* 画布仍旧透明，只把「面」回实底：宿主窗口的底色在外面，页面不抢着铺。 */
   html[data-magpie-glass] :is(.card, .dash-stat, .mc, .market-aside, .model-grid.as-list, .banner, .tabs, .market-top) {
     background: var(--card);
     box-shadow: none;
@@ -3766,12 +3768,6 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
 
 /* 用户要求减弱透明：同样回实底，不为「玻璃」牺牲可读性。 */
 @media (prefers-reduced-transparency: reduce) {
-  html[data-magpie-glass] { background: var(--bg); }
-  html[data-magpie-glass] body {
-    background: var(--bg);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
   html[data-magpie-glass] :is(.card, .dash-stat, .mc, .market-aside, .model-grid.as-list, .banner, .tabs, .market-top) {
     background: var(--card);
     box-shadow: none;

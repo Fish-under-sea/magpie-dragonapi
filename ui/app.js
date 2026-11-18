@@ -161,12 +161,40 @@ function initTheme() {
   // color-scheme 负责，meta 不要再切回 dark。
   if (meta) meta.setAttribute('content', 'light');
 
+  // 跳转前拿到的官方玻璃快照。bridge 重连失败时（gateway / 独立窗口）这是
+  // 唯一还能画出玻璃的来源；有它就不会退回实心白底。
+  applyGlassSnapshot(parseJson(params.get('glass')));
+
   // 深/浅以官方 --bg 的实际亮度为准，不信 ?theme：宿主 bridge 在页面自己的
   // 文档里算主题时，prefers-color-scheme 可能是另一套，单看 dark 会把深色
   // 界面画成浅色。
   const dark = isDarkColor(getComputedStyle(root).getPropertyValue('--bg'));
   if (dark !== null) root.dataset.theme = dark ? 'dark' : 'light';
   ensureReadable(root);
+}
+
+function parseJson(raw) {
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
+/** 把 boot.js 带来的 { on, regions } 落成官方变量与 data-magpie-glass。 */
+function applyGlassSnapshot(glass) {
+  if (!glass || typeof glass !== 'object' || glass.on !== true) return;
+  const root = document.documentElement;
+  root.setAttribute('data-magpie-glass', '');
+  for (const region of ['sidebar', 'content', 'overlay']) {
+    const part = glass.regions && glass.regions[region];
+    if (!part || typeof part !== 'object') continue;
+    const fill = Number(part.fill);
+    const blur = Number(part.blur);
+    if (Number.isFinite(fill)) {
+      root.style.setProperty(`--magpie-glass-${region}-fill`, `${Math.max(0, Math.min(100, fill))}%`);
+    }
+    if (Number.isFinite(blur)) {
+      root.style.setProperty(`--magpie-glass-${region}-blur`, `${Math.max(0, blur)}px`);
+    }
+  }
 }
 
 // ── 请求层 ────────────────────────────────────────────────

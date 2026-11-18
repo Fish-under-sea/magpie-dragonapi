@@ -281,3 +281,11 @@ test('loader 在 Gemini 协议的 URL 里也把「分组/模型」还原成裸�
   assert.doesNotMatch(seen, /image%2F|image\//, '不许把分组名带进 URL')
 })
 
+test('插件加载完成前本地服务已经 listen（避免宿主反代打到未监听的端口）', () => {
+  const src = readFileSync(join(here, '..', 'index.mjs'), 'utf8')
+  // 宿主判定插件加载完成是在默认导出返回时；服务没 listen 时，magpie web 的
+  // 第一跳会显示英文重试页（The plugin's service isn't answering yet）。
+  assert.match(src, /await Promise\.race\(\[\s*\n?\s*serviceReady,/, '默认导出必须等服务 bind 完再返回')
+  assert.match(src, /setTimeout\(resolve, 3000\)/, '等待要有上限，不能顶到宿主的 20 秒加载上限')
+})
+

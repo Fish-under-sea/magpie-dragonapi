@@ -3590,6 +3590,72 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
+
+  /* ── 玻璃细节：高光边 + 柔和外阴影，把面板做成玻璃胶囊 ─────────────
+     官方钩子只给「面」的不透明度与模糊；像不像玻璃靠材质本身。这一节
+     与宿主 fish-glass.css、Purge 的写法同一套：内侧 1px 亮边 + 下侧暗边
+     + 柔和外阴影，所有成块的「面」都套上，让它们从彼此身上浮起来。 */
+  html[data-magpie-glass] {
+    --mg-rim-line: rgba(255, 255, 255, .55);
+    --mg-rim-shade: rgba(0, 0, 0, .28);
+    --mg-shadow: 0 10px 30px rgba(0, 0, 0, .22);
+  }
+  html[data-theme="light"][data-magpie-glass] {
+    --mg-rim-line: rgba(255, 255, 255, .9);
+    --mg-rim-shade: rgba(0, 0, 0, .10);
+    --mg-shadow: 0 10px 30px rgba(20, 22, 30, .12);
+  }
+
+  /* 品牌行也做成一颗玻璃胶囊，页头文字不再直接落在壁纸上。 */
+  html[data-magpie-glass] .topbar {
+    background: color-mix(in srgb, var(--magpie-card, var(--card)) var(--mg-content-fill), transparent);
+    border: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+    border-radius: 14px;
+    padding: 10px 14px;
+    margin: -10px -14px 0;
+    box-shadow: inset 0 1px 0 var(--mg-rim-line), inset 0 -1px 0 var(--mg-rim-shade), var(--mg-shadow);
+  }
+
+  /* 卡片与所有成块的面：同一套胶囊材质。 */
+  html[data-magpie-glass] :is(.card, .dash-stat, .mc, .market-aside, .model-grid.as-list, .banner, .tabs, .market-top) {
+    border-color: color-mix(in srgb, var(--line) 55%, transparent);
+    box-shadow: inset 0 1px 0 var(--mg-rim-line), inset 0 -1px 0 var(--mg-rim-shade), var(--mg-shadow);
+  }
+
+  /* 卡片里的次级块（账户、订阅、推荐、统计、键值行）也各自成一颗玻璃胶囊。 */
+  html[data-magpie-glass] :is(.acct-card, .subscription-item, .rf, .summary-row, .kv, .dash-cards > .dash-stat, .ins-facts, .ins-callout) {
+    background: color-mix(in srgb, var(--magpie-card, var(--card)) var(--mg-content-fill), transparent);
+    border: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+    border-radius: 12px;
+    box-shadow: inset 0 1px 0 var(--mg-rim-line), inset 0 -1px 0 var(--mg-rim-shade);
+  }
+
+  /* 表头不再是一条实色长条：不吸顶、透明，只留一条细分隔线。 */
+  html[data-magpie-glass] .keys-table thead th,
+  html[data-magpie-glass] .data-table thead th {
+    position: static;
+    background: transparent;
+    border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+  html[data-magpie-glass] .lg-head,
+  html[data-magpie-glass] .model-grid.as-list .ml-head {
+    background: transparent;
+    box-shadow: none;
+  }
+
+  /* 控件：胶囊高光边 + 淡分隔线，去掉黑框。 */
+  html[data-magpie-glass] :is(.pill, .sel-trigger, .market-seg, .segmented, .tab[aria-selected="true"], .lg-stat,
+    .market-chip, .btn:not(.primary):not(.danger),
+    input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+    border-color: color-mix(in srgb, var(--line) 55%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--magpie-fg, var(--fg)) 14%, transparent);
+  }
+  html[data-magpie-glass] .btn.ghost,
+  html[data-magpie-glass] .modal-x,
+  html[data-magpie-glass] .banner-close { border-color: transparent; box-shadow: none; }
 }
 
 /* 环境不支持背景模糊：回落实底（整段增强在上面已按 @supports 关掉，这里

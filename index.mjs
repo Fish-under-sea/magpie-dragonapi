@@ -174,8 +174,18 @@ export default async function dragonapi(input, options) {
       return null
     })
   // 让本地服务能找到钥匙：它不能直接读这个闭包，所以注入一个取值函数。
-  void serviceReady
   void service
+
+  // 页面在 magpie web 下经宿主反代到本服务：宿主判定「插件加载完成」是在
+  // 这个函数返回时，而反代的第一跳不会等我们。服务若还没 listen，第一次
+  // 打开页面就会看到宿主的英文重试页（The plugin's service isn't answering
+  // yet），几秒后才好——这就是「偶尔」的来源。这里等服务监听上再返回；
+  // 只等本地 bind（毫秒级），失败或超时也照常返回，绝不让 20 秒加载上限
+  // 因为服务起不来而命中。
+  await Promise.race([
+    serviceReady,
+    new Promise((resolve) => setTimeout(resolve, 3000)),
+  ])
 
   return {
     /**

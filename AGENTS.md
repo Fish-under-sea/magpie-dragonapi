@@ -23,14 +23,15 @@
 - 插件页是跳到本地服务的，一跳转宿主 bridge 就没了：`page/boot.js` 必须把 `_magpie/bridge.js` 的 http(s) 地址随 URL 带给 `ui/host.js` 重新加载，否则 `magpie.glass` / `--magpie-glass-*` / `data-magpie-glass` 永远不出现。
 - 根元素绝不能声明深色 `color-scheme`：Chromium 会给文档画一层不透明的 `#121212` 画布，iframe 里的宿主壁纸被挡住，玻璃只剩深色实底。根固定 `color-scheme: normal !important`，深色交给 `body` 的 `color-scheme`（实测；meta color-scheme 也要保持 light）。
 - 玻璃规则一律带 `fill 100% / blur 0px` 回退，并挂在 `html[data-magpie-glass]` 下；不写死 blur，玻璃关着时页面必须与改动前逐像素一致。
-- 画布照抄 content 的 fill（0 就是真透）：**绝不能给整页加一层底**，否则宿主壁纸被压成一大块灰色遮罩（2026-11-18 实机反馈）。文字面下限 content/sidebar/overlay/control = 62/62/70/55%；玻璃颜色用 `--magpie-bg` / `--magpie-card`，字体色用 `--magpie-fg` 系列，`green/red/amber` 映射 `ok/warn/bad`，页面不自己挑颜色。
+- 画布与所有面**原样使用官方 fill**（0 就是真透）：绝不能加「最低不透明度」，否则壁纸颜色被压成灰板，和别的插件玻璃颜色对不上（2026-11-18 实机对比）。玻璃颜色用 `--magpie-bg` / `--magpie-card`，字体色用 `--magpie-fg` 系列，`green/red/amber` 映射 `ok/warn/bad`。页底只留 10% 极淡底，避免壁纸纯白区的「大白底」。
 - 无底色的长条（`.keys-titlebar`、`.keys-filterbar`）不能再带 `backdrop-filter`：玻璃卡片里 Chromium 会把「透明底 + 模糊」渲染成一条黑带（2026-11-18 实机截图）。玻璃开着时对它们 `backdrop-filter: none; background: transparent`。
 - 所有成块的「面」（卡片、次级卡片、页头、控件）都要套 1px 高光边 + 下侧暗边 + 柔和外阴影（宿主 `fish-glass.css`／Purge 的同一套材质），否则玻璃只是一块灰板，不像玻璃。
 - 本地服务必须在默认导出返回前 listen：`index.mjs` 里 `await Promise.race([serviceReady, 3s 超时])`。宿主判定「插件加载完成」是在默认导出返回时，而 magpie web 的反代第一跳不会等我们；服务没 listen 时页面会显示宿主的英文重试页（The plugin's service isn't answering yet），几秒后才好。
 - 所有表头（`.keys-table thead th`、`.data-table thead th`、`.lg-head`、`.model-grid.as-list .ml-head`）玻璃开时都改成**不吸顶、透明**，只留一条细分隔线——宿主页面里表头实色长条是最常见的「未透明色块」（2026-11-18 实机反馈）。表头原来若带 `backdrop-filter` 也要清掉。
+- 滚动条全局收成「只留拇指」：`scrollbar-color` 透明轨道、`::-webkit-scrollbar-button { display:none }`、拇指用 `--magpie-fg` 26% 的圆角细条；不要原生轨道底和上下箭头。
 
 ## 发布流程
-- 改版本 → `node --test --test-isolation=none "tests/*.test.mjs"`（当前 275 条）→ 原子提交 → `git tag vX.Y.Z`。
+- 改版本 → `node --test --test-isolation=none "tests/*.test.mjs"`（当前 276 条）→ 原子提交 → `git tag vX.Y.Z`。
 - `npm publish --access public`。账号启用 staged publishing，registry 生效有延迟；用 `npx npm@11.19.1 view @fish-under-sea/magpie-dragonapi dist-tags` 复核 `latest`。
 - 发布时把 npm cache 指到仓库内 `.npm-cache` 以避开沙箱限制，发布完删除该目录，不要提交。
 - 页面会轮询 `/api/ping` 的 `version` 与 `ui` 时间戳自动热重载；改 `ui/*` 或升级包后无需手动刷新。`/api/ping` 必须保留 `ui` 字段。

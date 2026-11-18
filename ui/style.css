@@ -3563,9 +3563,19 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
     backdrop-filter: blur(var(--magpie-glass-overlay-blur, 0px)) saturate(180%) brightness(1.06);
   }
 
-  /* 吸顶表头要压住滚过去的行，给它更高的底。 */
-  html[data-magpie-glass] .keys-table thead th {
-    background: color-mix(in srgb, var(--magpie-bg, var(--bg)) max(var(--magpie-glass-content-fill, 100%), 88%), transparent);
+  /* 吸顶表头也是玻璃：keys / PAT 的表格头用 overlay 区域的下限 + 模糊，
+     静态的日志表头 / 列表头用 content 下限。任何表头都不再是实色长条。 */
+  html[data-magpie-glass] .keys-table thead th,
+  html[data-magpie-glass] .data-table thead th {
+    background: color-mix(in srgb, var(--magpie-card, var(--card)) var(--mg-overlay-fill), transparent);
+    -webkit-backdrop-filter: blur(var(--magpie-glass-overlay-blur, 0px)) saturate(180%) brightness(1.05);
+    backdrop-filter: blur(var(--magpie-glass-overlay-blur, 0px)) saturate(180%) brightness(1.05);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--magpie-fg, var(--fg)) 9%, transparent);
+  }
+  html[data-magpie-glass] .lg-head,
+  html[data-magpie-glass] .model-grid.as-list .ml-head {
+    background: color-mix(in srgb, var(--magpie-card, var(--card)) var(--mg-content-fill), transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--magpie-fg, var(--fg)) 9%, transparent);
   }
   html[data-magpie-glass] .modal-foot {
     background: color-mix(in srgb, var(--magpie-card, var(--card)) 45%, transparent);
@@ -3592,7 +3602,10 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
     box-shadow: none;
   }
   html[data-magpie-glass] :is(.menu-pop, .sel-pop, .keys-more-pop, .dash-tip, .modal, .drawer-panel, .aff-modal-panel),
-  html[data-magpie-glass] .keys-table thead th { background: var(--bg); }
+  html[data-magpie-glass] .keys-table thead th,
+  html[data-magpie-glass] .data-table thead th,
+  html[data-magpie-glass] .lg-head,
+  html[data-magpie-glass] .model-grid.as-list .ml-head { background: var(--card); }
 }
 
 /* 用户要求减弱透明：同样回实底，不为「玻璃」牺牲可读性。 */
@@ -3617,8 +3630,11 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
     backdrop-filter: none;
   }
   html[data-magpie-glass] :is(.menu-pop, .sel-pop, .keys-more-pop, .dash-tip, .modal, .drawer-panel, .aff-modal-panel),
-  html[data-magpie-glass] .keys-table thead th {
-    background: var(--bg);
+  html[data-magpie-glass] .keys-table thead th,
+  html[data-magpie-glass] .data-table thead th,
+  html[data-magpie-glass] .lg-head,
+  html[data-magpie-glass] .model-grid.as-list .ml-head {
+    background: var(--card);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
@@ -3631,7 +3647,11 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
   html[data-magpie-glass] body { background: Canvas; }
   html[data-magpie-glass] :is(.card, .dash-stat, .mc, .market-aside, .model-grid.as-list, .banner, .tabs, .market-top,
     .pill, .sel-trigger, .market-seg, .segmented, .tab[aria-selected="true"], .lg-stat,
-    .menu-pop, .sel-pop, .keys-more-pop, .dash-tip, .modal, .drawer-panel, .aff-modal-panel) {
+    .menu-pop, .sel-pop, .keys-more-pop, .dash-tip, .modal, .drawer-panel, .aff-modal-panel),
+  html[data-magpie-glass] .keys-table thead th,
+  html[data-magpie-glass] .data-table thead th,
+  html[data-magpie-glass] .lg-head,
+  html[data-magpie-glass] .model-grid.as-list .ml-head {
     background: Canvas;
     border: 1px solid CanvasText;
     -webkit-backdrop-filter: none;

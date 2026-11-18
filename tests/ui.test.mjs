@@ -776,6 +776,9 @@ test('液态玻璃：四个区域各用各的变量，缺变量/玻璃关着时�
   }
   // 无底色的长条（密钥标题行/筛选行）不能再带 backdrop-filter，否则玻璃卡片里是一条黑带。
   assert.match(css, /html\[data-magpie-glass\] \.keys-titlebar,\s*\n\s*html\[data-magpie-glass\] \.keys-filterbar \{[\s\S]*?backdrop-filter: none;/, '密钥标题/筛选长条要去掉背景模糊')
+  // 表头也必须玻璃化，不能是实色长条。
+  assert.match(css, /html\[data-magpie-glass\] \.keys-table thead th,\s*\n\s*html\[data-magpie-glass\] \.data-table thead th \{[\s\S]*?var\(--mg-overlay-fill\)/, '密钥/PAT 表头要用玻璃底')
+  assert.match(css, /html\[data-magpie-glass\] \.lg-head,\s*\n\s*html\[data-magpie-glass\] \.model-grid\.as-list \.ml-head \{[\s\S]*?var\(--mg-content-fill\)/, '日志/列表表头要用玻璃底')
 })
 
 test('根元素不能声明深色 color-scheme：否则 iframe 画不透明底，玻璃透不出壁纸', async () => {

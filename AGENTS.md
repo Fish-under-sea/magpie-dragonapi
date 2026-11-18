@@ -30,6 +30,7 @@
 - 所有表头（`.keys-table thead th`、`.data-table thead th`、`.lg-head`、`.model-grid.as-list .ml-head`）玻璃开时都改成**不吸顶、透明**，只留一条细分隔线——宿主页面里表头实色长条是最常见的「未透明色块」（2026-11-18 实机反馈）。表头原来若带 `backdrop-filter` 也要清掉。
 - 滚动条全局收成「只留拇指」：`scrollbar-color` 透明轨道、`::-webkit-scrollbar-button { display:none }`、拇指用 `--magpie-fg` 26% 的圆角细条；不要原生轨道底和上下箭头。
 - 玻璃下选中/按下态改用强调色 18% 半透明（`--accent-soft` 在深色主题是深藏蓝，会看成黑块）；比例/端点胶囊与厂商图标不描黑框，`.mc-vicon` 30px、图标 22px。`#diag-body` 要有自己的 `overflow-y:auto`，否则健康表处滚轮手势被 `overflow:hidden` 吞掉。
+- 宿主 bridge 实际只下发 **sidebar / content / overlay** 三个区域，**没有 control**（源码 `GLASS_REGIONS` 只有三项，文档写四个是旧口径）。`--magpie-glass-control-fill` 必须按 0% 回退、再兜 12%，绝不能回退 100%——那会让所有按钮、分段、输入框变成实心黑块（2026-11-18 实机根因）。
 
 ## 发布流程
 - 改版本 → `node --test --test-isolation=none "tests/*.test.mjs"`（当前 277 条）→ 原子提交 → `git tag vX.Y.Z`。

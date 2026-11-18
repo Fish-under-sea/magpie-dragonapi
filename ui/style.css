@@ -3822,3 +3822,88 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
   }
 }
 
+
+/* ── 官方液态玻璃材质（照宿主 fish-glass.css）───────────────────────────
+   不自己调色：底色只取 --card 与官方 fill；高光/柔光/釉面边都用宿主同一套
+   常量与伪元素做法，所以看起来才会和「签到&探针」等插件一致。 */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) and (background: color-mix(in srgb, red, transparent)) {
+  html[data-magpie-glass] {
+    --lg-rim-line: rgba(255, 255, 255, .72);
+    --lg-rim-line-2: rgba(255, 255, 255, .12);
+    --lg-rim-soft: rgba(255, 255, 255, .20);
+    --lg-rim-shade: rgba(0, 0, 0, .26);
+    --lg-sheen-a: rgba(255, 255, 255, .20);
+    --lg-sheen-b: rgba(160, 205, 255, .12);
+  }
+  /* 页面本身不铺任何底：壁纸与 veils 全交给宿主，底部不再出现「白块」。 */
+  html[data-magpie-glass],
+  html[data-magpie-glass] body { background: transparent; }
+  html[data-magpie-glass] body { text-shadow: none; }
+
+  /* 阅读面：官方的底色 + saturate/brightness + 高光内边 + 柔光投影。 */
+  html[data-magpie-glass] :is(.card, .dash-stat, .mc, .market-aside, .banner, .pat-state) {
+    position: relative;
+    border-color: transparent;
+    background: color-mix(in srgb, var(--magpie-card, var(--card)) var(--mg-content-fill), transparent);
+    -webkit-backdrop-filter: blur(var(--magpie-glass-content-blur, 0px)) saturate(180%) brightness(1.06);
+    backdrop-filter: blur(var(--magpie-glass-content-blur, 0px)) saturate(180%) brightness(1.06);
+    box-shadow: inset 0 1px 0 var(--lg-rim-line), inset 0 -1px 0 var(--lg-rim-shade), 0 10px 30px rgba(0, 0, 0, .20);
+  }
+  /* 顶栏/页签条：官方 sidebar 的折射与高光。 */
+  html[data-magpie-glass] :is(.topbar, .tabs, .market-top) {
+    position: relative;
+    border-color: transparent;
+    background: color-mix(in srgb, var(--magpie-card, var(--card)) var(--mg-sidebar-fill), transparent);
+    -webkit-backdrop-filter: blur(var(--magpie-glass-sidebar-blur, 0px)) saturate(200%) brightness(1.14);
+    backdrop-filter: blur(var(--magpie-glass-sidebar-blur, 0px)) saturate(200%) brightness(1.14);
+    box-shadow: inset 0 1px 0 var(--lg-rim-line), inset 0 -1px 0 var(--lg-rim-shade);
+  }
+  /* 柔光：左上冷光 + 右下壳光，只给大面。 */
+  html[data-magpie-glass] :is(.card, .topbar, .tabs, .banner, .pat-state, .market-aside, .dash-stat)::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      radial-gradient(130% 85% at 18% -10%, var(--lg-sheen-a), transparent 62%),
+      radial-gradient(90% 70% at 105% 110%, var(--lg-sheen-b), transparent 68%);
+  }
+  /* 1px 渐变釉面边：mask 挖掉中间，只留边。 */
+  html[data-magpie-glass] :is(.card, .topbar, .tabs, .banner, .pat-state, .market-aside, .dash-stat)::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    pointer-events: none;
+    background: linear-gradient(145deg, var(--lg-rim-line), transparent 38%, transparent 62%, var(--lg-rim-line-2));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    opacity: .7;
+  }
+  /* 控件：只上底色与高光边，不做模糊（固定弹层会跟着小方块定位）。 */
+  html[data-magpie-glass] :is(button, input:not([type="checkbox"]):not([type="radio"]), select, textarea,
+    .pill, .sel-trigger, .segmented, .market-seg, .lg-stat, .lg-page-btn) {
+    border-color: transparent;
+    background: color-mix(in srgb, var(--magpie-card, var(--card)) var(--mg-control-fill), transparent);
+    box-shadow: inset 0 1px 0 var(--lg-rim-line), inset 0 -1px 0 var(--lg-rim-shade);
+  }
+  /* 选中/按下：官方「玻璃凸起」渐变，而不是一块深色实底。 */
+  html[data-magpie-glass] :is([aria-selected="true"], [aria-pressed="true"],
+    .tab[aria-selected="true"], .segmented button[aria-pressed="true"],
+    .market-seg button[aria-pressed="true"], .market-chip[aria-pressed="true"], .sel-opt.on) {
+    border-color: transparent;
+    background: linear-gradient(180deg,
+      color-mix(in srgb, var(--mark-fill, var(--pill, #4a4a52)) 84%, transparent) 0%,
+      color-mix(in srgb, var(--mark-fill, var(--pill, #4a4a52)) 54%, transparent) 100%);
+    box-shadow: inset 0 1px 0 var(--lg-rim-line), inset 0 -1px 0 var(--lg-rim-shade), 0 2px 7px rgba(0, 0, 0, .18);
+  }
+  /* 去黑框：面、胶囊、图标方块一律不描实色边。 */
+  html[data-magpie-glass] :is(.card, .mc, .market-aside, .banner, .tabs, .market-top, .pat-state,
+    .mc-vicon, .mc-end, .mc-kind, .gb-tag, .tag-chip, .keys-ratio, .lg-page-btn) {
+    border-color: transparent;
+  }
+}

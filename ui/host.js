@@ -17,6 +17,8 @@
 
 const BRIDGE_PATH = '/_magpie/bridge.js'
 
+import { ensureReadable, isDarkColor } from './color.js'
+
 let connecting = null
 
 /** bridgeUrl 校验 boot.js 带来的地址：只认 http(s)、路径是 bridge，且和
@@ -55,7 +57,11 @@ function ancestorOrigin() {
 export function applyTheme(theme) {
   if (!theme || typeof theme !== 'object') return
   const root = document.documentElement
-  if (typeof theme.dark === 'boolean') root.dataset.theme = theme.dark ? 'dark' : 'light'
+  // 以官方 --bg 的亮度定深浅：bridge 在页面自己的文档里算 dark 时，
+  // prefers-color-scheme 可能和宿主窗口不一致，照 dark 走会把深色画成浅色。
+  const byBg = isDarkColor(theme.tokens?.bg || theme.tokens?.card)
+  if (byBg !== null) root.dataset.theme = byBg ? 'dark' : 'light'
+  else if (typeof theme.dark === 'boolean') root.dataset.theme = theme.dark ? 'dark' : 'light'
   for (const [key, value] of Object.entries(theme.tokens || {})) {
     const v = String(value ?? '').trim()
     if (!v) continue
@@ -66,6 +72,7 @@ export function applyTheme(theme) {
     const alias = SEMANTIC[name]
     if (alias) root.style.setProperty('--' + alias, v)
   }
+  ensureReadable(root)
 }
 
 const SEMANTIC = { green: 'ok', red: 'bad', amber: 'warn' }

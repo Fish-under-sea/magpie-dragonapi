@@ -7,6 +7,7 @@ import { aggregateRows, focusGroupOf, orderDefault } from './model-agg.js';
 import { createDemoApi } from './demo.js';
 // 跳转后把宿主的页面 bridge 接回来：液态玻璃与主题都靠它持续下发。
 import { connectHost } from './host.js';
+import { ensureReadable, isDarkColor } from './color.js';
 
 const DEMO_PARAMS = new URLSearchParams(location.search);
 const DEMO_API = DEMO_PARAMS.has('demo') && DEMO_PARAMS.get('demo') !== '0' ? createDemoApi() : null;
@@ -159,6 +160,13 @@ function initTheme() {
   // iframe 里会挡住壁纸（见 style.css 的说明）。深层控件的深色由 body 的
   // color-scheme 负责，meta 不要再切回 dark。
   if (meta) meta.setAttribute('content', 'light');
+
+  // 深/浅以官方 --bg 的实际亮度为准，不信 ?theme：宿主 bridge 在页面自己的
+  // 文档里算主题时，prefers-color-scheme 可能是另一套，单看 dark 会把深色
+  // 界面画成浅色。
+  const dark = isDarkColor(getComputedStyle(root).getPropertyValue('--bg'));
+  if (dark !== null) root.dataset.theme = dark ? 'dark' : 'light';
+  ensureReadable(root);
 }
 
 // ── 请求层 ────────────────────────────────────────────────

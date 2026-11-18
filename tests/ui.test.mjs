@@ -774,6 +774,8 @@ test('液态玻璃：四个区域各用各的变量，缺变量/玻璃关着时�
   for (const [region, floor] of [['content', '78%'], ['sidebar', '82%'], ['control', '88%'], ['overlay', '84%']]) {
     assert.match(css, new RegExp(`max\\(var\\(--magpie-glass-${region}-fill, 100%\\), ${floor}\\)`), `${region} 缺少深色主题的可读性下限`)
   }
+  // 无底色的长条（密钥标题行/筛选行）不能再带 backdrop-filter，否则玻璃卡片里是一条黑带。
+  assert.match(css, /html\[data-magpie-glass\] \.keys-titlebar,\s*\n\s*html\[data-magpie-glass\] \.keys-filterbar \{[\s\S]*?backdrop-filter: none;/, '密钥标题/筛选长条要去掉背景模糊')
 })
 
 test('根元素不能声明深色 color-scheme：否则 iframe 画不透明底，玻璃透不出壁纸', async () => {

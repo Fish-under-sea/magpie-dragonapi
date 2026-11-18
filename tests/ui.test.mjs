@@ -833,3 +833,13 @@ test('玻璃快照随跳转带走，bridge 重连失败也能画玻璃', async (
   assert.match(app, /applyGlassSnapshot\(/, 'app 要消费玻璃快照')
   assert.match(app, /setAttribute\('data-magpie-glass'/, '快照要挂上玻璃属性')
 })
+
+test('画布永远不铺底：任何状态下 html/body 都不能有实色背景', async () => {
+  const css = await (await fetch(base + '/ui/style.css')).text()
+  // 「底部/整页白块」的唯一来源就是页面自己给画布铺了 --bg。宿主的壁纸在
+  // iframe 外面，页面一旦铺底就是一块遮罩，所以这条不变量不允许被破坏。
+  assert.equal(/html,\s*body\s*\{[^}]*background:\s*var\(--bg\)/.test(css), false, 'html/body 不能铺 --bg')
+  assert.equal(/html\[data-magpie-glass\]\s*\{\s*background:\s*var\(--bg\)/.test(css), false, '玻璃画布不能铺 --bg')
+  assert.equal(/html\[data-magpie-glass\]\s*body\s*\{[^}]*background:\s*var\(--bg\)/.test(css), false, '玻璃 body 不能铺 --bg')
+  assert.match(css, /html,\s*body\s*\{[^}]*background:\s*transparent/, 'html/body 必须是透明的')
+})

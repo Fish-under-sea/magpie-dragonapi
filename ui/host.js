@@ -59,9 +59,16 @@ export function applyTheme(theme) {
   for (const [key, value] of Object.entries(theme.tokens || {})) {
     const v = String(value ?? '').trim()
     if (!v) continue
-    root.style.setProperty('--' + String(key).replace(/^--/, ''), v)
+    const name = String(key).replace(/^--/, '')
+    root.style.setProperty('--' + name, v)
+    // 宿主的语义色叫 green/red/amber，本页用 ok/warn/bad；接过来，别让状态色
+    // 停在页面自己的兜底值上（2.4.7 起这些颜色也可在「设置 › 外观」里改）。
+    const alias = SEMANTIC[name]
+    if (alias) root.style.setProperty('--' + alias, v)
   }
 }
+
+const SEMANTIC = { green: 'ok', red: 'bad', amber: 'warn' }
 
 /** loadScript 加载宿主的 bridge；失败或超时都只是「没有桥」，不抛。 */
 function loadScript(src, timeoutMs) {

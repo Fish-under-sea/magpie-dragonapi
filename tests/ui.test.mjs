@@ -812,6 +812,14 @@ test('玻璃下分类与时段保留选中渐变，诊断表放行纵向滚轮',
   assert.match(css, /html\[data-magpie-glass\] :is\(\.gb-tag, \.mc-end,[\s\S]*?border-color: transparent;/, '比例/端点胶囊不要黑框')
 })
 
+test('分组与分类共用的介绍卡沿用阅读卡材质，未筛选时默认隐藏', async () => {
+  const html = await (await fetch(base + '/')).text()
+  const banner = html.match(/<div\b[^>]*\bid="group-banner"[^>]*>/)?.[0] || ''
+  assert.match(banner, /\bhidden\b/, '未选择筛选项时不占位')
+  const classes = banner.match(/class="([^"]*)"/)?.[1].split(/\s+/) || []
+  assert.ok(classes.includes('card'), '分组介绍要复用阅读卡，否则玻璃开启时会保留实心底色')
+})
+
 test('官方液态玻璃材质：折射、柔光、釉面边与全透页面底', async () => {
   const css = await (await fetch(base + '/ui/style.css')).text()
   assert.match(css, /--lg-rim-line: rgba\(255, 255, 255, \.72\)/, '要用宿主同一套高光边常量')

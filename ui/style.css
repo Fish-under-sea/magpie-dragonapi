@@ -1684,9 +1684,6 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 .group-banner {
   margin: 0 0 12px;
   padding: 10px 13px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--card);
 }
 .gb-head {
   display: flex;

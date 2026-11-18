@@ -26,6 +26,7 @@
   let port = DEFAULT_PORT
   let theme = ''
   let tokens = null
+  let glass = null
   let service = ''
   let bridge = ''
 
@@ -34,6 +35,9 @@
     if (t) {
       if (typeof t.dark === 'boolean') theme = t.dark ? 'dark' : 'light'
       if (t.tokens && typeof t.tokens === 'object') tokens = t.tokens
+      // 玻璃快照也要带过去：gateway/独立窗口里 bridge 重连可能失败，页面
+      // 至少还能按跳转前的官方数字把玻璃画出来，而不是退回实心底。
+      if (t.glass && typeof t.glass === 'object') glass = t.glass
     }
   } catch { /* 没有 bridge 就退回默认主题 */ }
 
@@ -62,6 +66,7 @@
     if (s) slim[k] = s
   }
   if (Object.keys(slim).length) q.set('tokens', JSON.stringify(slim))
+  if (glass) q.set('glass', JSON.stringify(glass))
   if (bridge) q.set('bridge', bridge)
 
   /** 5 秒后这份文档还活着，说明跳转没走成，换成能操作的提示。 */

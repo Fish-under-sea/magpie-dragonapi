@@ -825,3 +825,11 @@ test('官方液态玻璃材质：折射、柔光、釉面边与全透页面底',
   assert.match(css, /html\[data-magpie-glass\],\s*\n\s*html\[data-magpie-glass\] body \{ background: transparent; \}/, '页面本身不能铺底（会变成大白块）')
   assert.match(css, /linear-gradient\(180deg,\s*\n\s*color-mix\(in srgb, var\(--mark-fill/, '选中态要用官方的凸起渐变')
 })
+
+test('玻璃快照随跳转带走，bridge 重连失败也能画玻璃', async () => {
+  const boot = readFileSync(join(here, '..', 'page', 'boot.js'), 'utf8')
+  assert.match(boot, /q\.set\('glass'/, 'boot 要把 magpie.ready 的 glass 带进 URL')
+  const app = readFileSync(join(here, '..', 'ui', 'app.js'), 'utf8')
+  assert.match(app, /applyGlassSnapshot\(/, 'app 要消费玻璃快照')
+  assert.match(app, /setAttribute\('data-magpie-glass'/, '快照要挂上玻璃属性')
+})

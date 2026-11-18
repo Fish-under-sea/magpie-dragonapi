@@ -815,3 +815,13 @@ test('玻璃下的选中态用强调色半透明，健康表能滚', async () =>
   assert.match(css, /html\[data-magpie-glass\] \.mc-vicon \{[\s\S]*?width: 30px;/, '厂商图标要稍微放大')
   assert.match(css, /html\[data-magpie-glass\] :is\(\.gb-tag, \.mc-end,[\s\S]*?border-color: transparent;/, '比例/端点胶囊不要黑框')
 })
+
+test('官方液态玻璃材质：折射、柔光、釉面边与全透页面底', async () => {
+  const css = await (await fetch(base + '/ui/style.css')).text()
+  assert.match(css, /--lg-rim-line: rgba\(255, 255, 255, \.72\)/, '要用宿主同一套高光边常量')
+  assert.match(css, /saturate\(200%\) brightness\(1\.14\)/, '侧栏/页签要按宿主做 200% 折射')
+  assert.match(css, /saturate\(180%\) brightness\(1\.06\)/, '阅读面要按宿主做 180% 折射')
+  assert.match(css, /mask-composite: exclude;/, '要有 1px 渐变釉面边')
+  assert.match(css, /html\[data-magpie-glass\],\s*\n\s*html\[data-magpie-glass\] body \{ background: transparent; \}/, '页面本身不能铺底（会变成大白块）')
+  assert.match(css, /linear-gradient\(180deg,\s*\n\s*color-mix\(in srgb, var\(--mark-fill/, '选中态要用官方的凸起渐变')
+})

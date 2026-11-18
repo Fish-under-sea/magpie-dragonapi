@@ -29,9 +29,10 @@
 - 本地服务必须在默认导出返回前 listen：`index.mjs` 里 `await Promise.race([serviceReady, 3s 超时])`。宿主判定「插件加载完成」是在默认导出返回时，而 magpie web 的反代第一跳不会等我们；服务没 listen 时页面会显示宿主的英文重试页（The plugin's service isn't answering yet），几秒后才好。
 - 所有表头（`.keys-table thead th`、`.data-table thead th`、`.lg-head`、`.model-grid.as-list .ml-head`）玻璃开时都改成**不吸顶、透明**，只留一条细分隔线——宿主页面里表头实色长条是最常见的「未透明色块」（2026-11-18 实机反馈）。表头原来若带 `backdrop-filter` 也要清掉。
 - 滚动条全局收成「只留拇指」：`scrollbar-color` 透明轨道、`::-webkit-scrollbar-button { display:none }`、拇指用 `--magpie-fg` 26% 的圆角细条；不要原生轨道底和上下箭头。
+- 玻璃下选中/按下态改用强调色 18% 半透明（`--accent-soft` 在深色主题是深藏蓝，会看成黑块）；比例/端点胶囊与厂商图标不描黑框，`.mc-vicon` 30px、图标 22px。`#diag-body` 要有自己的 `overflow-y:auto`，否则健康表处滚轮手势被 `overflow:hidden` 吞掉。
 
 ## 发布流程
-- 改版本 → `node --test --test-isolation=none "tests/*.test.mjs"`（当前 276 条）→ 原子提交 → `git tag vX.Y.Z`。
+- 改版本 → `node --test --test-isolation=none "tests/*.test.mjs"`（当前 277 条）→ 原子提交 → `git tag vX.Y.Z`。
 - `npm publish --access public`。账号启用 staged publishing，registry 生效有延迟；用 `npx npm@11.19.1 view @fish-under-sea/magpie-dragonapi dist-tags` 复核 `latest`。
 - 发布时把 npm cache 指到仓库内 `.npm-cache` 以避开沙箱限制，发布完删除该目录，不要提交。
 - 页面会轮询 `/api/ping` 的 `version` 与 `ui` 时间戳自动热重载；改 `ui/*` 或升级包后无需手动刷新。`/api/ping` 必须保留 `ui` 字段。

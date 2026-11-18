@@ -802,3 +802,11 @@ test('滚动条只留拇指：无轨道底、无上下箭头', async () => {
   assert.match(css, /\*::-webkit-scrollbar-button \{ display: none; width: 0; height: 0; \}/, '要隐藏上下箭头')
   assert.match(css, /\*::-webkit-scrollbar-thumb \{[\s\S]*?border-radius: 999px;/, '拇指要是圆角细条')
 })
+
+test('玻璃下的选中态用强调色半透明，健康表能滚', async () => {
+  const css = await (await fetch(base + '/ui/style.css')).text()
+  assert.match(css, /html\[data-magpie-glass\] :is\(\.tab\[aria-selected="true"\][\s\S]*?--magpie-accent/, '选中态要改成强调色玻璃，不能是深色实底')
+  assert.match(css, /#diag-body \{[\s\S]*?overflow-y: auto/, '健康与诊断的表要能在卡内滚')
+  assert.match(css, /html\[data-magpie-glass\] \.mc-vicon \{[\s\S]*?width: 30px;/, '厂商图标要稍微放大')
+  assert.match(css, /html\[data-magpie-glass\] :is\(\.gb-tag, \.mc-end,[\s\S]*?border-color: transparent;/, '比例/端点胶囊不要黑框')
+})

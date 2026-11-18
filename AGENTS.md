@@ -24,6 +24,7 @@
 - 根元素绝不能声明深色 `color-scheme`：Chromium 会给文档画一层不透明的 `#121212` 画布，iframe 里的宿主壁纸被挡住，玻璃只剩深色实底。根固定 `color-scheme: normal !important`，深色交给 `body` 的 `color-scheme`（实测；meta color-scheme 也要保持 light）。
 - 玻璃规则一律带 `fill 100% / blur 0px` 回退，并挂在 `html[data-magpie-glass]` 下；不写死 blur，玻璃关着时页面必须与改动前逐像素一致。
 - 深色主题要有可读性下限（content/sidebar/control/overlay = 78/82/88/84%）：读者的壁纸可能很亮，`fill=0` 时浅色文字会整屏消失（2026-11-18 实测）。浅色主题不受影响；插件页拿不到宿主的 `fishGlassVeil`，只能自己兜底。
+- 无底色的长条（`.keys-titlebar`、`.keys-filterbar`）不能再带 `backdrop-filter`：玻璃卡片里 Chromium 会把「透明底 + 模糊」渲染成一条黑带（2026-11-18 实机截图）。玻璃开着时对它们 `backdrop-filter: none; background: transparent`。
 
 ## 发布流程
 - 改版本 → `node --test --test-isolation=none "tests/*.test.mjs"`（当前 274 条）→ 原子提交 → `git tag vX.Y.Z`。

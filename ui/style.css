@@ -3586,6 +3586,16 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
   html[data-magpie-glass] .modal-foot {
     background: color-mix(in srgb, var(--card) 45%, transparent);
   }
+
+  /* 标题行 / 筛选行只是排版用的长条，本身没有底色，却带着 backdrop-filter。
+     在半透明卡片里，Chromium 会把这种「无底 + 模糊」的层渲染成一条黑带；
+     玻璃开着时直接去掉它们的模糊，让卡片自己的玻璃露出来。 */
+  html[data-magpie-glass] .keys-titlebar,
+  html[data-magpie-glass] .keys-filterbar {
+    background: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
 
 /* 环境不支持背景模糊：回落实底（整段增强在上面已按 @supports 关掉，这里

@@ -3544,13 +3544,16 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
        - 颜色一律用宿主的 --magpie-bg / --magpie-card / --magpie-fg；
        - 像不像玻璃靠高光边 + 柔和外阴影，不靠加底色。
      做法与 checkin-relay-probe、Purge 的 page/glass.js、宿主 fish-glass.css 一致。 */
+  /* 回退必须是 0%：宿主可能只挂了 data-magpie-glass 却没给区域变量（bridge
+     的 glass.regions 为空时就是这样）。回退 100% 会把整页画成实心白/实心底——
+     这就是「整页被白色覆盖」的根因。 */
   html[data-magpie-glass] {
-    --mg-canvas-fill: var(--magpie-glass-content-fill, 100%);
+    --mg-canvas-fill: var(--magpie-glass-content-fill, 0%);
     --mg-canvas-blur: var(--magpie-glass-content-blur, 0px);
-    --mg-content-fill: var(--magpie-glass-content-fill, 100%);
-    --mg-sidebar-fill: var(--magpie-glass-sidebar-fill, 100%);
+    --mg-content-fill: var(--magpie-glass-content-fill, 0%);
+    --mg-sidebar-fill: var(--magpie-glass-sidebar-fill, 0%);
     --mg-control-fill: max(var(--magpie-glass-control-fill, 0%), 12%);
-    --mg-overlay-fill: var(--magpie-glass-overlay-fill, 100%);
+    --mg-overlay-fill: var(--magpie-glass-overlay-fill, 0%);
     --mg-control-blur: var(--magpie-glass-control-blur, 0px);
   }
 

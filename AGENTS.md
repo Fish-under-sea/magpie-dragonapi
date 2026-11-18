@@ -22,7 +22,7 @@
 ## 液态玻璃（Magpie 2.4.0+）
 - 插件页是跳到本地服务的，一跳转宿主 bridge 就没了：`page/boot.js` 必须把 `_magpie/bridge.js` 的 http(s) 地址随 URL 带给 `ui/host.js` 重新加载，否则 `magpie.glass` / `--magpie-glass-*` / `data-magpie-glass` 永远不出现。
 - 根元素绝不能声明深色 `color-scheme`：Chromium 会给文档画一层不透明的 `#121212` 画布，iframe 里的宿主壁纸被挡住，玻璃只剩深色实底。根固定 `color-scheme: normal !important`，深色交给 `body` 的 `color-scheme`（实测；meta color-scheme 也要保持 light）。
-- 玻璃规则一律带 `fill 100% / blur 0px` 回退，并挂在 `html[data-magpie-glass]` 下；不写死 blur，玻璃关着时页面必须与改动前逐像素一致。
+- 玻璃规则一律带 `fill 0% / blur 0px` 回退，并挂在 `html[data-magpie-glass]` 下；不写死 blur，玻璃关着时页面必须与改动前逐像素一致。**回退 0% 很重要**：bridge 可能只挂属性、`glass.regions` 为空，回退 100% 会把整页画成实心白/黑底（2026-11-18 实机「整页被白色覆盖」根因）。
 - 画布与所有面**原样使用官方 fill**（0 就是真透）：绝不能加「最低不透明度」，否则壁纸颜色被压成灰板，和别的插件玻璃颜色对不上（2026-11-18 实机对比）。玻璃颜色用 `--magpie-bg` / `--magpie-card`，字体色用 `--magpie-fg` 系列，`green/red/amber` 映射 `ok/warn/bad`。**页面 html/body 必须全透明**，不能铺 10% 之类的底——那在浅色主题下就是「底部白块」。
 - 无底色的长条（`.keys-titlebar`、`.keys-filterbar`）不能再带 `backdrop-filter`：玻璃卡片里 Chromium 会把「透明底 + 模糊」渲染成一条黑带（2026-11-18 实机截图）。玻璃开着时对它们 `backdrop-filter: none; background: transparent`。
 - 玻璃材质必须照宿主 `fish-glass.css` 整套搬：`--lg-rim-line rgba(255,255,255,.72)`、`--lg-rim-shade rgba(0,0,0,.26)`、`--lg-sheen-a/b` 柔光、`saturate(180–200%) brightness(1.06–1.14)` 折射、`::before` 双径向柔光、`::after` mask 挖出的 1px 渐变釉面边、选中态 84%→54% 的凸起渐变。自己写「加个圆角/加条阴影」会被一眼看出不是官方玻璃（2026-11-18 用户对比「签到&探针」）。

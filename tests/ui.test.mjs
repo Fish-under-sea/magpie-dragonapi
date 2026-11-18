@@ -754,11 +754,11 @@ test('本地界面接回宿主 bridge：校验地址，并在主题变化时继�
   assert.match(app, /from '\.\/host\.js'/, 'app.js 要加载 host.js，而不是假设自己还在宿主帧里')
 })
 
-test('液态玻璃：四个区域各用各的变量，缺变量/玻璃关着时回落到实处', async () => {
+test('液态玻璃：跟随宿主三个区域，控件复用内容区且不设透明度下限', async () => {
   const css = await (await fetch(base + '/ui/style.css')).text()
   // 宿主 bridge 可能只挂 data-magpie-glass 而不下发区域变量（glass.regions 为空）；
   // 回退必须是 0%，回退 100% 会把整页画成实心白/黑底。
-  for (const region of ['content', 'sidebar', 'overlay', 'control']) {
+  for (const region of ['content', 'sidebar', 'overlay']) {
     assert.match(css, new RegExp(`--magpie-glass-${region}-fill, 0%`), `${region} 的 fill 回退必须是 0%`)
     assert.match(css, new RegExp(`--magpie-glass-${region}-blur, 0px`), `${region} 的 blur 必须有 0px 回退`)
   }
@@ -779,12 +779,13 @@ test('液态玻璃：四个区域各用各的变量，缺变量/玻璃关着时�
   assert.equal(/max\(var\(--magpie-glass-content-fill/.test(css), false, '不能再给玻璃面加最低不透明度')
   // 宿主的 bridge 实际只下发 sidebar/content/overlay，没有 control；
   // control 若回退 100% 会让按钮/分段变成一整块黑底。
-  assert.match(css, /--mg-control-fill: max\(var\(--magpie-glass-control-fill, 0%\), 12%\)/, '控件不能用 100% 回退')
+  assert.ok(!css.includes('--magpie-glass-control-'), '不要依赖宿主没有下发的 control 区域')
+  assert.ok(css.includes('--mg-control-fill: var(--mg-content-fill)'), '控件跟随真实区域的 fill，0 就全透')
   // 无底色的长条（密钥标题行/筛选行）不能再带 backdrop-filter，否则玻璃卡片里是一条黑带。
   assert.match(css, /html\[data-magpie-glass\] \.keys-titlebar,\s*\n\s*html\[data-magpie-glass\] \.keys-filterbar \{[\s\S]*?backdrop-filter: none;/, '密钥标题/筛选长条要去掉背景模糊')
-  // 表头也必须玻璃化，不能是实色长条。
-  assert.match(css, /html\[data-magpie-glass\] \.keys-table thead th,\s*\n\s*html\[data-magpie-glass\] \.data-table thead th \{[\s\S]*?var\(--mg-overlay-fill\)/, '密钥/PAT 表头要用玻璃底')
-  assert.match(css, /html\[data-magpie-glass\] \.lg-head,\s*\n\s*html\[data-magpie-glass\] \.model-grid\.as-list \.ml-head \{[\s\S]*?var\(--mg-content-fill\)/, '日志/列表表头要用玻璃底')
+  // 表头不再单独叠一层模糊或实色长条。
+  assert.ok(/\.data-table thead th \{[^}]*position: static;[^}]*background: transparent;[^}]*backdrop-filter: none;/.test(css))
+  assert.ok(/\.model-grid\.as-list \.ml-head \{[^}]*background: transparent;/.test(css))
 })
 
 test('iframe 画布支持两种宿主色系并允许官方 bridge 接管', async () => {
@@ -803,10 +804,10 @@ test('滚动条只留拇指：无轨道底、无上下箭头', async () => {
   assert.match(css, /\*::-webkit-scrollbar-thumb \{[\s\S]*?border-radius: 999px;/, '拇指要是圆角细条')
 })
 
-test('玻璃下的选中态用强调色半透明，健康表能滚', async () => {
+test('玻璃下分类与时段保留选中渐变，诊断表放行纵向滚轮', async () => {
   const css = await (await fetch(base + '/ui/style.css')).text()
-  assert.match(css, /html\[data-magpie-glass\] :is\(\.tab\[aria-selected="true"\][\s\S]*?--magpie-accent/, '选中态要改成强调色玻璃，不能是深色实底')
-  assert.match(css, /#diag-body \{[\s\S]*?overflow-y: auto/, '健康与诊断的表要能在卡内滚')
+  assert.ok(/button\[aria-pressed="true"\]:is\(\.cat-head,[^{]*\{[^}]*background: var\(--control-mark\)/.test(css), '分类、分段选中态要用凸起渐变')
+  assert.ok(/#diag-body \{[^}]*overflow: visible;[^}]*overscroll-behavior: auto;/.test(css), '诊断内容要放行滚轮给外层，不能在零滚动范围内截断手势')
   assert.match(css, /html\[data-magpie-glass\] \.mc-vicon \{[\s\S]*?width: 30px;/, '厂商图标要稍微放大')
   assert.match(css, /html\[data-magpie-glass\] :is\(\.gb-tag, \.mc-end,[\s\S]*?border-color: transparent;/, '比例/端点胶囊不要黑框')
 })
@@ -819,6 +820,12 @@ test('官方液态玻璃材质：折射、柔光、釉面边与全透页面底',
   assert.match(css, /mask-composite: exclude;/, '要有 1px 渐变釉面边')
   assert.match(css, /html\[data-magpie-glass\],\s*\n\s*html\[data-magpie-glass\] body \{ background: transparent; \}/, '页面本身不能铺底（会变成大白块）')
   assert.match(css, /linear-gradient\(180deg,\s*\n\s*color-mix\(in srgb, var\(--mark-fill/, '选中态要用官方的凸起渐变')
+})
+
+test('推荐复制与密钥操作的独立图标有固定画布，不被按钮内边距挤小', async () => {
+  const css = await (await fetch(base + '/ui/style.css')).text()
+  assert.ok(/\.rf-copy > svg,\s*\.keys-act > svg\s*\{[^}]*width: 20px;[^}]*height: 20px;[^}]*flex: none;/.test(css))
+  assert.ok(/\.rf-copy,\s*\.keys-act:has\(> svg\)\s*\{[^}]*padding: 0;/.test(css))
 })
 
 test('玻璃快照随跳转带走，bridge 重连失败也能画玻璃', async () => {

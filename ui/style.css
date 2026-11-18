@@ -1870,10 +1870,11 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
   background: transparent;
   border: 0;
   cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
 }
+.mc-name:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 .mc-name:hover { color: var(--accent); text-decoration: underline; }
 .mc-vendor {
   font-size: 10.5px;
@@ -2152,8 +2153,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; }
 /* 卡片主体：撑满卡片、超出在卡内滚动 */
 #account-body,
 #usage-body,
-#keys-body,
-#diag-body {
+#keys-body {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
@@ -2970,14 +2970,8 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
   flex-direction: column;
   overflow: hidden;
 }
-/* 健康与诊断的表格要能在卡内滚（之前 overflow:hidden 把滚动手势吞了）。 */
-#diag-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-}
+/* 诊断卡随记录增高；纵向滚轮交给面板，横向滚动仍归内部 .table-wrap。 */
+#diag-body { overflow: visible; overscroll-behavior: auto; }
 
 /* 账户内容增多后统一面板滚动：不把订阅或密钥挤成不可达的小窗口。 */
 #panel-wallet { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
@@ -3058,10 +3052,11 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
 .dash-tip-k { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
 .dash-tip-v { margin-left: auto; font-family: var(--code); }
 .dash-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; }
-.dash-legend-item { display: inline-flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 11px; color: var(--muted); background: none; border: 0; cursor: pointer; }
+.dash-legend-item { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; padding: 3px 9px; border-radius: 8px; font-size: 11px; color: var(--muted); background: none; border: 0; cursor: pointer; text-align: start; }
+.dash-legend-label { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 .dash-legend-item:hover { color: var(--fg); }
 .dash-legend-item.off { opacity: .38; }
-.dash-legend-dot { width: 9px; height: 9px; border-radius: 2px; }
+.dash-legend-dot { flex: none; width: 9px; height: 9px; border-radius: 2px; }
 .dash-props { display: flex; flex-direction: column; gap: 9px; padding: 2px 0 6px; }
 .dash-prop-row { display: grid; grid-template-columns: 190px minmax(0, 1fr) 130px; gap: 10px; align-items: center; font-size: 11.5px; }
 .dash-prop-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -3195,6 +3190,11 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
   width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
   border-radius: 999px; border: 1px solid transparent; background: transparent; color: var(--muted); cursor: pointer;
 }
+/* 只放大推荐复制、启用/禁用和编辑的笔画，不改 28px 点击区或「更多」。 */
+.rf-copy,
+.keys-act:has(> svg) { padding: 0; }
+.rf-copy > svg,
+.keys-act > svg { width: 20px; height: 20px; flex: none; stroke-width: 2; }
 .keys-act:hover { background: var(--card-hover); color: var(--fg); }
 .keys-act.danger:hover { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
 
@@ -3352,16 +3352,13 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
 }
 #keys-view-pop { max-height: 300px; overflow: auto; }
 
-/* 扁平胶囊：去掉描边，纯色浅底 */
-.logs-range,
-.logs-toolbar .logs-input,
-.logs-toolbar .sel-trigger,
+/* 普通主题用扁平底；玻璃下的日志控件交给下方材质规则。 */
+:where(html:not([data-magpie-glass])) :is(.logs-range, .logs-toolbar .logs-input, .logs-toolbar .sel-trigger, .logs-tools .btn),
 .keys-filterbar .keys-input,
 .keys-filterbar .keys-select,
 .keys-filterbar .btn,
 .keys-filterbar .sel-trigger,
-#keys-api-addr,
-.logs-tools .btn {
+#keys-api-addr {
   border-color: transparent !important;
   background: rgba(255, 255, 255, .05) !important;
 }
@@ -3525,19 +3522,17 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
  *
  *   - content：整页底、卡片、看板统计、模型卡、筛选栏、列表容器、toast；
  *   - sidebar：标签栏、模型广场的工具条；
- *   - control：按钮、胶囊、输入框、下拉；
+ *   - 控件：跟随 content 的填充，不再叠加模糊；
  *   - overlay：菜单、下拉弹层、代码详情、对话框、抽屉。
  *
- * 回退值写 100% / 0px：旧宿主、玻璃关着、单独打开服务时仍完全是原来的
- * 实底；模糊一律走变量，用户把 blur 拖到 0 时页面必须真的不糊。
+ * 玻璃开启却缺少区域值时回退 0% / 0px；没有玻璃属性时保留普通样式。
  * 参考 docs/developers/liquid-glass-hooks.md、checkin-relay-probe 与 Clash
  * 的同款写法。 */
+@media (not (forced-colors: active)) and (not (prefers-reduced-transparency: reduce)) {
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) and (background: color-mix(in srgb, red, transparent)) {
   /* 玻璃数字全部照官方钩子来：
-       - 画布（整页底）与所有面都直接用官方的 fill，0 就是真透——壁纸由宿主
-         画在它自己的 body 上（带 --wall-veil 遮挡），页面不叠底、也不设
-         「最低不透明度」；加下限会把壁纸透出来的颜色压成灰板，和别的插件
-         的玻璃颜色对不上（实机对比）；
+       - 画布始终透明，壁纸与遮罩由宿主绘制；面板直接用区域 fill，
+         不设「最低不透明度」，避免把壁纸压成灰色；
        - 颜色一律用宿主的 --magpie-bg / --magpie-card / --magpie-fg；
        - 像不像玻璃靠高光边 + 柔和外阴影，不靠加底色。
      做法与 checkin-relay-probe、Purge 的 page/glass.js、宿主 fish-glass.css 一致。 */
@@ -3545,26 +3540,11 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
      的 glass.regions 为空时就是这样）。回退 100% 会把整页画成实心白/实心底——
      这就是「整页被白色覆盖」的根因。 */
   html[data-magpie-glass] {
-    --mg-canvas-fill: var(--magpie-glass-content-fill, 0%);
-    --mg-canvas-blur: var(--magpie-glass-content-blur, 0px);
     --mg-content-fill: var(--magpie-glass-content-fill, 0%);
     --mg-sidebar-fill: var(--magpie-glass-sidebar-fill, 0%);
-    --mg-control-fill: max(var(--magpie-glass-control-fill, 0%), 12%);
+    --mg-control-fill: var(--mg-content-fill);
     --mg-overlay-fill: var(--magpie-glass-overlay-fill, 0%);
-    --mg-control-blur: var(--magpie-glass-control-blur, 0px);
   }
-
-  /* 画布：照抄主界面数字；壁纸在宿主文档里，跨文档模糊浏览器不给，所以不糊。 */
-  html[data-magpie-glass] {
-    background: color-mix(in srgb, var(--magpie-bg, var(--bg)) var(--mg-canvas-fill), transparent);
-  }
-  html[data-magpie-glass] body {
-    /* 很淡的一层底：只为了不让壁纸的纯白区域在页底显得像「大白底」，
-       不改变玻璃的透感（10% 远低于任何「灰板」）。 */
-    background: color-mix(in srgb, var(--magpie-card, var(--card)) 10%, transparent);
-    text-shadow: 0 1px 2px rgba(0, 0, 0, .38);
-  }
-  html[data-theme="light"][data-magpie-glass] body { text-shadow: none; }
 
   /* 阅读面：卡片与列表容器。 */
   html[data-magpie-glass] :is(.card, .dash-stat, .mc, .market-aside, .model-grid.as-list, .banner) {
@@ -3602,20 +3582,6 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
     backdrop-filter: blur(var(--magpie-glass-overlay-blur, 0px)) saturate(180%) brightness(1.06);
   }
 
-  /* 吸顶表头也是玻璃：keys / PAT 的表格头用 overlay 区域的下限 + 模糊，
-     静态的日志表头 / 列表头用 content 下限。任何表头都不再是实色长条。 */
-  html[data-magpie-glass] .keys-table thead th,
-  html[data-magpie-glass] .data-table thead th {
-    background: color-mix(in srgb, var(--magpie-card, var(--card)) var(--mg-overlay-fill), transparent);
-    -webkit-backdrop-filter: blur(var(--magpie-glass-overlay-blur, 0px)) saturate(180%) brightness(1.05);
-    backdrop-filter: blur(var(--magpie-glass-overlay-blur, 0px)) saturate(180%) brightness(1.05);
-    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--magpie-fg, var(--fg)) 9%, transparent);
-  }
-  html[data-magpie-glass] .lg-head,
-  html[data-magpie-glass] .model-grid.as-list .ml-head {
-    background: color-mix(in srgb, var(--magpie-card, var(--card)) var(--mg-content-fill), transparent);
-    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--magpie-fg, var(--fg)) 9%, transparent);
-  }
   html[data-magpie-glass] .modal-foot {
     background: color-mix(in srgb, var(--magpie-card, var(--card)) 45%, transparent);
   }
@@ -3645,13 +3611,25 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
     --mg-shadow: 0 10px 30px rgba(20, 22, 30, .12);
   }
 
+  /* 共用顶栏的外沿；两个整页滚动的面板将拇指放在右侧留白，不挤窄卡片。 */
+  html[data-magpie-glass] .app { --page-inset: 8px; padding-inline: var(--page-inset); container-type: inline-size; }
+  html[data-magpie-glass] .panels:has(> :is(#panel-dashboard, #panel-pat):not([hidden])) {
+    margin-inline-end: calc(-1 * var(--page-inset));
+    overflow-y: auto;
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+  html[data-magpie-glass] .panels::-webkit-scrollbar { width: var(--page-inset); }
+  html[data-magpie-glass] :is(#panel-dashboard, #panel-pat) {
+    flex: none; width: 100%; max-width: 100cqi; overflow: visible; padding-inline-end: 0;
+  }
   /* 品牌行也做成一颗玻璃胶囊，页头文字不再直接落在壁纸上。 */
   html[data-magpie-glass] .topbar {
     background: color-mix(in srgb, var(--magpie-card, var(--card)) var(--mg-content-fill), transparent);
     border: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
     border-radius: 14px;
     padding: 10px 14px;
-    margin: -10px -14px 0;
+    margin: -10px 0 0;
     box-shadow: inset 0 1px 0 var(--mg-rim-line), inset 0 -1px 0 var(--mg-rim-shade), var(--mg-shadow);
   }
 
@@ -3710,15 +3688,6 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
   html[data-magpie-glass] .modal-x,
   html[data-magpie-glass] .banner-close { border-color: transparent; box-shadow: none; }
 
-  /* 选中/按下态不能再用深色实底（--accent-soft 在深色主题是很深的藏蓝，
-     看起来就是黑块）。改成强调色的半透明玻璃，环和底都跟着官方强调色。 */
-  html[data-magpie-glass] :is(.tab[aria-selected="true"], .segmented button[aria-pressed="true"],
-    .market-seg button[aria-pressed="true"], .market-chip[aria-pressed="true"], .sel-opt.on,
-    .menu-pop [role="option"][aria-selected="true"], .keys-table tr.is-selected) {
-    background: color-mix(in srgb, var(--magpie-accent, var(--accent)) 18%, transparent);
-    border-color: color-mix(in srgb, var(--magpie-accent, var(--accent)) 45%, transparent);
-    box-shadow: inset 0 1px 0 var(--mg-rim-line);
-  }
 
   /* 分页、行内小按钮、比例/端点/端点胶囊：不画黑框，只留玻璃边或干脆无框。 */
   html[data-magpie-glass] .lg-page-btn {
@@ -3743,6 +3712,7 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
     box-shadow: inset 0 1px 0 color-mix(in srgb, var(--magpie-fg, var(--fg)) 12%, transparent);
   }
   html[data-magpie-glass] .mc-vicon img { width: 22px; height: 22px; }
+}
 }
 
 /* 环境不支持背景模糊：回落实底（整段增强在上面已按 @supports 关掉，这里
@@ -3819,6 +3789,7 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
 /* ── 官方液态玻璃材质（照宿主 fish-glass.css）───────────────────────────
    不自己调色：底色只取 --card 与官方 fill；高光/柔光/釉面边都用宿主同一套
    常量与伪元素做法，所以看起来才会和「签到&探针」等插件一致。 */
+@media (not (forced-colors: active)) and (not (prefers-reduced-transparency: reduce)) {
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) and (background: color-mix(in srgb, red, transparent)) {
   html[data-magpie-glass] {
     --lg-rim-line: rgba(255, 255, 255, .72);
@@ -3827,6 +3798,11 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
     --lg-rim-shade: rgba(0, 0, 0, .26);
     --lg-sheen-a: rgba(255, 255, 255, .20);
     --lg-sheen-b: rgba(160, 205, 255, .12);
+    --control-face: color-mix(in srgb, var(--magpie-card, var(--card)) var(--mg-control-fill), transparent);
+    --control-rim: inset 0 1px 0 var(--lg-rim-line), inset 0 0 0 1px var(--lg-rim-line-2);
+    --control-mark: linear-gradient(180deg,
+      color-mix(in srgb, var(--mark-fill, var(--card-hover)) 84%, transparent),
+      color-mix(in srgb, var(--mark-fill, var(--card-hover)) 54%, transparent));
   }
   /* 页面本身不铺任何底：壁纸与 veils 全交给宿主，底部不再出现「白块」。 */
   html[data-magpie-glass],
@@ -3884,19 +3860,38 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
     background: color-mix(in srgb, var(--magpie-card, var(--card)) var(--mg-control-fill), transparent);
     box-shadow: inset 0 1px 0 var(--lg-rim-line), inset 0 -1px 0 var(--lg-rim-shade);
   }
+  /* 分类、分段与日志都嵌在已有阅读面中：只勾亮边，不再叠深色内阴影或模糊。 */
+  html[data-magpie-glass] :is(#panel-catalog, #panel-dashboard, #panel-logs) :is(.cat-head, .market-chip, .segmented, .market-seg,
+    .dash-legend-item, .logs-range, .logs-input, .sel-trigger, .lg-stat, .lg-page-btn,
+    .lg-pill, .lg-model-pill, .lg-cost-pill, :where(.logs-tools) .btn:where(:not(.primary))) {
+    background: var(--control-face);
+    border-color: transparent;
+    box-shadow: var(--control-rim);
+  }
+  html[data-magpie-glass] .cat-head { padding: 4px 8px; border-radius: 8px; }
+  html[data-magpie-glass] .panel :is(.segmented, .market-seg) button {
+    background: transparent; border-color: transparent; box-shadow: none;
+  }
+  html[data-magpie-glass] #panel-logs :is(.logs-head-box, .logs-body) {
+    background: transparent; border-color: transparent; box-shadow: var(--control-rim);
+  }
+  html[data-magpie-glass] .lg-row { border-bottom-color: color-mix(in srgb, var(--fg) 15%, transparent); }
+  html[data-magpie-glass] .lg-tag:not(.ok) { border-color: var(--lg-rim-soft); }
+  html[data-magpie-glass] .mc-head button.mc-name { background: none; box-shadow: none; }
   /* 选中/按下：官方「玻璃凸起」渐变，而不是一块深色实底。 */
   html[data-magpie-glass] :is([aria-selected="true"], [aria-pressed="true"],
     .tab[aria-selected="true"], .segmented button[aria-pressed="true"],
-    .market-seg button[aria-pressed="true"], .market-chip[aria-pressed="true"], .sel-opt.on) {
+    .menu-pop [role="option"][aria-selected="true"], .keys-table tr.is-selected, .sel-opt.on),
+  html[data-magpie-glass] :is(#panel-dashboard, #panel-catalog) button[aria-pressed="true"]:is(.cat-head, .market-chip,
+    .dash-legend-item, .segmented > button, .market-seg > button) {
     border-color: transparent;
-    background: linear-gradient(180deg,
-      color-mix(in srgb, var(--mark-fill, var(--pill, #4a4a52)) 84%, transparent) 0%,
-      color-mix(in srgb, var(--mark-fill, var(--pill, #4a4a52)) 54%, transparent) 100%);
-    box-shadow: inset 0 1px 0 var(--lg-rim-line), inset 0 -1px 0 var(--lg-rim-shade), 0 2px 7px rgba(0, 0, 0, .18);
+    background: var(--control-mark);
+    box-shadow: var(--control-rim);
   }
   /* 去黑框：面、胶囊、图标方块一律不描实色边。 */
   html[data-magpie-glass] :is(.card, .mc, .market-aside, .banner, .tabs, .market-top, .pat-state,
     .mc-vicon, .mc-end, .mc-kind, .gb-tag, .tag-chip, .keys-ratio, .lg-page-btn) {
     border-color: transparent;
   }
+}
 }

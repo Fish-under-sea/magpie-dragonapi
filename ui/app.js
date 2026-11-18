@@ -2321,7 +2321,8 @@ function renderDashLegend(box, series) {
       else dashView.hidden.add(s.model);
       renderDashboard();
     },
-  }, h('i', { class: 'dash-legend-dot', style: `background:${s.color}` }), s.model)));
+  }, h('i', { class: 'dash-legend-dot', style: `background:${s.color}` }),
+  h('span', { class: 'dash-legend-label', text: s.model }))));
 }
 
 function renderDashboard() {

@@ -3549,7 +3549,7 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
     --mg-canvas-blur: var(--magpie-glass-content-blur, 0px);
     --mg-content-fill: var(--magpie-glass-content-fill, 100%);
     --mg-sidebar-fill: var(--magpie-glass-sidebar-fill, 100%);
-    --mg-control-fill: var(--magpie-glass-control-fill, 100%);
+    --mg-control-fill: max(var(--magpie-glass-control-fill, 0%), 12%);
     --mg-overlay-fill: var(--magpie-glass-overlay-fill, 100%);
     --mg-control-blur: var(--magpie-glass-control-blur, 0px);
   }

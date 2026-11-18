@@ -756,8 +756,10 @@ test('本地界面接回宿主 bridge：校验地址，并在主题变化时继�
 
 test('液态玻璃：四个区域各用各的变量，缺变量/玻璃关着时回落到实处', async () => {
   const css = await (await fetch(base + '/ui/style.css')).text()
-  for (const region of ['content', 'sidebar', 'overlay', 'control']) {
-    assert.match(css, new RegExp(`--magpie-glass-${region}-fill, 100%`), `${region} 的 fill 必须有 100% 回退`)
+  // 宿主 bridge 实际只下发 sidebar/content/overlay 三个区域；control 缺席，
+  // 回退必须是 0%（再用 12% 的下限兜一下），不能是 100%（会变成一整块黑底）。
+  for (const [region, fallback] of [['content', '100%'], ['sidebar', '100%'], ['overlay', '100%'], ['control', '0%']]) {
+    assert.match(css, new RegExp(`--magpie-glass-${region}-fill, ${fallback.replace('%', '\\%')}`), `${region} 的 fill 回退不对`)
     assert.match(css, new RegExp(`--magpie-glass-${region}-blur, 0px`), `${region} 的 blur 必须有 0px 回退`)
   }
   // 只在宿主说「玻璃开着」时才重上色；关着时页面必须还是原来的实底。
@@ -771,10 +773,13 @@ test('液态玻璃：四个区域各用各的变量，缺变量/玻璃关着时�
   const glass = css.slice(at).split('\n').filter((line) => !line.includes('@supports')).join('\n')
   assert.equal(/blur\(\s*\d/.test(glass), false, '玻璃段的 blur 必须走 --magpie-glass-*-blur，不能写死像素')
   // 官方 fill 必须原样用，不能加「最低不透明度」：加了下限会把壁纸颜色压成灰板。
-  for (const [name, region] of [['content', 'content'], ['sidebar', 'sidebar'], ['control', 'control'], ['overlay', 'overlay']]) {
-    assert.match(css, new RegExp(`--mg-${name}-fill: var\\(--magpie-glass-${region}-fill, 100%\\)`), `${region} 必须原样使用官方 fill`)
+  for (const region of ['content', 'sidebar', 'overlay']) {
+    assert.match(css, new RegExp(`--mg-${region}-fill: var\\(--magpie-glass-${region}-fill, 100%\\)`), `${region} 必须原样使用官方 fill`)
   }
   assert.equal(/max\(var\(--magpie-glass-content-fill/.test(css), false, '不能再给玻璃面加最低不透明度')
+  // 宿主的 bridge 实际只下发 sidebar/content/overlay，没有 control；
+  // control 若回退 100% 会让按钮/分段变成一整块黑底。
+  assert.match(css, /--mg-control-fill: max\(var\(--magpie-glass-control-fill, 0%\), 12%\)/, '控件不能用 100% 回退')
   // 无底色的长条（密钥标题行/筛选行）不能再带 backdrop-filter，否则玻璃卡片里是一条黑带。
   assert.match(css, /html\[data-magpie-glass\] \.keys-titlebar,\s*\n\s*html\[data-magpie-glass\] \.keys-filterbar \{[\s\S]*?backdrop-filter: none;/, '密钥标题/筛选长条要去掉背景模糊')
   // 表头也必须玻璃化，不能是实色长条。

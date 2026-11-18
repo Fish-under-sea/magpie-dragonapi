@@ -23,7 +23,7 @@
 - 插件页是跳到本地服务的，一跳转宿主 bridge 就没了：`page/boot.js` 必须把 `_magpie/bridge.js` 的 http(s) 地址随 URL 带给 `ui/host.js` 重新加载，否则 `magpie.glass` / `--magpie-glass-*` / `data-magpie-glass` 永远不出现。
 - 根元素绝不能声明深色 `color-scheme`：Chromium 会给文档画一层不透明的 `#121212` 画布，iframe 里的宿主壁纸被挡住，玻璃只剩深色实底。根固定 `color-scheme: normal !important`，深色交给 `body` 的 `color-scheme`（实测；meta color-scheme 也要保持 light）。
 - 玻璃规则一律带 `fill 100% / blur 0px` 回退，并挂在 `html[data-magpie-glass]` 下；不写死 blur，玻璃关着时页面必须与改动前逐像素一致。
-- 深色主题要有可读性下限（content/sidebar/control/overlay = 78/82/88/84%）：读者的壁纸可能很亮，`fill=0` 时浅色文字会整屏消失（2026-11-18 实测）。浅色主题不受影响；插件页拿不到宿主的 `fishGlassVeil`，只能自己兜底。
+- 画布照抄 content 的 fill（0 就是真透）：**绝不能给整页加一层底**，否则宿主壁纸被压成一大块灰色遮罩（2026-11-18 实机反馈）。文字面下限 content/sidebar/overlay/control = 62/62/70/55%；玻璃颜色用 `--magpie-bg` / `--magpie-card`，字体色用 `--magpie-fg` 系列，`green/red/amber` 映射 `ok/warn/bad`，页面不自己挑颜色。
 - 无底色的长条（`.keys-titlebar`、`.keys-filterbar`）不能再带 `backdrop-filter`：玻璃卡片里 Chromium 会把「透明底 + 模糊」渲染成一条黑带（2026-11-18 实机截图）。玻璃开着时对它们 `backdrop-filter: none; background: transparent`。
 
 ## 发布流程

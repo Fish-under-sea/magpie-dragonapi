@@ -140,9 +140,13 @@ function initTheme() {
     try {
       const tokens = JSON.parse(raw);
       if (tokens && typeof tokens === 'object') {
+        // 宿主语义色 green/red/amber → 本页 ok/warn/bad（与 ui/host.js 同一套映射）。
+        const SEMANTIC = { green: 'ok', red: 'bad', amber: 'warn' };
         for (const [key, value] of Object.entries(tokens)) {
           if (typeof value !== 'string' || !value.trim()) continue;
-          root.style.setProperty('--' + String(key).replace(/^--/, ''), value.trim());
+          const name = String(key).replace(/^--/, '');
+          root.style.setProperty('--' + name, value.trim());
+          if (SEMANTIC[name]) root.style.setProperty('--' + SEMANTIC[name], value.trim());
         }
       }
     } catch {

@@ -21,10 +21,10 @@
 
 ## 液态玻璃（Magpie 2.4.0+）
 - 插件页是跳到本地服务的，一跳转宿主 bridge 就没了：`page/boot.js` 必须把 `_magpie/bridge.js` 的 http(s) 地址随 URL 带给 `ui/host.js` 重新加载，否则 `magpie.glass` / `--magpie-glass-*` / `data-magpie-glass` 永远不出现。
-- 根元素绝不能声明深色 `color-scheme`：Chromium 会给文档画一层不透明的 `#121212` 画布，iframe 里的宿主壁纸被挡住，玻璃只剩深色实底。根固定 `color-scheme: normal !important`，深色交给 `body` 的 `color-scheme`（实测；meta color-scheme 也要保持 light）。
+- iframe 画布要匹配嵌入它的宿主：meta 声明 `light dark`，不要覆盖官方 bridge 给 `html` 写的 `color-scheme`。Edge 深色宿主对照中，旧版的 `normal !important` 让透明文档画成白底；隐藏 `.app` 不消失，隐藏 iframe 或恢复 bridge 的 `dark` 就露出壁纸。浅色宿主没有复现，不能脱离父页色系单测。
 - 玻璃规则一律带 `fill 0% / blur 0px` 回退，并挂在 `html[data-magpie-glass]` 下；不写死 blur，玻璃关着时页面必须与改动前逐像素一致。**回退 0% 很重要**：bridge 可能只挂属性、`glass.regions` 为空，回退 100% 会把整页画成实心白/黑底（2026-11-18 实机「整页被白色覆盖」根因）。
 - 画布与所有面**原样使用官方 fill**（0 就是真透）：绝不能加「最低不透明度」，否则壁纸颜色被压成灰板，和别的插件玻璃颜色对不上（2026-11-18 实机对比）。玻璃颜色用 `--magpie-bg` / `--magpie-card`，字体色用 `--magpie-fg` 系列，`green/red/amber` 映射 `ok/warn/bad`。
-- **`html`/`body` 任何状态下都不能铺底色**（`background: transparent`，不带 `[data-magpie-glass]` 条件）。宿主壁纸在 iframe 外面；页面一旦铺 `--bg`，gateway 里 bridge 连不上（界面显示「连接中…」、没有 `data-magpie-glass`）时就是一整块白/灰遮罩盖住壁纸——这是「底部白块」的根因（2026-11-18 实机 + 条纹背景实测）。可读性只交给卡片与控件这些「面」，回退块（`@supports not` / `prefers-reduced-transparency`）也只回退「面」，不碰画布。
+- 普通模式下 `html` / `body` 保持透明，不依赖 `data-magpie-glass` 是否存在。宿主壁纸在 iframe 外面；不要给画布铺 `--bg`，也不要只凭 CSS 的 `transparent` 判定实际已经透底。排查时用同一坐标比较「隐藏内容」与「隐藏整帧」，保留强制色模式的系统色回退。
 - 无底色的长条（`.keys-titlebar`、`.keys-filterbar`）不能再带 `backdrop-filter`：玻璃卡片里 Chromium 会把「透明底 + 模糊」渲染成一条黑带（2026-11-18 实机截图）。玻璃开着时对它们 `backdrop-filter: none; background: transparent`。
 - 玻璃材质必须照宿主 `fish-glass.css` 整套搬：`--lg-rim-line rgba(255,255,255,.72)`、`--lg-rim-shade rgba(0,0,0,.26)`、`--lg-sheen-a/b` 柔光、`saturate(180–200%) brightness(1.06–1.14)` 折射、`::before` 双径向柔光、`::after` mask 挖出的 1px 渐变釉面边、选中态 84%→54% 的凸起渐变。自己写「加个圆角/加条阴影」会被一眼看出不是官方玻璃（2026-11-18 用户对比「签到&探针」）。
 - 深浅色以官方 `--bg` 的亮度判定，**不要信 bridge 的 `dark`**：bridge 在页面自己的文档里算主题时 `prefers-color-scheme` 可能和宿主窗口反着来，会把深色界面画成浅色/白底。`ui/color.js` 提供 `isDarkColor`。

@@ -15,12 +15,19 @@
 //      在自己的地址上替本服务转发的路径（package.json 的 magpie.page.service
 //      声明了它）。有就跳那里。
 //   3. 旧版 magpie 既没有 service、又不在本机：给出 SSH 端口转发的做法。
+//
+// 跳转会把宿主的 bridge 一起带走：bridge 是宿主发的一个脚本，只有它后面
+// 才有 magpie.glass / magpie.onGlass 与 --magpie-glass-* 那组液态玻璃变量。
+// 跳转以后本文档没了，所以把 bridge 的地址捎给本地界面，由它重新加载并接回
+// 主题与玻璃（ui/host.js）。拿不到 http(s) 地址（例如某些平台的 wails://）
+// 就不带，界面退回 ?theme / ?tokens 的静态快照，功能照常。
 (async () => {
   const DEFAULT_PORT = 3517
   let port = DEFAULT_PORT
   let theme = ''
   let tokens = null
   let service = ''
+  let bridge = ''
 
   try {
     const t = await window.magpie?.ready
@@ -34,6 +41,11 @@
     const s = window.magpie?.service
     if (typeof s === 'string' && /^https?:\/\//.test(s)) service = s
   } catch { /* 旧版 magpie 没有 service */ }
+
+  try {
+    const b = new URL('_magpie/bridge.js', location.href)
+    if (b.protocol === 'http:' || b.protocol === 'https:') bridge = b.href
+  } catch { /* 取不到地址就不带，界面照样能开 */ }
 
   try {
     const o = await window.magpie?.options?.get?.()
@@ -50,6 +62,7 @@
     if (s) slim[k] = s
   }
   if (Object.keys(slim).length) q.set('tokens', JSON.stringify(slim))
+  if (bridge) q.set('bridge', bridge)
 
   /** 5 秒后这份文档还活着，说明跳转没走成，换成能操作的提示。 */
   function armTimeout(p) {

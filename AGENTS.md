@@ -23,6 +23,7 @@
 - 插件页是跳到本地服务的，一跳转宿主 bridge 就没了：`page/boot.js` 必须把 `_magpie/bridge.js` 的 http(s) 地址随 URL 带给 `ui/host.js` 重新加载，否则 `magpie.glass` / `--magpie-glass-*` / `data-magpie-glass` 永远不出现。
 - 根元素绝不能声明深色 `color-scheme`：Chromium 会给文档画一层不透明的 `#121212` 画布，iframe 里的宿主壁纸被挡住，玻璃只剩深色实底。根固定 `color-scheme: normal !important`，深色交给 `body` 的 `color-scheme`（实测；meta color-scheme 也要保持 light）。
 - 玻璃规则一律带 `fill 100% / blur 0px` 回退，并挂在 `html[data-magpie-glass]` 下；不写死 blur，玻璃关着时页面必须与改动前逐像素一致。
+- 深色主题要有可读性下限（content/sidebar/control/overlay = 78/82/88/84%）：读者的壁纸可能很亮，`fill=0` 时浅色文字会整屏消失（2026-11-18 实测）。浅色主题不受影响；插件页拿不到宿主的 `fishGlassVeil`，只能自己兜底。
 
 ## 发布流程
 - 改版本 → `node --test --test-isolation=none "tests/*.test.mjs"`（当前 274 条）→ 原子提交 → `git tag vX.Y.Z`。

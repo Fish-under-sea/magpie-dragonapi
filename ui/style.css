@@ -3506,10 +3506,29 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
  * 参考 docs/developers/liquid-glass-hooks.md、checkin-relay-probe 与 Clash
  * 的同款写法。 */
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) and (background: color-mix(in srgb, red, transparent)) {
+  /* 有效填充：正常用宿主给的数字；深色主题另有可读性下限。
+     原因：深色主题的文字是浅色的，而读者的壁纸可能很亮（实测一张平均
+     亮度 150/255 的壁纸 + fill=0 时，白字直接消失在壁纸里）。宿主自己的
+     液态玻璃靠壁纸遮挡兜底，插件页拿不到遮挡值，所以这里给「面」留一个
+     最低不透明度：fill=0 时仍然透出壁纸，但字始终有底色。浅色主题（深色
+     文字）不受影响，仍按宿主数字走。 */
+  html[data-magpie-glass] {
+    --mg-content-fill: var(--magpie-glass-content-fill, 100%);
+    --mg-sidebar-fill: var(--magpie-glass-sidebar-fill, 100%);
+    --mg-control-fill: var(--magpie-glass-control-fill, 100%);
+    --mg-overlay-fill: var(--magpie-glass-overlay-fill, 100%);
+  }
+  html[data-theme="dark"][data-magpie-glass] {
+    --mg-content-fill: max(var(--magpie-glass-content-fill, 100%), 78%);
+    --mg-sidebar-fill: max(var(--magpie-glass-sidebar-fill, 100%), 82%);
+    --mg-control-fill: max(var(--magpie-glass-control-fill, 100%), 88%);
+    --mg-overlay-fill: max(var(--magpie-glass-overlay-fill, 100%), 84%);
+  }
+
   /* 整页让位于壁纸；body 是「主界面」那一层玻璃，页头/标签因此仍有底可读。 */
   html[data-magpie-glass] { background: transparent; }
   html[data-magpie-glass] body {
-    background: color-mix(in srgb, var(--bg) var(--magpie-glass-content-fill, 100%), transparent);
+    background: color-mix(in srgb, var(--bg) var(--mg-content-fill), transparent);
     -webkit-backdrop-filter: blur(var(--magpie-glass-content-blur, 0px)) saturate(180%) brightness(1.06);
     backdrop-filter: blur(var(--magpie-glass-content-blur, 0px)) saturate(180%) brightness(1.06);
   }
@@ -3517,13 +3536,13 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
   /* 阅读面：卡片与列表容器。只铺底色，不再各自糊一次——body 已经是玻璃，
      层层 backdrop-filter 既重又会让嵌套卡片出现「外透内实」。 */
   html[data-magpie-glass] :is(.card, .dash-stat, .mc, .market-aside, .model-grid.as-list, .banner) {
-    background: color-mix(in srgb, var(--card) var(--magpie-glass-content-fill, 100%), transparent);
+    background: color-mix(in srgb, var(--card) var(--mg-content-fill), transparent);
     box-shadow: inset 0 1px 0 color-mix(in srgb, var(--fg) 9%, transparent);
   }
 
   /* 顶栏与工具条：侧边栏区域的数字。 */
   html[data-magpie-glass] :is(.tabs, .market-top) {
-    background: color-mix(in srgb, var(--card) var(--magpie-glass-sidebar-fill, 100%), transparent);
+    background: color-mix(in srgb, var(--card) var(--mg-sidebar-fill), transparent);
     -webkit-backdrop-filter: blur(var(--magpie-glass-sidebar-blur, 0px)) saturate(180%) brightness(1.05);
     backdrop-filter: blur(var(--magpie-glass-sidebar-blur, 0px)) saturate(180%) brightness(1.05);
     box-shadow: inset 0 1px 0 color-mix(in srgb, var(--fg) 9%, transparent);
@@ -3532,19 +3551,19 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
   /* 控件留在自己的底上（控件区域的数字通常接近实底），玻璃化不把可读性透掉。
      主按钮、危险按钮与选中态仍用强调色，不在这里改写。 */
   html[data-magpie-glass] :is(.pill, .sel-trigger, .market-seg, .segmented, .tab[aria-selected="true"], .lg-stat) {
-    background: color-mix(in srgb, var(--card) var(--magpie-glass-control-fill, 100%), transparent);
+    background: color-mix(in srgb, var(--card) var(--mg-control-fill), transparent);
     -webkit-backdrop-filter: blur(var(--magpie-glass-control-blur, 0px)) saturate(180%) brightness(1.05);
     backdrop-filter: blur(var(--magpie-glass-control-blur, 0px)) saturate(180%) brightness(1.05);
   }
   html[data-magpie-glass] .btn:not(.primary):not(.danger) {
-    background: color-mix(in srgb, var(--card) var(--magpie-glass-control-fill, 100%), transparent);
+    background: color-mix(in srgb, var(--card) var(--mg-control-fill), transparent);
     -webkit-backdrop-filter: blur(var(--magpie-glass-control-blur, 0px)) saturate(180%) brightness(1.05);
     backdrop-filter: blur(var(--magpie-glass-control-blur, 0px)) saturate(180%) brightness(1.05);
   }
   html[data-magpie-glass] input:not([type="checkbox"]):not([type="radio"]),
   html[data-magpie-glass] select,
   html[data-magpie-glass] textarea {
-    background: color-mix(in srgb, var(--card) var(--magpie-glass-control-fill, 100%), transparent);
+    background: color-mix(in srgb, var(--card) var(--mg-control-fill), transparent);
     -webkit-backdrop-filter: blur(var(--magpie-glass-control-blur, 0px)) saturate(180%) brightness(1.05);
     backdrop-filter: blur(var(--magpie-glass-control-blur, 0px)) saturate(180%) brightness(1.05);
   }
@@ -3555,14 +3574,14 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
 
   /* 浮层：菜单与对话框压在内容之上，这里自己糊一次，把背后的内容推远。 */
   html[data-magpie-glass] :is(.menu-pop, .sel-pop, .keys-more-pop, .dash-tip, .modal, .drawer-panel, .aff-modal-panel) {
-    background: color-mix(in srgb, var(--bg) var(--magpie-glass-overlay-fill, 100%), transparent);
+    background: color-mix(in srgb, var(--bg) var(--mg-overlay-fill), transparent);
     -webkit-backdrop-filter: blur(var(--magpie-glass-overlay-blur, 0px)) saturate(180%) brightness(1.06);
     backdrop-filter: blur(var(--magpie-glass-overlay-blur, 0px)) saturate(180%) brightness(1.06);
   }
 
   /* 粘在玻璃卡上的表头与对话框脚：半透，别在玻璃面上再糊一块实底。 */
   html[data-magpie-glass] .keys-table thead th {
-    background: color-mix(in srgb, var(--bg) var(--magpie-glass-content-fill, 100%), transparent);
+    background: color-mix(in srgb, var(--bg) var(--mg-content-fill), transparent);
   }
   html[data-magpie-glass] .modal-foot {
     background: color-mix(in srgb, var(--card) 45%, transparent);

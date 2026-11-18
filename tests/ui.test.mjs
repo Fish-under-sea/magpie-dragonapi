@@ -724,3 +724,64 @@ test('转入余额：服务端转发站点的 /api/user/aff_transfer，不编结
   assert.match(site, /api\/user\/aff_transfer/, '站点端点是 /api/user/aff_transfer')
   assert.match(site, /env\?\.message/, '成功与否以站点 message 为准')
 })
+
+// ── 液态玻璃：把宿主的钩子接回来 ─────────────────────────────────────
+//
+// 本插件的界面不是停在 magpie 的沙箱帧里，而是跳到插件自己的本地服务。
+// 一跳转，宿主注入的 bridge 就没了；所以 boot.js 要把 bridge 的地址一并
+// 带过去，界面再把它接回来，才拿得到 magpie.glass / onGlass 与
+// --magpie-glass-<region>-fill/-blur、data-magpie-glass。
+
+test('boot.js 把宿主的 bridge 地址带过跳转，本地界面才接得回玻璃钩子', () => {
+  const boot = readFileSync(join(root, 'page', 'boot.js'), 'utf8')
+  assert.match(boot, /_magpie\/bridge\.js/, 'boot.js 必须认得宿主的 bridge 脚本')
+  assert.match(boot, /q\.set\('bridge'/, 'bridge 地址要随跳转交给本地界面')
+  assert.match(boot, /protocol/, '不能把任意协议的地址带过去（wails:// 之类要放弃）')
+})
+
+test('本地界面接回宿主 bridge：校验地址，并在主题变化时继续跟随', async () => {
+  const r = await fetch(base + '/ui/host.js')
+  assert.equal(r.status, 200, 'host.js 必须由本地服务提供')
+  assert.match(r.headers.get('content-type') || '', /javascript/)
+  const js = await r.text()
+  assert.match(js, /_magpie\/bridge\.js/, 'host.js 要认得宿主的 bridge 路径')
+  assert.match(js, /http:/, '只接受 http(s) 的 bridge 地址')
+  assert.match(js, /magpie\.ready/, '要等宿主把手伸过来（hello/ready）')
+  assert.match(js, /onTheme/, '主题变化后页面要跟着换色')
+  assert.match(js, /--/, '宿主的设计令牌要落成页面自己的 CSS 变量')
+
+  const app = await (await fetch(base + '/ui/app.js')).text()
+  assert.match(app, /from '\.\/host\.js'/, 'app.js 要加载 host.js，而不是假设自己还在宿主帧里')
+})
+
+test('液态玻璃：四个区域各用各的变量，缺变量/玻璃关着时回落到实处', async () => {
+  const css = await (await fetch(base + '/ui/style.css')).text()
+  for (const region of ['content', 'sidebar', 'overlay', 'control']) {
+    assert.match(css, new RegExp(`--magpie-glass-${region}-fill, 100%`), `${region} 的 fill 必须有 100% 回退`)
+    assert.match(css, new RegExp(`--magpie-glass-${region}-blur, 0px`), `${region} 的 blur 必须有 0px 回退`)
+  }
+  // 只在宿主说「玻璃开着」时才重上色；关着时页面必须还是原来的实底。
+  assert.match(css, /html\[data-magpie-glass\]/, '玻璃样式要挂在 data-magpie-glass 上')
+  assert.match(css, /@supports not \(\(backdrop-filter/, '不支持背景模糊时要退回实底')
+  assert.match(css, /prefers-reduced-transparency: reduce/, '用户要求减弱透明时要退回实底')
+  assert.match(css, /forced-colors: active/, '高对比度模式要退回系统色')
+  // 玻璃段里不许写死模糊值：用户把 blur 拖到 0 时页面必须真的不糊。
+  const at = css.indexOf('液态玻璃')
+  assert.ok(at > 0, '找不到液态玻璃段')
+  const glass = css.slice(at).split('\n').filter((line) => !line.includes('@supports')).join('\n')
+  assert.equal(/blur\(\s*\d/.test(glass), false, '玻璃段的 blur 必须走 --magpie-glass-*-blur，不能写死像素')
+})
+
+test('根元素不能声明深色 color-scheme：否则 iframe 画不透明底，玻璃透不出壁纸', async () => {
+  // 实测：html{color-scheme:dark} 的透明 iframe 在 Chromium 里渲染成 #121212
+  // 实底，宿主墙纸被整块挡住。深色只给 body，根保持 normal。
+  const html = await (await fetch(base + '/')).text()
+  assert.match(html, /<meta name="color-scheme" content="light">/, 'meta 的 color-scheme 必须保持 light')
+
+  const css = await (await fetch(base + '/ui/style.css')).text()
+  assert.match(css, /html\s*\{\s*color-scheme:\s*normal\s*!important;\s*\}/, '根元素必须固定 color-scheme: normal')
+  assert.match(css, /html\[data-theme="dark"\]\s*body\s*\{\s*color-scheme:\s*dark;\s*\}/, '深色控件交给 body')
+
+  const app = await (await fetch(base + '/ui/app.js')).text()
+  assert.match(app, /meta\.setAttribute\('content', 'light'\)/, 'app.js 不能再把 meta 切回 dark')
+})

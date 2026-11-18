@@ -5,6 +5,8 @@
 import { aggregateRows, focusGroupOf, orderDefault } from './model-agg.js';
 // 演示数据层：网址带 ?demo 时接管全部 GET 读接口，只在内存里，刷新即还原。
 import { createDemoApi } from './demo.js';
+// 跳转后把宿主的页面 bridge 接回来：液态玻璃与主题都靠它持续下发。
+import { connectHost } from './host.js';
 
 const DEMO_PARAMS = new URLSearchParams(location.search);
 const DEMO_API = DEMO_PARAMS.has('demo') && DEMO_PARAMS.get('demo') !== '0' ? createDemoApi() : null;
@@ -149,7 +151,10 @@ function initTheme() {
   }
 
   const meta = document.querySelector('meta[name="color-scheme"]');
-  if (meta) meta.setAttribute('content', mode === 'light' ? 'light dark' : 'dark light');
+  // 根元素固定 light：深色 color-scheme 会给文档盖一层不透明画布，嵌在宿主
+  // iframe 里会挡住壁纸（见 style.css 的说明）。深层控件的深色由 body 的
+  // color-scheme 负责，meta 不要再切回 dark。
+  if (meta) meta.setAttribute('content', 'light');
 }
 
 // ── 请求层 ────────────────────────────────────────────────
@@ -4331,6 +4336,9 @@ function startHotReload() {
 
 async function boot() {
   initTheme();
+  // 先按 URL 上的快照上色，再异步接回宿主：接上了主题与液态玻璃会跟着
+  // 「设置 › 外观」实时变；接不上（旧宿主、独立打开）就停在快照上。
+  void connectHost();
   bindGlobal();
   bindTabs();
   bindCatalogControls();

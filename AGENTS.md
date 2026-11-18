@@ -19,8 +19,13 @@
 - 把裸模型名写进 metadata 的 `allowed`；`provider.models` 用 `pickAllowed` 过滤，并且**不能再让 `lastGood` 把整组模型补回来**，否则「只导入钥匙包含的模型」会被上一次的缓存破坏。
 - 分组可由 PAT 的 `/api/token/` 列表按 key 尾号匹配，匹配不到再用可用模型与目录做交集打分；分组只用于展示/排序，最终请求仍由钥匙自己的分组决定。
 
+## 液态玻璃（Magpie 2.4.0+）
+- 插件页是跳到本地服务的，一跳转宿主 bridge 就没了：`page/boot.js` 必须把 `_magpie/bridge.js` 的 http(s) 地址随 URL 带给 `ui/host.js` 重新加载，否则 `magpie.glass` / `--magpie-glass-*` / `data-magpie-glass` 永远不出现。
+- 根元素绝不能声明深色 `color-scheme`：Chromium 会给文档画一层不透明的 `#121212` 画布，iframe 里的宿主壁纸被挡住，玻璃只剩深色实底。根固定 `color-scheme: normal !important`，深色交给 `body` 的 `color-scheme`（实测；meta color-scheme 也要保持 light）。
+- 玻璃规则一律带 `fill 100% / blur 0px` 回退，并挂在 `html[data-magpie-glass]` 下；不写死 blur，玻璃关着时页面必须与改动前逐像素一致。
+
 ## 发布流程
-- 改版本 → `node --test --test-isolation=none "tests/*.test.mjs"`（当前 266 条）→ 原子提交 → `git tag vX.Y.Z`。
+- 改版本 → `node --test --test-isolation=none "tests/*.test.mjs"`（当前 274 条）→ 原子提交 → `git tag vX.Y.Z`。
 - `npm publish --access public`。账号启用 staged publishing，registry 生效有延迟；用 `npx npm@11.19.1 view @fish-under-sea/magpie-dragonapi dist-tags` 复核 `latest`。
 - 发布时把 npm cache 指到仓库内 `.npm-cache` 以避开沙箱限制，发布完删除该目录，不要提交。
 - 页面会轮询 `/api/ping` 的 `version` 与 `ui` 时间戳自动热重载；改 `ui/*` 或升级包后无需手动刷新。`/api/ping` 必须保留 `ui` 字段。

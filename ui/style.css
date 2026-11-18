@@ -2973,6 +2973,14 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
   flex-direction: column;
   overflow: hidden;
 }
+/* 健康与诊断的表格要能在卡内滚（之前 overflow:hidden 把滚动手势吞了）。 */
+#diag-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
 
 /* 账户内容增多后统一面板滚动：不把订阅或密钥挤成不可达的小窗口。 */
 #panel-wallet { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
@@ -3701,6 +3709,40 @@ input.keys-input:focus-visible, select.keys-select:focus-visible {
   html[data-magpie-glass] .btn.ghost,
   html[data-magpie-glass] .modal-x,
   html[data-magpie-glass] .banner-close { border-color: transparent; box-shadow: none; }
+
+  /* 选中/按下态不能再用深色实底（--accent-soft 在深色主题是很深的藏蓝，
+     看起来就是黑块）。改成强调色的半透明玻璃，环和底都跟着官方强调色。 */
+  html[data-magpie-glass] :is(.tab[aria-selected="true"], .segmented button[aria-pressed="true"],
+    .market-seg button[aria-pressed="true"], .market-chip[aria-pressed="true"], .sel-opt.on,
+    .menu-pop [role="option"][aria-selected="true"], .keys-table tr.is-selected) {
+    background: color-mix(in srgb, var(--magpie-accent, var(--accent)) 18%, transparent);
+    border-color: color-mix(in srgb, var(--magpie-accent, var(--accent)) 45%, transparent);
+    box-shadow: inset 0 1px 0 var(--mg-rim-line);
+  }
+
+  /* 分页、行内小按钮、比例/端点/端点胶囊：不画黑框，只留玻璃边或干脆无框。 */
+  html[data-magpie-glass] .lg-page-btn {
+    background: color-mix(in srgb, var(--magpie-card, var(--card)) var(--mg-control-fill), transparent);
+    border-color: color-mix(in srgb, var(--line) 55%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--magpie-fg, var(--fg)) 12%, transparent);
+  }
+  html[data-magpie-glass] :is(.gb-tag, .mc-end, .mc-kind, .tag-chip, .keys-ratio) {
+    border-color: transparent;
+  }
+  html[data-magpie-glass] :is(.mc-end, .mc-kind, .tag-chip, .keys-ratio) {
+    background: color-mix(in srgb, var(--magpie-card, var(--card)) 14%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--magpie-fg, var(--fg)) 10%, transparent);
+  }
+
+  /* 模型卡的厂商标记：去掉黑方框，图标放大一点。 */
+  html[data-magpie-glass] .mc-vicon {
+    width: 30px;
+    height: 30px;
+    border-color: transparent;
+    background: color-mix(in srgb, var(--magpie-card, var(--card)) 18%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--magpie-fg, var(--fg)) 12%, transparent);
+  }
+  html[data-magpie-glass] .mc-vicon img { width: 22px; height: 22px; }
 }
 
 /* 环境不支持背景模糊：回落实底（整段增强在上面已按 @supports 关掉，这里

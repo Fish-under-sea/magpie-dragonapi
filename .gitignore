@@ -19,3 +19,5 @@ dragonapi-state.json.tmp-*
 .idea/
 .DS_Store
 Thumbs.db
+
+.npm-cache/

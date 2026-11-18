@@ -25,10 +25,12 @@
 - 玻璃规则一律带 `fill 100% / blur 0px` 回退，并挂在 `html[data-magpie-glass]` 下；不写死 blur，玻璃关着时页面必须与改动前逐像素一致。
 - 画布照抄 content 的 fill（0 就是真透）：**绝不能给整页加一层底**，否则宿主壁纸被压成一大块灰色遮罩（2026-11-18 实机反馈）。文字面下限 content/sidebar/overlay/control = 62/62/70/55%；玻璃颜色用 `--magpie-bg` / `--magpie-card`，字体色用 `--magpie-fg` 系列，`green/red/amber` 映射 `ok/warn/bad`，页面不自己挑颜色。
 - 无底色的长条（`.keys-titlebar`、`.keys-filterbar`）不能再带 `backdrop-filter`：玻璃卡片里 Chromium 会把「透明底 + 模糊」渲染成一条黑带（2026-11-18 实机截图）。玻璃开着时对它们 `backdrop-filter: none; background: transparent`。
-- 所有表头（`.keys-table thead th`、`.data-table thead th`、`.lg-head`、`.model-grid.as-list .ml-head`）玻璃开时都要铺 `--magpie-card` 的玻璃底 + 上下限（吸顶用 overlay、静态用 content），不能留 88–98% 的实色长条；密钥、PAT、日志、模型列表是同一个通病。
+- 所有成块的「面」（卡片、次级卡片、页头、控件）都要套 1px 高光边 + 下侧暗边 + 柔和外阴影（宿主 `fish-glass.css`／Purge 的同一套材质），否则玻璃只是一块灰板，不像玻璃。
+- 本地服务必须在默认导出返回前 listen：`index.mjs` 里 `await Promise.race([serviceReady, 3s 超时])`。宿主判定「插件加载完成」是在默认导出返回时，而 magpie web 的反代第一跳不会等我们；服务没 listen 时页面会显示宿主的英文重试页（The plugin's service isn't answering yet），几秒后才好。
+- 所有表头（`.keys-table thead th`、`.data-table thead th`、`.lg-head`、`.model-grid.as-list .ml-head`）玻璃开时都改成**不吸顶、透明**，只留一条细分隔线——宿主页面里表头实色长条是最常见的「未透明色块」（2026-11-18 实机反馈）。表头原来若带 `backdrop-filter` 也要清掉。
 
 ## 发布流程
-- 改版本 → `node --test --test-isolation=none "tests/*.test.mjs"`（当前 274 条）→ 原子提交 → `git tag vX.Y.Z`。
+- 改版本 → `node --test --test-isolation=none "tests/*.test.mjs"`（当前 275 条）→ 原子提交 → `git tag vX.Y.Z`。
 - `npm publish --access public`。账号启用 staged publishing，registry 生效有延迟；用 `npx npm@11.19.1 view @fish-under-sea/magpie-dragonapi dist-tags` 复核 `latest`。
 - 发布时把 npm cache 指到仓库内 `.npm-cache` 以避开沙箱限制，发布完删除该目录，不要提交。
 - 页面会轮询 `/api/ping` 的 `version` 与 `ui` 时间戳自动热重载；改 `ui/*` 或升级包后无需手动刷新。`/api/ping` 必须保留 `ui` 字段。

@@ -155,12 +155,6 @@ function initTheme() {
     }
   }
 
-  const meta = document.querySelector('meta[name="color-scheme"]');
-  // 根元素固定 light：深色 color-scheme 会给文档盖一层不透明画布，嵌在宿主
-  // iframe 里会挡住壁纸（见 style.css 的说明）。深层控件的深色由 body 的
-  // color-scheme 负责，meta 不要再切回 dark。
-  if (meta) meta.setAttribute('content', 'light');
-
   // 跳转前拿到的官方玻璃快照。bridge 重连失败时（gateway / 独立窗口）这是
   // 唯一还能画出玻璃的来源；有它就不会退回实心白底。
   applyGlassSnapshot(parseJson(params.get('glass')));

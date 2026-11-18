@@ -787,18 +787,13 @@ test('液态玻璃：四个区域各用各的变量，缺变量/玻璃关着时�
   assert.match(css, /html\[data-magpie-glass\] \.lg-head,\s*\n\s*html\[data-magpie-glass\] \.model-grid\.as-list \.ml-head \{[\s\S]*?var\(--mg-content-fill\)/, '日志/列表表头要用玻璃底')
 })
 
-test('根元素不能声明深色 color-scheme：否则 iframe 画不透明底，玻璃透不出壁纸', async () => {
-  // 实测：html{color-scheme:dark} 的透明 iframe 在 Chromium 里渲染成 #121212
-  // 实底，宿主墙纸被整块挡住。深色只给 body，根保持 normal。
+test('iframe 画布支持两种宿主色系并允许官方 bridge 接管', async () => {
   const html = await (await fetch(base + '/')).text()
-  assert.match(html, /<meta name="color-scheme" content="light">/, 'meta 的 color-scheme 必须保持 light')
-
+  assert.ok(/<meta name="color-scheme" content="light dark">/.test(html), '首次绘制要声明支持深浅两种色系')
   const css = await (await fetch(base + '/ui/style.css')).text()
-  assert.match(css, /html\s*\{\s*color-scheme:\s*normal\s*!important;\s*\}/, '根元素必须固定 color-scheme: normal')
-  assert.match(css, /html\[data-theme="dark"\]\s*body\s*\{\s*color-scheme:\s*dark;\s*\}/, '深色控件交给 body')
-
+  assert.ok(!/color-scheme\s*:[^;}]*!important/i.test(css), '页面不能压过 bridge 写入的内联色系')
   const app = await (await fetch(base + '/ui/app.js')).text()
-  assert.match(app, /meta\.setAttribute\('content', 'light'\)/, 'app.js 不能再把 meta 切回 dark')
+  assert.ok(!/meta\.setAttribute\('content', 'light'\)/.test(app), '初始化不能又将画布锁回浅色')
 })
 test('滚动条只留拇指：无轨道底、无上下箭头', async () => {
   const css = await (await fetch(base + '/ui/style.css')).text()
@@ -836,8 +831,7 @@ test('玻璃快照随跳转带走，bridge 重连失败也能画玻璃', async (
 
 test('画布永远不铺底：任何状态下 html/body 都不能有实色背景', async () => {
   const css = await (await fetch(base + '/ui/style.css')).text()
-  // 「底部/整页白块」的唯一来源就是页面自己给画布铺了 --bg。宿主的壁纸在
-  // iframe 外面，页面一旦铺底就是一块遮罩，所以这条不变量不允许被破坏。
+  // 这里只检查作者样式。即使 html/body 都透明，iframe 的色系不匹配也可能遮住壁纸。
   assert.equal(/html,\s*body\s*\{[^}]*background:\s*var\(--bg\)/.test(css), false, 'html/body 不能铺 --bg')
   assert.equal(/html\[data-magpie-glass\]\s*\{\s*background:\s*var\(--bg\)/.test(css), false, '玻璃画布不能铺 --bg')
   assert.equal(/html\[data-magpie-glass\]\s*body\s*\{[^}]*background:\s*var\(--bg\)/.test(css), false, '玻璃 body 不能铺 --bg')

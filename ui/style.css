@@ -36,12 +36,8 @@
   --pad: 16px;
 }
 
-/* 根元素永远保持 normal：深色 color-scheme 会让浏览器给文档画一层不透明的
- * 深色画布；界面嵌在宿主的 iframe 里时，这层画布会把宿主壁纸整个挡住，液态
- * 玻璃再透明也透不出来（实测：html{color-scheme:dark} 的透明 iframe 在
- * Chromium 里渲染成 #121212 实底）。控件与滚动条的深色改由 body 的
- * color-scheme 提供，二者互不影响。 */
-html { color-scheme: normal !important; }
+/* iframe 画布的色系由宿主 bridge 写到 html；不要在这里覆盖它。
+ * body 的色系只用于控件与滚动条，仍按本页实际显示的配色选择。 */
 html[data-theme="dark"] body { color-scheme: dark; }
 html[data-theme="light"] body { color-scheme: light; }
 
@@ -63,9 +59,7 @@ button,
 
 * { box-sizing: border-box; }
 
-/* 画布永远是透的：本页由插件本地服务提供，外面那层画布的底色属于宿主窗口
-   （桌面窗口的壁纸、gateway 的页面底）。页面自己一旦铺 --bg，嵌进宿主就是
-   一整块白/灰遮罩——这是「底部白块」的唯一来源。可读性交给卡片与控件。 */
+/* 宿主绘制壁纸，插件不为普通文档画布铺底。可读性交给卡片与控件。 */
 html, body {
   margin: 0;
   padding: 0;

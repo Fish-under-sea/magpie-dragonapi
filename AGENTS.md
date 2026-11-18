@@ -25,6 +25,7 @@
 - 玻璃规则一律带 `fill 100% / blur 0px` 回退，并挂在 `html[data-magpie-glass]` 下；不写死 blur，玻璃关着时页面必须与改动前逐像素一致。
 - 画布照抄 content 的 fill（0 就是真透）：**绝不能给整页加一层底**，否则宿主壁纸被压成一大块灰色遮罩（2026-11-18 实机反馈）。文字面下限 content/sidebar/overlay/control = 62/62/70/55%；玻璃颜色用 `--magpie-bg` / `--magpie-card`，字体色用 `--magpie-fg` 系列，`green/red/amber` 映射 `ok/warn/bad`，页面不自己挑颜色。
 - 无底色的长条（`.keys-titlebar`、`.keys-filterbar`）不能再带 `backdrop-filter`：玻璃卡片里 Chromium 会把「透明底 + 模糊」渲染成一条黑带（2026-11-18 实机截图）。玻璃开着时对它们 `backdrop-filter: none; background: transparent`。
+- 所有表头（`.keys-table thead th`、`.data-table thead th`、`.lg-head`、`.model-grid.as-list .ml-head`）玻璃开时都要铺 `--magpie-card` 的玻璃底 + 上下限（吸顶用 overlay、静态用 content），不能留 88–98% 的实色长条；密钥、PAT、日志、模型列表是同一个通病。
 
 ## 发布流程
 - 改版本 → `node --test --test-isolation=none "tests/*.test.mjs"`（当前 274 条）→ 原子提交 → `git tag vX.Y.Z`。
